@@ -443,6 +443,14 @@ describe("structured logging never leaks secrets", () => {
     expect(text).not.toContain("abcdefghijklmnop");
     expect(text).not.toContain(hex);
     expect(text).not.toContain("eyJ");
+    // Credential-NAMED fields are replaced even when the value looks harmless.
+    const named = redactFields({
+      password: "hunter2",
+      idToken: "opaque",
+      secretValue: "plain",
+      key: "abc",
+    });
+    expect(Object.values(named)).toEqual(["[redacted]", "[redacted]", "[redacted]", "[redacted]"]);
     expect(out.keyId).toBe("KEY-SIM-001");
     expect((out.nested as Record<string, unknown>).fine).toBe(1);
     expect(scrubString("Bearer abcdefghijkl")).toBe("Bearer [redacted]");
