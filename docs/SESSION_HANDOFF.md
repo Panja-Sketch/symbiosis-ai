@@ -25,7 +25,7 @@ S6 — Evidence + consent (S0 to S5 completed earlier)
 
 ## Files changed
 
-Commit `feat(s6): implement evidence and consent sharing` (see "Last known good commit SHA"). New: `packages/contracts/src/{evidence,consent}.ts`, `packages/evidence/src/{canonical,hash,store,builder,verify,service}.ts`, `packages/consent/src/{access,sharing,projection,gateway}.ts`, `apps/api/src/insurance-handler.ts`, `scripts/smoke-s6.ts`, `tests/integration/{evidence,consent,s6-world}`, `tests/unit/evidence-boundaries.test.ts`, package tests (evidence canonical, consent access and projection, repositories S6, risk-cases documentation, tenancy organizations), `docs/EVIDENCE_STANDARD.md` (written). Modified: contracts (events, audit actions, verification attempt snapshot), repositories (evidence index, agreements, share ledger), risk-cases, tenancy (organizations, insurer actors), authz, action-orchestration case view, verification runner (device snapshots), api handler/html/server/edge types, local and dev runtime, root package.json, README, DECISIONS (D-047 to D-055), IMPLEMENTATION_STATE, and the six earlier test assertions listed in D-055.
+Commit `422f915` (`feat(s6): implement evidence and consent sharing`): 59 files, +7984/-101. New: `packages/contracts/src/{evidence,consent}.ts`, `packages/evidence/src/{canonical,hash,store,builder,verify,service}.ts`, `packages/consent/src/{access,sharing,projection,gateway}.ts`, `apps/api/src/insurance-handler.ts`, `scripts/smoke-s6.ts`, `tests/integration/{evidence,consent,s6-world}`, `tests/unit/evidence-boundaries.test.ts`, package tests (evidence canonical, consent access and projection, repositories S6, risk-cases documentation, tenancy organizations), `docs/EVIDENCE_STANDARD.md` (written). Modified: contracts (events, audit actions, verification attempt snapshot), repositories (evidence index, agreements, share ledger), risk-cases, tenancy (organizations, insurer actors), authz, action-orchestration case view, verification runner (device snapshots), api handler/html/server/edge types, local and dev runtime, root package.json, README, DECISIONS (D-047 to D-055), IMPLEMENTATION_STATE, and the six earlier test assertions listed in D-055.
 
 ## Commands executed
 
@@ -73,7 +73,7 @@ Clean after the S6 handoff commit; `main` pushed to `origin/main`.
 
 ## Last known good commit SHA
 
-Recorded in the follow-up docs commit (`docs(s6): record validated evidence handoff`); the implementation commit is `feat(s6): implement evidence and consent sharing` (check `git log`).
+`422f915956c1ae6bffdef500a7274928fa0fe7e3` (S6 implementation, `feat(s6): implement evidence and consent sharing`). Check `git log` for the later handoff commit, which changes only documentation.
 
 ## Exact next task
 
