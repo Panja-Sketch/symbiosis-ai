@@ -1,5 +1,5 @@
 // S9 mutation checks: deliberately break an invariant, prove the test suite notices, restore.
-// Usage: node scripts/mutation-s9.mjs   (run from the repo root with a clean working tree)
+// Usage: node scripts/mutation-s9.mjs [M<n>]   (run from the repo root with a clean working tree)
 // Each mutation edits one source file, runs only the tests that should catch it, expects failures,
 // then restores the file with `git checkout`. Exits non-zero if any mutation SURVIVES.
 import { execFileSync, spawnSync } from "node:child_process";
@@ -89,8 +89,9 @@ const mutations = [
   },
 ];
 
+const only = process.argv[2]; // optional: run one mutation, e.g. `node scripts/mutation-s9.mjs M7`
 let survivors = 0;
-for (const m of mutations) {
+for (const m of mutations.filter((x) => only === undefined || x.id.startsWith(`${only} `))) {
   const original = readFileSync(m.file, "utf8");
   if (!original.includes(m.from)) {
     console.log(`${m.id}: PATTERN NOT FOUND (update the script)`);
