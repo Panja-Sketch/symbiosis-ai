@@ -181,6 +181,7 @@ export function createEdgeHandler(
         seq,
         receivedAt,
         assetId: device.assetId,
+        ...(device.assetMapping !== undefined && { assetMapping: device.assetMapping }),
         expectedSignals: device.expectedSignals,
         deviceHealth: current.health,
         telemetry,

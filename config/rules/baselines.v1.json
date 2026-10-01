@@ -1,0 +1,21 @@
+{
+  "version": "baselines.v1",
+  "warmUpSeconds": 120,
+  "minObservations": 12,
+  "baselinedSignals": ["vibration_rms", "current", "temperature", "relative_humidity"],
+  "stdDevFloor": {
+    "vibration_rms": 0.02,
+    "current": 0.005,
+    "temperature": 0.1,
+    "relative_humidity": 0.5
+  },
+  "operatingModes": {
+    "loadSignal": "load_percent",
+    "modeSensitiveSignals": ["vibration_rms", "current"],
+    "defaultMode": "DEFAULT",
+    "bands": [
+      { "name": "LOW_LOAD", "minInclusive": 0 },
+      { "name": "HIGH_LOAD", "minInclusive": 50 }
+    ]
+  }
+}

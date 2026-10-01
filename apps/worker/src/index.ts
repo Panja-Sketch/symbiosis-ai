@@ -17,6 +17,8 @@ import type { ObservationRepository } from "@symbiosis/repositories";
 export const PACKAGE_NAME = "@symbiosis/worker" as const;
 export const SCAFFOLD_PHASE = "S0" as const;
 
+export * from "./risk-pipeline";
+
 export type TelemetryWorkerDeps = {
   readonly bus: EventBus;
   /** Source adapters keyed by the packet's declared source. */
@@ -54,6 +56,7 @@ async function processAuthenticated(
     organizationId: event.organization_id,
     facilityId: event.facility_id,
     assetId: payload.assetId,
+    ...(payload.assetMapping !== undefined && { assetMapping: payload.assetMapping }),
     deviceId: payload.deviceId,
     expectedSignals: payload.expectedSignals,
     receivedAt: payload.receivedAt,

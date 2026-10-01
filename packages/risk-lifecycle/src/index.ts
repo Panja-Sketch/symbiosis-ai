@@ -13,12 +13,13 @@ import type {
   Result,
   RiskEvent,
   RiskEventState,
+  RiskDetection,
   RiskImprovementCase,
   Transitioned,
   TransitionRecord,
   VerificationAssessment,
 } from "@symbiosis/contracts";
-import { applyCaseCommand } from "@symbiosis/risk-cases";
+import { applyCaseCommand, createRiskImprovementCase } from "@symbiosis/risk-cases";
 import { validateVerificationAssessment } from "@symbiosis/verification";
 
 export const PACKAGE_NAME = "@symbiosis/risk-lifecycle" as const;
@@ -320,4 +321,61 @@ export function reopenOnRecurrence(input: {
   });
   if (!result.ok) return result;
   return ok({ case: result.value.value, caseRecord: result.value.record });
+}
+
+/**
+ * Case-correlation convention (S3): a hazard episode is identified by organization +
+ * facility + hazard type + primary asset. The primary asset is `assetIds[0]` of a case.
+ */
+export function caseMatchesDetection(c: RiskImprovementCase, d: RiskDetection): boolean {
+  return (
+    c.organizationId === d.organizationId &&
+    c.facilityId === d.facilityId &&
+    c.hazardType === d.hazardType &&
+    c.assetIds[0] === d.primaryAssetId
+  );
+}
+
+/** Cases that still represent an unresolved episode; a new detection joins them. */
+export function isEpisodeActive(c: RiskImprovementCase): boolean {
+  return c.state !== "CLOSED" && c.state !== "VERIFIED_IMPROVED";
+}
+
+/**
+ * Opens a Risk Improvement Case and its first Risk Event for a first qualifying detection.
+ * The case starts OPEN (origin DETECTED_HAZARD) and the event DETECTED; alerting and
+ * acknowledgement belong to S4. IDs and the baseline snapshot are supplied by the caller.
+ */
+export function openCaseFromDetection(input: {
+  readonly detection: RiskDetection;
+  readonly caseId: string;
+  readonly eventId: string;
+  readonly baselineSnapshotId: string;
+}): Result<{ readonly case: RiskImprovementCase; readonly event: RiskEvent }, DomainError> {
+  const { detection: d } = input;
+  const assetIds = [d.primaryAssetId, ...d.contextAssetIds.filter((a) => a !== d.primaryAssetId)];
+  const event = createRiskEvent({
+    eventId: input.eventId,
+    caseId: input.caseId,
+    organizationId: d.organizationId,
+    facilityId: d.facilityId,
+    assetIds,
+    detectedAt: d.detectedAt,
+  });
+  if (!event.ok) return event;
+  const created = createRiskImprovementCase({
+    caseId: input.caseId,
+    organizationId: d.organizationId,
+    facilityId: d.facilityId,
+    assetIds,
+    origin: { type: "DETECTED_HAZARD", detectionId: d.detectionId },
+    hazardType: d.hazardType,
+    title: `${d.hazardType} on ${d.primaryAssetId}`,
+    severity: d.severity,
+    baselineSnapshotId: input.baselineSnapshotId,
+    activeRiskEventId: input.eventId,
+    createdAt: d.detectedAt,
+  });
+  if (!created.ok) return created;
+  return ok({ case: created.value, event: event.value });
 }

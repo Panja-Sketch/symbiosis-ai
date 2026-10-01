@@ -1,5 +1,7 @@
+import type { CaseSeverity, CaseState } from "./case";
+import type { ObservationEvaluation, RiskDetection } from "./risk";
 import type { UnassessedObservation, CanonicalObservation, CanonicalSignal } from "./canonical";
-import type { DeviceHealth, EdgeTelemetryPayload } from "./edge";
+import type { AssetMapping, DeviceHealth, EdgeTelemetryPayload } from "./edge";
 import type { IsoTimestamp } from "./primitives";
 
 export const EVENT_SCHEMA_VERSION = "1.0" as const;
@@ -35,7 +37,9 @@ export type TelemetryAuthenticatedPayload = {
   readonly keyId: string;
   readonly seq: number;
   readonly receivedAt: IsoTimestamp;
+  /** Default asset for readings the mapping does not place elsewhere. */
   readonly assetId: string;
+  readonly assetMapping?: AssetMapping;
   readonly expectedSignals: readonly CanonicalSignal[];
   /** Registry-known health at receipt. UNKNOWN is never treated as healthy. */
   readonly deviceHealth: DeviceHealth;
@@ -82,12 +86,49 @@ export type TelemetryQualityAssessedEvent = EventEnvelope<
   TelemetryQualityAssessedPayload
 >;
 
+export type RiskObservationEvaluatedPayload = ObservationEvaluation;
+export type RiskDetectedPayload = RiskDetection;
+
+export type CaseCreatedPayload = {
+  readonly caseId: string;
+  readonly riskEventId: string;
+  readonly detectionId: string;
+  readonly hazardType: string;
+  readonly severity: CaseSeverity;
+  readonly state: CaseState;
+  /** The primary asset is first (case-correlation convention). */
+  readonly assetIds: readonly string[];
+  readonly baselineSnapshotId: string;
+};
+
+export type CaseUpdatedPayload = {
+  readonly caseId: string;
+  readonly riskEventId: string;
+  readonly detectionId: string;
+  readonly change: "DETECTION_CONTINUED";
+  readonly severity: CaseSeverity;
+  readonly previousSeverity: CaseSeverity;
+  readonly state: CaseState;
+};
+
+export type RiskObservationEvaluatedEvent = EventEnvelope<
+  "risk.observation_evaluated.v1",
+  RiskObservationEvaluatedPayload
+>;
+export type RiskDetectedEvent = EventEnvelope<"risk.detected.v1", RiskDetectedPayload>;
+export type CaseCreatedEvent = EventEnvelope<"case.created.v1", CaseCreatedPayload>;
+export type CaseUpdatedEvent = EventEnvelope<"case.updated.v1", CaseUpdatedPayload>;
+
 /** All platform events defined so far. Later phases extend this union. */
 export type PlatformEvent =
   | TelemetryReceivedEvent
   | TelemetryAuthenticatedEvent
   | TelemetryNormalizedEvent
-  | TelemetryQualityAssessedEvent;
+  | TelemetryQualityAssessedEvent
+  | RiskObservationEvaluatedEvent
+  | RiskDetectedEvent
+  | CaseCreatedEvent
+  | CaseUpdatedEvent;
 
 export type PlatformEventType = PlatformEvent["event_type"];
 export type EventOfType<T extends PlatformEventType> = Extract<PlatformEvent, { event_type: T }>;

@@ -57,7 +57,6 @@ describe("simulator -> signed HTTP -> edge -> canonical observations", () => {
       expect(o).toMatchObject({
         organizationId: "ORG-SIM-001",
         facilityId: "FAC-SIM-001",
-        assetId: "AST-SIM-FAN-A",
         deviceId: "DEV-SIM-001",
         sourceType: "SIMULATOR",
         sourceAdapter: "simulator-edge-v1",
@@ -73,10 +72,27 @@ describe("simulator -> signed HTTP -> edge -> canonical observations", () => {
     }
   });
 
-  it("emits exactly the S2 event sequence with correlation and causation preserved", async () => {
+  it("places each reading on its mapped logical asset (one device, several assets)", async () => {
     await client.sendHeartbeat("HEALTHY");
     await client.sendTelemetry();
-    const history = runtime.bus.history();
+    const bySignal = Object.fromEntries(
+      (await runtime.observations.list("ORG-SIM-001")).map((o) => [o.signal, o.assetId]),
+    );
+    expect(bySignal).toEqual({
+      vibration_rms: "AST-SIM-FAN-A",
+      current: "AST-SIM-FAN-A",
+      load_percent: "AST-SIM-FAN-A",
+      temperature: "AST-SIM-ZONE-1",
+      relative_humidity: "AST-SIM-ZONE-1",
+      equipment_running: "AST-SIM-FAN-B",
+    });
+  });
+
+  it("emits the S2 telemetry sequence with correlation and causation preserved", async () => {
+    await client.sendHeartbeat("HEALTHY");
+    await client.sendTelemetry();
+    // S3 appended risk.* events after quality_assessed; the telemetry chain itself is unchanged.
+    const history = runtime.bus.history().filter((e) => e.event_type.startsWith("telemetry."));
     expect(history.map((e) => e.event_type)).toEqual([
       "telemetry.received.v1",
       "telemetry.authenticated.v1",
@@ -91,7 +107,10 @@ describe("simulator -> signed HTTP -> edge -> canonical observations", () => {
     ]);
     expect(new Set(history.map((e) => e.correlation_id)).size).toBe(1);
     expect(history.map((e) => e.producer)).toEqual(["api", "api", "worker", "worker"]);
-    expect(history.some((e) => (e.event_type as string).startsWith("risk."))).toBe(false);
+    // a single healthy sample never detects a risk or opens a case
+    const all = runtime.bus.history().map((e) => e.event_type as string);
+    expect(all).not.toContain("risk.detected.v1");
+    expect(all.some((t) => t.startsWith("case."))).toBe(false);
   });
 
   it("without a prior heartbeat, device health is UNKNOWN and confidence is reduced", async () => {

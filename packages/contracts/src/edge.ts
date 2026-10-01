@@ -8,6 +8,19 @@ export const EDGE_PATHS = {
   heartbeat: "/edge/v1/heartbeat",
 } as const;
 
+import type { CanonicalSignal } from "./canonical";
+
+/**
+ * Which logical asset a reading belongs to. One physical device may observe several assets or
+ * zones. Resolution order per reading: `byField` (source field name), then `bySignal`
+ * (canonical signal), then the device's default `assetId`. Pure configuration: normalization
+ * code contains no asset IDs.
+ */
+export type AssetMapping = {
+  readonly byField?: Readonly<Record<string, string>>;
+  readonly bySignal?: Readonly<Partial<Record<CanonicalSignal, string>>>;
+};
+
 export const EDGE_SOURCES = ["HARDWARE", "SIMULATOR"] as const;
 export type EdgeSource = (typeof EDGE_SOURCES)[number];
 

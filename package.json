@@ -14,13 +14,15 @@
     "test": "vitest run",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "smoke:s2": "tsx scripts/smoke-s2.ts"
+    "smoke:s2": "tsx scripts/smoke-s2.ts",
+    "smoke:s3": "tsx scripts/smoke-s3.ts"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",
     "@symbiosis/adapter-esp32": "workspace:*",
     "@symbiosis/adapter-simulator": "workspace:*",
     "@symbiosis/api": "workspace:*",
+    "@symbiosis/baselines": "workspace:*",
     "@symbiosis/clock": "workspace:*",
     "@symbiosis/contracts": "workspace:*",
     "@symbiosis/data-quality": "workspace:*",
@@ -29,6 +31,7 @@
     "@symbiosis/event-bus": "workspace:*",
     "@symbiosis/normalization": "workspace:*",
     "@symbiosis/repositories": "workspace:*",
+    "@symbiosis/risk-detection": "workspace:*",
     "@symbiosis/worker": "workspace:*",
     "@types/node": "^26.6.3",
     "eslint": "^9.39.5",

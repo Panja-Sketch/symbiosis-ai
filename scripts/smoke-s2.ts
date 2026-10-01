@@ -47,7 +47,8 @@ for (const o of observations) {
 }
 check("six canonical observations produced", observations.length === 6);
 
-const history = runtime.bus.history();
+// S3 appends risk.* events after quality_assessed; the S2 telemetry chain is unchanged.
+const history = runtime.bus.history().filter((e) => e.event_type.startsWith("telemetry."));
 console.log("\nevent sequence:");
 for (const e of history) {
   console.log(
@@ -72,7 +73,11 @@ check(
     history[3]?.causation_id === history[2]?.event_id &&
     new Set(history.map((e) => e.correlation_id)).size === 1,
 );
-check("no risk events emitted", !history.some((e) => e.event_type.startsWith("risk.")));
+const all = runtime.bus.history().map((e) => e.event_type as string);
+check(
+  "a single healthy sample detects no risk and opens no case",
+  !all.includes("risk.detected.v1") && !all.some((t) => t.startsWith("case.")),
+);
 
 console.log("");
 const replay = await client.send(request);
@@ -96,7 +101,8 @@ check(
 const after = await runtime.observations.list(SYNTHETIC_DEV_DEVICE.organizationId);
 check(
   "rejected requests produced no observations or events",
-  after.length === 6 && runtime.bus.history().length === 4,
+  after.length === 6 &&
+    runtime.bus.history().filter((e) => e.event_type.startsWith("telemetry.")).length === 4,
 );
 
 await runtime.close();

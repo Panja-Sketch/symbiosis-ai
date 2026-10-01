@@ -1,2 +1,5 @@
 export const PACKAGE_NAME = "@symbiosis/risk-detection" as const;
 export const SCAFFOLD_PHASE = "S0" as const;
+
+export * from "./config";
+export * from "./evaluate";

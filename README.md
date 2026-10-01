@@ -6,12 +6,14 @@ architecture (single source of truth).
 
 ## Status
 
-Phases **S0** (repository foundation), **S1** (domain core) and **S2** (local ingestion) are
-complete. A local simulator can send signed telemetry through the same edge endpoints future
-hardware will use; the packet is authenticated, replay-checked, normalized into canonical
-observations, quality-assessed and emitted as typed in-memory events. There is still **no risk
-detection, baselines, case workflow, verification evaluation, UI or cloud integration**. Progress
-is tracked in [docs/IMPLEMENTATION_STATE.md](docs/IMPLEMENTATION_STATE.md).
+Phases **S0** (foundation), **S1** (domain core), **S2** (local ingestion) and **S3**
+(detection + baselines) are complete. A local simulator sends signed telemetry through the same
+edge endpoints future hardware will use; it is authenticated, replay-checked, normalized into
+canonical observations (a device may map readings to several logical assets), quality-assessed,
+and fed to a deterministic baseline engine and the cooling/electrical risk rule. A persistent
+compound deterioration creates one Risk Improvement Case and Risk Event. There is still **no
+alerting or operations workflow, verification, evidence, consent, UI, AI or cloud integration**.
+Progress is tracked in [docs/IMPLEMENTATION_STATE.md](docs/IMPLEMENTATION_STATE.md).
 
 ## Layout
 
@@ -31,11 +33,12 @@ pnpm test
 pnpm format:check
 ```
 
-## Running locally (S2)
+## Running locally (S2, S3)
 
 ```
 pnpm dev          # api + worker (one process, in-memory bus) and the simulator
-pnpm smoke:s2     # self-checking end-to-end run over real HTTP, exits non-zero on failure
+pnpm smoke:s2     # self-checking ingestion run over real HTTP, exits non-zero on failure
+pnpm smoke:s3     # baseline -> isolated anomalies -> compound deterioration -> one case
 ```
 
 `pnpm dev` listens on `http://127.0.0.1:8787` (override with `EDGE_PORT`) and prints each
@@ -56,3 +59,10 @@ Google Secret Manager.
 ## Working with Claude
 
 Read [CLAUDE.md](CLAUDE.md) and [docs/SESSION_HANDOFF.md](docs/SESSION_HANDOFF.md) first.
+
+Choose what the simulator sends with `SIMULATOR_SCENARIO` (`normal`, `isolated-vibration`,
+`isolated-current`, `context-only`, `compound-outdoor-heat`, `compound-rising-temperature`), e.g.
+`SIMULATOR_SCENARIO=compound-outdoor-heat pnpm dev`. With real time the baseline needs its 2
+minute warm-up before detection can conclude anything; `pnpm smoke:s3` and the tests use a
+simulated clock instead of waiting. Baseline and rule thresholds live in `config/rules/`
+(`baselines.v1.json`, `cooling-electrical.v1.json`, `data-quality.v1.json`).

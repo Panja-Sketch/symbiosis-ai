@@ -178,6 +178,9 @@ importers:
       '@symbiosis/api':
         specifier: workspace:*
         version: link:apps/api
+      '@symbiosis/baselines':
+        specifier: workspace:*
+        version: link:packages/baselines
       '@symbiosis/clock':
         specifier: workspace:*
         version: link:packages/clock
@@ -202,6 +205,9 @@ importers:
       '@symbiosis/repositories':
         specifier: workspace:*
         version: link:packages/repositories
+      '@symbiosis/risk-detection':
+        specifier: workspace:*
+        version: link:packages/risk-detection
       '@symbiosis/worker':
         specifier: workspace:*
         version: link:apps/worker
@@ -289,6 +295,9 @@ importers:
 
   apps/worker:
     dependencies:
+      '@symbiosis/baselines':
+        specifier: workspace:*
+        version: link:../../packages/baselines
       '@symbiosis/clock':
         specifier: workspace:*
         version: link:../../packages/clock
@@ -307,6 +316,15 @@ importers:
       '@symbiosis/repositories':
         specifier: workspace:*
         version: link:../../packages/repositories
+      '@symbiosis/risk-cases':
+        specifier: workspace:*
+        version: link:../../packages/risk-cases
+      '@symbiosis/risk-detection':
+        specifier: workspace:*
+        version: link:../../packages/risk-detection
+      '@symbiosis/risk-lifecycle':
+        specifier: workspace:*
+        version: link:../../packages/risk-lifecycle
 
   packages/action-orchestration:
     dependencies:
@@ -320,7 +338,11 @@ importers:
 
   packages/authz: {}
 
-  packages/baselines: {}
+  packages/baselines:
+    dependencies:
+      '@symbiosis/contracts':
+        specifier: workspace:*
+        version: link:../contracts
 
   packages/clock: {}
 
@@ -402,7 +424,17 @@ importers:
         specifier: workspace:*
         version: link:../verification
 
-  packages/risk-detection: {}
+  packages/risk-detection:
+    dependencies:
+      '@symbiosis/baselines':
+        specifier: workspace:*
+        version: link:../baselines
+      '@symbiosis/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@symbiosis/data-quality':
+        specifier: workspace:*
+        version: link:../data-quality
 
   packages/risk-lifecycle:
     dependencies:

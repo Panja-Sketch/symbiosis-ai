@@ -145,3 +145,5 @@ export class SimulatorClient {
     return this.send(this.buildHeartbeatRequest(health));
   }
 }
+
+export * from "./scenarios";

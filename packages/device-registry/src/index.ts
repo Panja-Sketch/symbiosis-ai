@@ -1,4 +1,4 @@
-import type { CanonicalSignal, DeviceHealth } from "@symbiosis/contracts";
+import type { AssetMapping, CanonicalSignal, DeviceHealth } from "@symbiosis/contracts";
 
 export const PACKAGE_NAME = "@symbiosis/device-registry" as const;
 export const SCAFFOLD_PHASE = "S0" as const;
@@ -11,7 +11,10 @@ export type DeviceRecord = {
   readonly deviceId: string;
   readonly organizationId: string;
   readonly facilityId: string;
+  /** Default (primary) asset; readings not covered by `assetMapping` belong to it. */
   readonly assetId: string;
+  /** Optional per-field / per-signal placement onto other logical assets or zones. */
+  readonly assetMapping?: AssetMapping;
   readonly status: DeviceStatus;
   /** The only key version currently accepted for this device. */
   readonly activeKeyId: string;
@@ -97,7 +100,16 @@ export const SYNTHETIC_DEV_DEVICE: DeviceRecord = {
   deviceId: "DEV-SIM-001",
   organizationId: "ORG-SIM-001",
   facilityId: "FAC-SIM-001",
+  // Primary cooling/fan asset. Zone and backup readings map to other logical assets.
   assetId: "AST-SIM-FAN-A",
+  assetMapping: {
+    bySignal: {
+      temperature: "AST-SIM-ZONE-1",
+      relative_humidity: "AST-SIM-ZONE-1",
+      outdoor_temperature: "AST-SIM-OUTDOOR",
+    },
+    byField: { chiller_b_running: "AST-SIM-FAN-B" },
+  },
   status: "ACTIVE",
   activeKeyId: "KEY-SIM-001",
   expectedSignals: [
@@ -107,6 +119,7 @@ export const SYNTHETIC_DEV_DEVICE: DeviceRecord = {
     "current",
     "load_percent",
     "equipment_running",
+    "outdoor_temperature",
   ],
   capabilities: ["telemetry", "heartbeat"],
   health: "UNKNOWN",

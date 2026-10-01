@@ -51,25 +51,33 @@ describe("hardware independence (spec principle 7)", () => {
   });
 });
 
-describe("S2 stays within scope", () => {
+describe("S3 stays within scope", () => {
   const all = [...sources("packages"), ...sources("apps"), ...sources("adapters")];
 
-  it("contains no S3 detection or baseline logic", () => {
-    for (const f of all) {
-      expect(readFileSync(f, "utf8"), rel(f)).not.toMatch(
-        /vibration_z|current_deviation|z[-_]?score|learnedBaseline|learnBaseline/i,
-      );
-    }
-  });
-
-  it("defines no risk.* events and the platform event union stays at the four S2 events", () => {
+  it("defines only the telemetry, risk and case events through S3 (no S4+ events)", () => {
     const text = readFileSync(join(root, "packages/contracts/src/events.ts"), "utf8");
-    expect(text).not.toMatch(/"risk\./);
     const union = text.slice(
       text.indexOf("export type PlatformEvent ="),
       text.indexOf("export type PlatformEventType"),
     );
-    expect(union.match(/\| Telemetry/g)).toHaveLength(4);
+    expect(union.match(/\| (Telemetry|Risk|Case)\w+Event/g)).toHaveLength(8);
+    expect(union.match(/^\s*\| /gm)).toHaveLength(8);
+    expect(text).not.toMatch(
+      /"(alert|action|acknowledg|escalat|verification|evidence|consent|recurrence|intervention|notification)[._]/i,
+    );
+    expect(text).not.toMatch(/"risk\.(alert|escalat|verif)/i);
+  });
+
+  it("has no alerting, notification, workflow or verification-evaluation code in S3 packages", () => {
+    const s3 = ["baselines", "risk-detection"].flatMap((p) =>
+      sources("packages").filter((f) => rel(f).startsWith(`packages/${p}/`)),
+    );
+    expect(s3.length).toBeGreaterThan(0);
+    for (const f of s3) {
+      expect(readFileSync(f, "utf8"), rel(f)).not.toMatch(
+        /notif|acknowledg|escalat|mitigat|postAction|verificationPolicy|gemini|vertex|openai/i,
+      );
+    }
   });
 
   it("introduces no cloud SDK dependency in any manifest", () => {

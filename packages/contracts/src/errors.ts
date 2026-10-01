@@ -4,6 +4,7 @@ export const DOMAIN_ENTITIES = [
   "RISK_EVENT",
   "ACTION",
   "VERIFICATION",
+  "BASELINE",
 ] as const;
 export type DomainEntity = (typeof DOMAIN_ENTITIES)[number];
 

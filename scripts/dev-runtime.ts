@@ -13,6 +13,9 @@ for (const type of [
   "telemetry.authenticated.v1",
   "telemetry.normalized.v1",
   "telemetry.quality_assessed.v1",
+  "risk.detected.v1",
+  "case.created.v1",
+  "case.updated.v1",
 ] as const) {
   runtime.bus.subscribe(type, (event) => {
     console.log(`[bus] ${event.event_type} ${event.event_id} corr=${event.correlation_id}`);

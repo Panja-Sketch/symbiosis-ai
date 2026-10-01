@@ -124,3 +124,41 @@ export function assessObservation(
     reasons,
   };
 }
+
+/** Deterministic policy for when an assessed observation may support learning or detection. */
+export type TrustPolicy = {
+  readonly minConfidence: number;
+  readonly requireHealthyDevice: boolean;
+};
+
+export function parseTrustPolicy(value: unknown): TrustPolicy {
+  const v = value as Partial<TrustPolicy> | null;
+  if (
+    v === null ||
+    typeof v !== "object" ||
+    typeof v.minConfidence !== "number" ||
+    v.minConfidence < 0 ||
+    v.minConfidence > 1 ||
+    typeof v.requireHealthyDevice !== "boolean"
+  ) {
+    throw new Error("invalid trust policy");
+  }
+  return { minConfidence: v.minConfidence, requireHealthyDevice: v.requireHealthyDevice };
+}
+
+export type TrustAssessment = { readonly trusted: boolean; readonly reasons: readonly string[] };
+
+/**
+ * Unauthenticated, stale or out-of-range observations are never trusted, whatever their
+ * confidence. Unhealthy or unknown-health devices are untrusted when the policy requires a
+ * healthy device. Reasons explain every refusal; missing evidence is never "trusted".
+ */
+export function assessTrust(quality: ObservationQuality, policy: TrustPolicy): TrustAssessment {
+  const reasons: string[] = [];
+  if (!quality.authVerified) reasons.push("NOT_AUTHENTICATED");
+  if (quality.stale) reasons.push("STALE");
+  if (quality.outOfRange) reasons.push("OUT_OF_RANGE");
+  if (policy.requireHealthyDevice && !quality.deviceHealthy) reasons.push("DEVICE_NOT_HEALTHY");
+  if (!(quality.confidence >= policy.minConfidence)) reasons.push("LOW_CONFIDENCE");
+  return { trusted: reasons.length === 0, reasons };
+}

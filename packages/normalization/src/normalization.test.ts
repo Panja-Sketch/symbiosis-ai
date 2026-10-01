@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { EdgeTelemetryPayload } from "@symbiosis/contracts";
-import { createEdgeV1Adapter, normalizeTelemetry } from "./index";
+import { createEdgeV1Adapter, normalizeTelemetry, resolveAssetId } from "./index";
 import type { NormalizeContext } from "./index";
 
 const hardware = createEdgeV1Adapter({ adapterName: "hw-test", sourceType: "HARDWARE" });
@@ -136,5 +136,63 @@ describe("normalizeTelemetry", () => {
       ctx,
     );
     expect(out.observations.map((o) => o.value)).toEqual([1, 2]);
+  });
+});
+
+describe("multi-asset mapping (configuration-driven)", () => {
+  const readings = { ...all, outdoor_temperature_c: 31 };
+  const wide: NormalizeContext = {
+    ...ctx,
+    expectedSignals: [...ctx.expectedSignals, "outdoor_temperature"],
+  };
+  const assetsBySignal = (c: NormalizeContext) =>
+    Object.fromEntries(
+      normalizeTelemetry(hardware, payload(readings), c).observations.map((o) => [
+        o.signal,
+        o.assetId,
+      ]),
+    );
+
+  it("one device emits observations for several asset IDs from a single packet", () => {
+    const out = assetsBySignal({
+      ...wide,
+      assetMapping: {
+        bySignal: {
+          temperature: "ZONE-A",
+          relative_humidity: "ZONE-A",
+          outdoor_temperature: "OUT-A",
+        },
+        byField: { chiller_b_running: "BACKUP-B" },
+      },
+    });
+    expect(out).toEqual({
+      temperature: "ZONE-A",
+      relative_humidity: "ZONE-A",
+      outdoor_temperature: "OUT-A",
+      equipment_running: "BACKUP-B",
+      vibration_rms: "AST-1",
+      current: "AST-1",
+      load_percent: "AST-1",
+    });
+  });
+
+  it("the same packet maps differently under different configuration (no IDs in code)", () => {
+    const a = assetsBySignal({ ...wide, assetMapping: { bySignal: { temperature: "X1" } } });
+    const b = assetsBySignal({ ...wide, assetMapping: { bySignal: { temperature: "Y2" } } });
+    expect(a.temperature).toBe("X1");
+    expect(b.temperature).toBe("Y2");
+  });
+
+  it("byField takes precedence over bySignal, which takes precedence over the default", () => {
+    expect(
+      resolveAssetId({ byField: { f: "F" }, bySignal: { current: "S" } }, "f", "current", "D"),
+    ).toBe("F");
+    expect(resolveAssetId({ bySignal: { current: "S" } }, "g", "current", "D")).toBe("S");
+    expect(resolveAssetId({}, "g", "current", "D")).toBe("D");
+    expect(resolveAssetId(undefined, "g", "current", "D")).toBe("D");
+  });
+
+  it("a simple one-asset device (no mapping) still places everything on its asset", () => {
+    expect(new Set(Object.values(assetsBySignal(wide)))).toEqual(new Set(["AST-1"]));
   });
 });

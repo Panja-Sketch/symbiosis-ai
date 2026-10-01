@@ -12,4 +12,6 @@ export * from "./action";
 export * from "./case";
 export * from "./canonical";
 export * from "./edge";
+export * from "./baseline";
+export * from "./risk";
 export * from "./events";

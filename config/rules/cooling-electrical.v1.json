@@ -1,0 +1,37 @@
+{
+  "ruleId": "RULE-COOLING-ELECTRICAL",
+  "ruleVersion": "1",
+  "hazardType": "COOLING_ELECTRICAL_DETERIORATION",
+  "signals": {
+    "vibration": "vibration_rms",
+    "current": "current",
+    "load": "load_percent",
+    "zoneTemperature": "temperature",
+    "outdoorTemperature": "outdoor_temperature"
+  },
+  "thresholds": {
+    "vibrationZ": 2,
+    "currentDeviationPercent": 8,
+    "outdoorTemperatureDegF": 105,
+    "zoneTemperatureSlopeDegCPerHour": 0
+  },
+  "zoneSlope": {
+    "windowSeconds": 300,
+    "minSamples": 4,
+    "minSpanSeconds": 15
+  },
+  "contextMaxAgeSeconds": 60,
+  "persistence": {
+    "minQualifyingEvaluations": 3,
+    "maxGapSeconds": 30
+  },
+  "trust": {
+    "minConfidence": 0.5,
+    "requireHealthyDevice": true
+  },
+  "severity": {
+    "default": "MODERATE",
+    "high": { "vibrationZ": 4, "currentDeviationPercent": 15 },
+    "critical": { "requiresHigh": true, "requiresBothContextBranches": true }
+  }
+}

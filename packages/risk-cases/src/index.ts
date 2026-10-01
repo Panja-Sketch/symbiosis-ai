@@ -10,6 +10,7 @@ import {
   ok,
 } from "@symbiosis/contracts";
 import type {
+  CaseSeverity,
   CaseState,
   DomainError,
   IsoTimestamp,
@@ -168,6 +169,13 @@ export type CaseCommand =
       readonly newRiskEventId: string;
     }
   | {
+      /** A continuing detection of the same hazard; keeps state, may only raise severity. */
+      readonly type: "RECORD_DETECTION";
+      readonly at: IsoTimestamp;
+      readonly detectionId: string;
+      readonly severity: CaseSeverity;
+    }
+  | {
       readonly type: "CLOSE";
       readonly at: IsoTimestamp;
       readonly actorId: string;
@@ -181,7 +189,7 @@ const VERIFICATION_TARGET: Readonly<Record<VerificationAssessment["result"], Cas
   INCONCLUSIVE: "INCONCLUSIVE",
 };
 
-function targetState(command: CaseCommand): CaseState {
+function targetState(command: Exclude<CaseCommand, { type: "RECORD_DETECTION" }>): CaseState {
   switch (command.type) {
     case "REQUIRE_ACTION":
       return "ACTION_REQUIRED";
@@ -217,6 +225,7 @@ export function applyCaseCommand(
       domainError("TIMESTAMP_REGRESSION", "CASE", "command.at precedes the case's last update"),
     );
   }
+  if (command.type === "RECORD_DETECTION") return recordDetection(c, command);
   const from = c.state;
   let patch: Partial<RiskImprovementCase> = {};
 
@@ -355,6 +364,43 @@ export function applyCaseCommand(
       command: command.type,
       at: command.at,
       ...(actorId !== undefined && { actorId }),
+    },
+  });
+}
+
+/** States in which a continuing detection of the same hazard may be recorded (S3). */
+const DETECTION_RECORDABLE: readonly CaseState[] = ["OPEN", "ACTION_REQUIRED", "REOPENED"];
+
+function recordDetection(
+  c: RiskImprovementCase,
+  command: Extract<CaseCommand, { type: "RECORD_DETECTION" }>,
+): Result<Transitioned<RiskImprovementCase, CaseState>, DomainError> {
+  if (!isNonEmptyString(command.detectionId) || !CASE_SEVERITIES.includes(command.severity)) {
+    return err(invalid("A detection ID and a valid severity are required"));
+  }
+  if (!DETECTION_RECORDABLE.includes(c.state)) {
+    return err(
+      domainError(
+        "ILLEGAL_LIFECYCLE_TRANSITION",
+        "CASE",
+        `A detection cannot be recorded while the case is ${c.state}`,
+        { from: c.state, to: c.state },
+      ),
+    );
+  }
+  const severity =
+    CASE_SEVERITIES.indexOf(command.severity) > CASE_SEVERITIES.indexOf(c.severity)
+      ? command.severity
+      : c.severity;
+  return ok({
+    value: Object.freeze({ ...c, severity, updatedAt: command.at }),
+    record: {
+      entity: "CASE",
+      entityId: c.caseId,
+      from: c.state,
+      to: c.state,
+      command: command.type,
+      at: command.at,
     },
   });
 }

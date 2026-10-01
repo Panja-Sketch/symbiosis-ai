@@ -6,11 +6,15 @@
   "main": "src/index.ts",
   "types": "src/index.ts",
   "dependencies": {
+    "@symbiosis/baselines": "workspace:*",
     "@symbiosis/clock": "workspace:*",
     "@symbiosis/contracts": "workspace:*",
     "@symbiosis/data-quality": "workspace:*",
     "@symbiosis/event-bus": "workspace:*",
     "@symbiosis/normalization": "workspace:*",
-    "@symbiosis/repositories": "workspace:*"
+    "@symbiosis/repositories": "workspace:*",
+    "@symbiosis/risk-cases": "workspace:*",
+    "@symbiosis/risk-detection": "workspace:*",
+    "@symbiosis/risk-lifecycle": "workspace:*"
   }
 }

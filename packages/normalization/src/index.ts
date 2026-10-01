@@ -1,4 +1,5 @@
 import type {
+  AssetMapping,
   CanonicalSignal,
   EdgeTelemetryPayload,
   RejectedReading,
@@ -37,6 +38,7 @@ export const EDGE_V1_FIELDS: Readonly<Record<string, FieldMapping>> = {
   current_ma: { signal: "current", unit: "A", valueType: "number", convert: (v) => v / 1000 },
   fan_a_load_pct: { signal: "load_percent", unit: "%", valueType: "number" },
   chiller_b_running: { signal: "equipment_running", unit: "boolean", valueType: "boolean" },
+  outdoor_temperature_c: { signal: "outdoor_temperature", unit: "degC", valueType: "number" },
 };
 
 /**
@@ -53,7 +55,9 @@ export function createEdgeV1Adapter(options: {
 export type NormalizeContext = {
   readonly organizationId: string;
   readonly facilityId: string;
+  /** Default asset for readings `assetMapping` does not place elsewhere. */
   readonly assetId: string;
+  readonly assetMapping?: AssetMapping;
   readonly deviceId: string;
   readonly expectedSignals: readonly CanonicalSignal[];
   readonly receivedAt: string;
@@ -63,6 +67,16 @@ export type NormalizationResult = {
   readonly observations: readonly UnassessedObservation[];
   readonly rejectedReadings: readonly RejectedReading[];
 };
+
+/** Resolves a reading's logical asset: byField, then bySignal, then the default asset. */
+export function resolveAssetId(
+  mapping: AssetMapping | undefined,
+  field: string,
+  signal: CanonicalSignal,
+  defaultAssetId: string,
+): string {
+  return mapping?.byField?.[field] ?? mapping?.bySignal?.[signal] ?? defaultAssetId;
+}
 
 /** Deterministic observation ID derived from the dedupe identity. */
 export function observationIdFor(deviceId: string, signal: CanonicalSignal, observedAt: string) {
@@ -106,7 +120,7 @@ export function normalizeTelemetry(
         observationId: observationIdFor(ctx.deviceId, mapping.signal, observedAt),
         organizationId: ctx.organizationId,
         facilityId: ctx.facilityId,
-        assetId: ctx.assetId,
+        assetId: resolveAssetId(ctx.assetMapping, field, mapping.signal, ctx.assetId),
         deviceId: ctx.deviceId,
         signal: mapping.signal,
         value,
