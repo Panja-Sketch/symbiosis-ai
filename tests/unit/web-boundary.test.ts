@@ -59,11 +59,13 @@ describe("S7 web boundary: presentation only", () => {
     }
   });
 
-  it("has no AI, cloud or production-identity code (S8 and S9 own those)", () => {
+  it("has no AI client, cloud or production-identity code (the API owns explanations; S9 owns cloud)", () => {
     for (const f of production) {
-      expect(strip(text(f)), f).not.toMatch(
-        /gemini|genai|vertex|firebase|firestore|pubsub|openai|anthropic/i,
+      const s = strip(text(f));
+      expect(s, f).not.toMatch(
+        /@google|genai|vertexai|aiplatform|generativelanguage|firebase|firestore|pubsub|openai|anthropic/i,
       );
+      expect(s, f).not.toMatch(/fetch\([^)]*gemini/i);
     }
   });
 

@@ -7,6 +7,7 @@
   "types": "src/index.ts",
   "dependencies": {
     "@symbiosis/action-orchestration": "workspace:*",
+    "@symbiosis/ai-explanation": "workspace:*",
     "@symbiosis/authz": "workspace:*",
     "@symbiosis/clock": "workspace:*",
     "@symbiosis/consent": "workspace:*",

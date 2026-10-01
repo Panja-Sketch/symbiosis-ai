@@ -322,3 +322,28 @@ source of truth; this log records choices made while implementing it. Not a sess
 
 - **Decision:** Three S6-era tests encoded "no Next.js/React yet" or "every app has `src/index.ts`" and were changed deliberately, keeping their intent: `tests/unit/evidence-boundaries.test.ts` no longer forbids `react` in the root `package.json` or `apps/web` and instead keeps forbidding Gemini, Firebase, Pub/Sub, Cloud Storage and `next` in the root, and any React/cloud imports in `packages/` and `apps/api`; `tests/unit/workspace.smoke.test.ts` accepts `src/app/layout.tsx` as the entry of the Next.js `apps/web` (the placeholder `src/index.ts` was removed).
 - **Reason:** The tests guarded "S7 not started", which is no longer true; the remaining invariants stay.
+
+## D-064 — ExplanationProvider port, template provider, Gemini adapter (S8, 2026-10-01)
+
+- **Decision:** The existing `packages/ai-explanation` (placeholder since S0) holds the explanation layer: port `ExplanationProvider`, `TemplateExplanationProvider` (deterministic, default, fallback), `GeminiExplanationProvider` (Vertex AI `generateContent` over REST with `fetch`, **no SDK**, injected credential supplier and network function), `ExplanationService` (timeout, validation, fallback, cache, governance log, never throws). It depends only on `clock` and `event-bus`; no domain, repository or UI package depends on it (tests assert this); the API composes it. No cloud resource, service account or deployment was created (S9).
+- **Reason:** Spec 11.2 (`FakeExplainer | GeminiExplainer`), 15, 18; the S8 brief. A REST adapter keeps core tests offline and avoids pulling a cloud SDK before S9.
+
+## D-065 — Output schema and grounding rules (S8, 2026-10-01)
+
+- **Decision:** One combined structured response `explanation-output.v1` (`summary`, `keyFacts`, `whyItMatters`, `actionContext`, `verificationExplanation`, `interventionExplanation`, `evidenceExplanation`, `limitations`, `sourceFactIds`) instead of the spec 18.1 example shape; it covers the four required use cases (case summary, verification, intervention, evidence) and keeps spec 18.1's reject-and-fall-back rules (invalid schema, unknown evidence or action id, unsupported statement). `confidence` and `step_order` were not adopted: confidence comes from the verification engine and action order is not an AI choice. Validation is strict and all-or-nothing (D-064 list in `docs/AI_GOVERNANCE.md`), applied to the template as well. Facts, not prose, are the unit of provenance: `sourceFactIds` and `meta.sources` (case, event, action, verification and policy version, intervention and policy version, package ids) are real records only.
+- **Reason:** Spec 18; "do not partially trust malformed output".
+
+## D-066 — Inputs, personas and consent (S8, 2026-10-01)
+
+- **Decision:** Context builders accept structural subsets of the facility `CaseView` and the insurer projection, so telemetry, keys and other tenants have no path into a prompt. The insurer explanation is built from `gateway.caseView` (consent re-evaluated and audited on every request, no raw-telemetry option exists on that path) plus `gateway.interventions`; it never calls a customer-side service. Absent scopes become "not shared" limitations. Facility and insurer text differ in wording and content. Operator notes are the only free text: facility only, length-limited, delimited as untrusted data. The cache key includes a hash of the exact facts and callers rebuild facts through the authorized path first, so revoked consent denies immediately even when text is cached.
+- **Reason:** Consent applies to AI inputs too (S8 brief, spec 20).
+
+## D-067 — Model and configuration (S8, 2026-10-01)
+
+- **Decision:** The spec names no Gemini model. `config/explanation/explanation.v1.json` sets the default provider to `template` and the Gemini model to `gemini-2.5-flash` (region `us-central1`, temperature 0.1, 1500 output tokens, 8 s timeout), overridable by `GEMINI_MODEL`, `GCP_REGION`, `GCP_PROJECT_ID`, `SYMBIOSIS_AI_PROVIDER`; the access token is read from `VERTEX_ACCESS_TOKEN` at call time. Config parsing fails closed; `gemini` without project or token degrades to the template. The model id is an assumption to confirm before S9 enables it.
+- **Reason:** "Do not silently choose a newer model": the choice is explicit, versioned and replaceable.
+
+## D-068 — API, UI and test harness additions (S8, 2026-10-01)
+
+- **Decision:** `GET /api/v1/cases/:id/explanation` and `GET /insurance/v1/cases/:id/explanation` (GET only). Web: `ExplanationPanel` rendered through Suspense after the "Did it work?" section (facility) and the verification section (insurer); states loading, AI, template, fallback (with reason) and unavailable; authoritative facts and AI prose are separate boxes and only validated Gemini output carries the AI label. No client-side refresh (the page is the refresh). The S7 browser backend gained `/control/ai` (template or the real Gemini adapter over `FakeGemini` in a chosen failure mode) and `/control/ai-log`. Mutation checks M1 to M6 were run and restored (see handoff).
+- **Reason:** S8 brief UX and test requirements.

@@ -3,6 +3,8 @@ import type {
   InterventionError,
   InterventionService,
 } from "@symbiosis/intervention-prioritization";
+import { buildFacilityContext } from "@symbiosis/ai-explanation";
+import type { EvidenceInput, ExplanationService } from "@symbiosis/ai-explanation";
 import { can } from "@symbiosis/authz";
 import { permissionsFor } from "@symbiosis/authz";
 import { EVIDENCE_CONSENT_SCOPES } from "@symbiosis/contracts";
@@ -38,6 +40,8 @@ export type AppApiDeps = {
    * (S7). Absent means the route does not exist. It lists directory entries only; choosing one
    * still goes through the same server-side directory lookup as every other request.
    */
+  /** Optional explanation layer (S8). Absent means the explanation route does not exist. */
+  readonly explanations?: ExplanationService;
   readonly devIdentities?: {
     readonly actors: readonly ActorContext[];
     readonly organizations: readonly OrganizationRecord[];
@@ -441,6 +445,33 @@ export function createAppHandler(
       return problem(404, "NOT_FOUND", "Unknown route");
     }
     const caseId = route[1] as string;
+
+    if (route.length === 3 && route[2] === "explanation") {
+      if (method !== "GET") return problem(405, "METHOD_NOT_ALLOWED", "GET only");
+      if (deps.explanations === undefined) return problem(404, "NOT_FOUND", "Unknown route");
+      // Same authorization and tenant scoping as the case page: the facts come from the case view.
+      const view = await deps.operations.getCaseView(actor, caseId);
+      if (!view.ok) return fromError(view.error);
+      let evidence: EvidenceInput | undefined;
+      const pkgId = view.value.evidence.latestEvidencePackageId;
+      if (pkgId !== undefined && can(actor, "EVIDENCE_READ")) {
+        const e = await deps.evidence.getForActor(actor, pkgId);
+        if (e.ok) {
+          evidence = {
+            packageId: e.value.record.packageId,
+            createdAt: e.value.record.createdAt,
+            integrity: e.value.integrity.valid ? "PASSED" : "FAILED",
+            synthetic: e.value.package.payload.source.synthetic,
+            sourceLabel: e.value.package.payload.source.label,
+            artifactCount: e.value.package.manifest.artifacts.length,
+          };
+        }
+      }
+      const out = await deps.explanations.explain(buildFacilityContext(view.value, evidence), {
+        actorId: actor.actorId,
+      });
+      return json(200, out);
+    }
 
     if (method === "GET" && route.length === 2) {
       const r = await deps.operations.getCaseView(actor, caseId);

@@ -8,7 +8,7 @@ architecture (single source of truth).
 
 Phases **S0** (foundation), **S1** (domain core), **S2** (local ingestion), **S3** (detection +
 baselines), **S4** (operations workflow), **S5** (verification + recurrence + intervention
-prioritization) **S6** (evidence + consent) and **S7** (persona UI) are complete. A simulated device is authenticated, normalized and assessed; a
+prioritization) **S6** (evidence + consent), **S7** (persona UI) and **S8** (grounded Gemini explanations) are complete. A simulated device is authenticated, normalized and assessed; a
 deterministic rule detects persistent compound deterioration and opens a Risk Improvement Case; an
 alert goes out through a local notification port (ConsoleEmail); a person acknowledges, an approved
 action is assigned and reported, and the case waits as **VERIFICATION PENDING**. A reported action
@@ -22,7 +22,7 @@ evidence package** (canonical JSON, SHA-256 manifest, frozen device facts, expli
 synthetic-data label) that preserves its actual result; the insured controls what an insurer
 sees through scoped, revocable **sharing agreements**, raw telemetry is off by default, and
 every insurer read is authorization-checked and audited. The system deliberately stops there:
-S7 added the Next.js persona web app; **no AI (S8) or cloud integration (S9) yet.** Progress is tracked in
+S7 added the Next.js persona web app and S8 a strictly bounded explanation layer (AI explains, never decides); **no cloud integration (S9) yet.** Progress is tracked in
 [docs/IMPLEMENTATION_STATE.md](docs/IMPLEMENTATION_STATE.md).
 
 ## Layout
@@ -53,7 +53,8 @@ pnpm smoke:s4     # detected -> alert -> acknowledge -> assign -> report -> VERI
 pnpm smoke:s5     # ... -> trusted post-action data -> VERIFIED -> hazard returns -> same case REOPENED
 pnpm smoke:s6     # ... VERIFIED -> evidence package + hashes -> SHAREABLE -> consent -> insurer read -> revoke
 pnpm smoke:s7     # builds the web app, then drives both personas in a real browser (incl. phone width)
-pnpm test:e2e     # builds the web app, then the 17 Playwright browser tests
+pnpm test:e2e     # builds the web app, then the 26 Playwright browser tests
+pnpm smoke:s8     # grounded explanations: Gemini adapter over a scripted endpoint, consent, fallback
 ```
 
 `pnpm dev` listens on `http://127.0.0.1:8787` (override with `EDGE_PORT`) and prints each
@@ -170,3 +171,24 @@ superseded; they remain as a fallback and debugging surface. Browser tests use t
 a simulated clock through `scripts/s7-backend.ts`; the identity switcher lists
 `GET /api/v1/dev/identities` (local only). The layout is responsive (tables become cards on
 phones) and was checked with axe-core (WCAG 2.1 A/AA).
+
+### Grounded explanations (S8)
+
+Case detail (facility) and the shared case (insurer) show a **Plain-language summary** below the
+deterministic facts. The explanation comes from the `ExplanationProvider` port in
+`packages/ai-explanation`: a deterministic **template** (default, offline, always the fallback) or the
+**Gemini** adapter (Vertex AI REST). Gemini only restates facts the deterministic system already
+established; every answer is validated against those facts (schema, ids, numbers, result and level
+fidelity, approved actions, prohibited claims) and one failed check discards it in favour of the
+template. The page labels what it is: "AI-generated explanation based on verified system data" only for a
+validated Gemini answer, otherwise "Template summary ... No AI model was used". Insurer explanations use
+the consent-filtered projection only and are denied the moment sharing is revoked.
+
+```
+GET /api/v1/cases/:id/explanation          # facility (same authorization as the case)
+GET /insurance/v1/cases/:id/explanation    # insurer (consent gateway, audited)
+SYMBIOSIS_AI_PROVIDER=gemini GCP_PROJECT_ID=... VERTEX_ACCESS_TOKEN=... pnpm dev   # opt in; template otherwise
+```
+
+The model, region and limits are in `config/explanation/explanation.v1.json` (default model
+`gemini-2.5-flash`, override with `GEMINI_MODEL`). See [docs/AI_GOVERNANCE.md](docs/AI_GOVERNANCE.md).

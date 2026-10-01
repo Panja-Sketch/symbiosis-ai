@@ -184,6 +184,9 @@ importers:
       '@symbiosis/adapter-simulator':
         specifier: workspace:*
         version: link:adapters/simulator
+      '@symbiosis/ai-explanation':
+        specifier: workspace:*
+        version: link:packages/ai-explanation
       '@symbiosis/api':
         specifier: workspace:*
         version: link:apps/api
@@ -320,6 +323,9 @@ importers:
       '@symbiosis/action-orchestration':
         specifier: workspace:*
         version: link:../../packages/action-orchestration
+      '@symbiosis/ai-explanation':
+        specifier: workspace:*
+        version: link:../../packages/ai-explanation
       '@symbiosis/authz':
         specifier: workspace:*
         version: link:../../packages/authz
@@ -466,7 +472,14 @@ importers:
         specifier: workspace:*
         version: link:../verification
 
-  packages/ai-explanation: {}
+  packages/ai-explanation:
+    dependencies:
+      '@symbiosis/clock':
+        specifier: workspace:*
+        version: link:../clock
+      '@symbiosis/event-bus':
+        specifier: workspace:*
+        version: link:../event-bus
 
   packages/audit:
     dependencies:

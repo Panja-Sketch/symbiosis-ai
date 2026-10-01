@@ -1,5 +1,8 @@
+import { Suspense } from "react";
 import { ApiErrorView } from "../../../../components/ApiErrorView";
 import { CaseDetail } from "../../../../components/CaseDetail";
+import { FacilityExplanation } from "../../../../components/ExplanationLoaders";
+import { ExplanationLoading } from "../../../../components/ExplanationPanel";
 import { NOTICES } from "../../../../lib/notices";
 import { loadCase } from "../../../../lib/loaders";
 import { getDirectory, getOrgNames, getPeople, requireSession } from "../../../../lib/session";
@@ -37,6 +40,11 @@ export default async function CasePage({
           a.permissions.includes("ACTION_ACKNOWLEDGE"),
       )}
       insurers={(directory?.organizations ?? []).filter((o) => o.type === "INSURER")}
+      explanationSlot={
+        <Suspense fallback={<ExplanationLoading />}>
+          <FacilityExplanation actorId={session.actorId} caseId={id} />
+        </Suspense>
+      }
       notice={noticeKey === undefined ? undefined : NOTICES[noticeKey]}
       error={one(q.error) === undefined ? undefined : (one(q.msg) ?? "The request was rejected.")}
     />

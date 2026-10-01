@@ -1,4 +1,7 @@
+import { Suspense } from "react";
 import { ApiErrorView } from "../../../../components/ApiErrorView";
+import { InsurerExplanation } from "../../../../components/ExplanationLoaders";
+import { ExplanationLoading } from "../../../../components/ExplanationPanel";
 import { InsurerCaseDetail } from "../../../../components/InsurerCaseDetail";
 import { loadInsurerCase } from "../../../../lib/loaders";
 import { requireSession } from "../../../../lib/session";
@@ -15,5 +18,14 @@ export default async function InsurerCasePage({
   if (!result.ok) {
     return <ApiErrorView error={result} session={session} subject="this shared case" />;
   }
-  return <InsurerCaseDetail data={result.value} />;
+  return (
+    <InsurerCaseDetail
+      data={result.value}
+      explanationSlot={
+        <Suspense fallback={<ExplanationLoading />}>
+          <InsurerExplanation actorId={session.actorId} caseId={id} />
+        </Suspense>
+      }
+    />
+  );
 }

@@ -4,6 +4,7 @@ import type {
   CaseDto,
   DirectoryDto,
   EvidenceDetailDto,
+  ExplanationDto,
   InsurerCaseDto,
   InsurerInterventionDto,
   InsurerSiteDto,
@@ -126,3 +127,13 @@ export async function loadInsurerCase(
     : undefined;
   return { ok: true, value: { view: r.value, ...(mine !== undefined && { intervention: mine }) } };
 }
+
+// ---- explanations (S8) ----------------------------------------------------------------------------
+
+/** Facility explanation: built by the API from the same case view the page shows. */
+export const loadExplanation = (actorId: string, caseId: string) =>
+  apiGet<ExplanationDto>(actorId, `/api/v1/cases/${encodeURIComponent(caseId)}/explanation`);
+
+/** Insurer explanation: built by the API from the consent-filtered projection only. */
+export const loadInsurerExplanation = (actorId: string, caseId: string) =>
+  apiGet<ExplanationDto>(actorId, `/insurance/v1/cases/${encodeURIComponent(caseId)}/explanation`);

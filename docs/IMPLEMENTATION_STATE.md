@@ -12,7 +12,7 @@ Allowed status: NOT_STARTED | IN_PROGRESS | BLOCKED | COMPLETE
 | S5    | Verification + recurrence + intervention prioritization | COMPLETE    |
 | S6    | Evidence + consent                                      | COMPLETE    |
 | S7    | Persona UI                                              | COMPLETE    |
-| S8    | Gemini                                                  | NOT_STARTED |
+| S8    | Gemini                                                  | COMPLETE    |
 | S9    | GCP adapters                                            | NOT_STARTED |
 | S10   | Hardware                                                | NOT_STARTED |
 | S11   | Hardening                                               | NOT_STARTED |

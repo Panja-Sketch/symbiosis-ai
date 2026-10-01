@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
 import {
   acknowledgeActionAction,
   acknowledgeCaseAction,
@@ -73,6 +74,8 @@ type Props = {
   readonly insurers: readonly OrganizationDto[];
   readonly notice?: string | undefined;
   readonly error?: string | undefined;
+  /** Streamed plain-language summary (S8); the deterministic sections never wait for it. */
+  readonly explanationSlot?: ReactNode;
 };
 
 export const SECTION_LINKS: readonly (readonly [string, string])[] = [
@@ -82,6 +85,7 @@ export const SECTION_LINKS: readonly (readonly [string, string])[] = [
   ["accountability", "Accountability"],
   ["what-was-done", "What was done"],
   ["did-it-work", "Did it work?"],
+  ["explanation", "Plain-language summary"],
   ["staying-fixed", "Is it staying fixed?"],
   ["evidence", "Evidence"],
   ["sharing", "Sharing"],
@@ -687,6 +691,7 @@ export function CaseDetail({
   insurers,
   notice,
   error,
+  explanationSlot,
 }: Props) {
   const c = data.case;
   const st = statusForState(c.state);
@@ -735,6 +740,7 @@ export function CaseDetail({
         <Accountability c={c} session={session} people={people} />
         <WhatWasDone c={c} session={session} people={people} />
         <DidItWork c={c} />
+        {explanationSlot}
         <StayingFixed c={c} />
         <Section
           id="evidence"

@@ -17,6 +17,13 @@ import { simulatorSourceAdapter } from "@symbiosis/adapter-simulator";
 import { InMemoryAuditLog } from "@symbiosis/audit";
 import { createInsuranceGateway, createSharingService, startSharing } from "@symbiosis/consent";
 import type { InsuranceGateway, SharingService } from "@symbiosis/consent";
+import {
+  ExplanationService,
+  InMemoryExplanationLog,
+  resolveExplanationConfig,
+  selectProvider,
+} from "@symbiosis/ai-explanation";
+import type { ExplanationProvider } from "@symbiosis/ai-explanation";
 import { SystemClock } from "@symbiosis/clock";
 import type { Clock } from "@symbiosis/clock";
 import { parseBaselineConfig } from "@symbiosis/baselines";
@@ -101,6 +108,10 @@ export type LocalRuntimeOptions = {
   readonly consoleSink?: (line: string) => void;
   /** Replaces the in-memory evidence object store (tests inject a failing or tamperable one). */
   readonly evidenceStore?: EvidenceObjectStore;
+  /** Replaces the configured primary explanation provider (tests inject fakes). The template stays the fallback. */
+  readonly explanationProvider?: ExplanationProvider;
+  /** Environment used for explanation settings; defaults to process.env. */
+  readonly explanationEnv?: Readonly<Record<string, string | undefined>>;
 };
 
 export type LocalRuntime = {
@@ -120,6 +131,8 @@ export type LocalRuntime = {
   readonly agreements: InMemorySharingAgreementRepository;
   readonly shares: InMemorySharedEvidenceRepository;
   readonly evidenceService: EvidenceService;
+  readonly explanations: ExplanationService;
+  readonly explanationLog: InMemoryExplanationLog;
   readonly sharingService: SharingService;
   readonly insuranceGateway: InsuranceGateway;
   readonly verificationRunner: VerificationRunner;
@@ -182,6 +195,13 @@ export function loadInterventionPolicy(): InterventionPolicy {
     "risk-engineer-prioritization.v1.json",
   );
   return parseInterventionPolicy(JSON.parse(readFileSync(path, "utf8")));
+}
+
+export function loadExplanationConfig(
+  env: Readonly<Record<string, string | undefined>> = process.env,
+) {
+  const path = join(repoRoot, "config", "explanation", "explanation.v1.json");
+  return resolveExplanationConfig(JSON.parse(readFileSync(path, "utf8")), env);
 }
 
 export function loadActionLibrary(): ActionLibrary {
@@ -390,6 +410,26 @@ export async function createLocalRuntime(options: LocalRuntimeOptions = {}): Pro
     ids,
     ...(options.log !== undefined && { log: options.log }),
   });
+  const explanationEnv = options.explanationEnv ?? process.env;
+  const explanationConfig = loadExplanationConfig(explanationEnv);
+  const chosen = selectProvider(explanationConfig, explanationEnv);
+  const explanationLog = new InMemoryExplanationLog();
+  const explanations = new ExplanationService({
+    primary: options.explanationProvider ?? chosen.primary,
+    fallback: chosen.fallback,
+    clock,
+    ids,
+    log: explanationLog,
+    ...(chosen.note !== undefined &&
+      options.explanationProvider === undefined && { primaryNote: chosen.note }),
+    settings: {
+      promptVersion: explanationConfig.promptVersion,
+      schemaVersion: explanationConfig.outputSchemaVersion,
+      timeoutMs: explanationConfig.gemini.timeoutMs,
+      cacheTtlMs: explanationConfig.cache.ttlSeconds * 1000,
+      fallbackCacheTtlMs: explanationConfig.cache.fallbackTtlSeconds * 1000,
+    },
+  });
   const handler = createApiHandler({
     edge: edgeHandler,
     app: createAppHandler({
@@ -400,9 +440,10 @@ export async function createLocalRuntime(options: LocalRuntimeOptions = {}): Pro
       insurance: insuranceGateway,
       directory,
       runTick: tick,
+      explanations,
       devIdentities: { actors: SYNTHETIC_ACTORS, organizations: SYNTHETIC_ORGANIZATIONS },
     }),
-    insurance: createInsuranceHandler({ gateway: insuranceGateway, directory }),
+    insurance: createInsuranceHandler({ gateway: insuranceGateway, directory, explanations }),
   });
   const server = await listen(createEdgeServer(handler), options.port ?? 0);
   return {
@@ -422,6 +463,8 @@ export async function createLocalRuntime(options: LocalRuntimeOptions = {}): Pro
     agreements,
     shares,
     evidenceService,
+    explanations,
+    explanationLog,
     sharingService,
     insuranceGateway,
     verificationRunner,

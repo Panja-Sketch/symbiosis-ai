@@ -1,5 +1,11 @@
 import { createServer } from "node:http";
 import type { Server } from "node:http";
+import {
+  FakeGemini,
+  GeminiExplanationProvider,
+  TemplateExplanationProvider,
+} from "@symbiosis/ai-explanation";
+import type { ExplanationProvider, FakeGeminiMode } from "@symbiosis/ai-explanation";
 import { SimulatorClient, scenarioReadings } from "@symbiosis/adapter-simulator";
 import type { ScenarioName } from "@symbiosis/adapter-simulator";
 import { ManualClock } from "@symbiosis/clock";
@@ -34,6 +40,8 @@ export type S7Backend = {
   expire(): Promise<unknown>;
   /** The hazard returns after a verified improvement. */
   recur(): Promise<void>;
+  /** Explanation provider for browser tests: the template, or the real Gemini adapter over a scripted fake endpoint. */
+  setAi(mode: "template" | FakeGeminiMode): void;
   /** A fresh, empty world on the same ports. */
   reset(): Promise<void>;
   close(): Promise<void>;
@@ -47,6 +55,23 @@ export async function startS7Backend(
 
   let clock = new ManualClock(Date.parse("2026-10-01T00:00:00Z"));
   let current: LocalRuntime;
+  const fakeGemini = new FakeGemini();
+  const aiProvider = (mode: "template" | FakeGeminiMode): ExplanationProvider => {
+    if (mode === "template") return new TemplateExplanationProvider();
+    fakeGemini.mode = mode;
+    return new GeminiExplanationProvider(
+      {
+        projectId: "demo-project",
+        location: "us-central1",
+        model: "gemini-2.5-flash",
+        temperature: 0.1,
+        maxOutputTokens: 1500,
+        timeoutMs: 1000,
+      },
+      async () => "fake-local-token",
+      fakeGemini.fetch,
+    );
+  };
   let client: SimulatorClient;
 
   async function boot(): Promise<void> {
@@ -106,6 +131,9 @@ export async function startS7Backend(
       await send("normal", 3);
       await send("compound-outdoor-heat", 3);
     },
+    setAi(mode) {
+      current.explanations.setPrimary(aiProvider(mode));
+    },
     async reset() {
       await current.close();
       await boot();
@@ -141,6 +169,13 @@ export async function startS7Backend(
             return reply(200, { ok: true });
           }
           if (req.method !== "POST") return reply(405, { error: "POST only" });
+          if (url.pathname === "/control/ai") {
+            backend.setAi((body.mode as "template" | FakeGeminiMode | undefined) ?? "template");
+            return reply(200, { ok: true });
+          }
+          if (url.pathname === "/control/ai-log") {
+            return reply(200, { records: current.explanationLog.list() });
+          }
           if (url.pathname === "/control/reset") {
             await backend.reset();
             return reply(200, { ok: true });

@@ -1180,3 +1180,43 @@ textarea {
     gap: 2px 12px;
   }
 }
+
+/* ---- explanations (S8): authoritative facts and AI prose are visibly separate ------------------ */
+.explanation .fact-box {
+  border: 2px solid var(--brand);
+  border-radius: var(--radius);
+  padding: 10px 14px;
+  margin: 8px 0 14px;
+}
+.fact-box-title {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 700;
+  color: var(--brand);
+  margin-bottom: 4px;
+}
+.ai-box {
+  border: 2px dashed var(--synthetic-ink);
+  border-radius: var(--radius);
+  padding: 10px 14px;
+  background: #faf8fe;
+}
+.ai-box.ai-template,
+.ai-box.ai-fallback {
+  border-color: var(--neutral-ink);
+  background: var(--bg);
+}
+.ai-label {
+  font-size: 0.9rem;
+}
+.explanation-summary {
+  font-size: 1.02rem;
+}
+.ai-box h4 {
+  margin: 12px 0 4px;
+  font-size: 0.9rem;
+}
+.section-ai {
+  background: var(--synthetic-ink);
+}

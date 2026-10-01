@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { formatPercent, formatTime, shortHash } from "../lib/format";
 import {
   SCOPE_INFO,
@@ -69,7 +70,14 @@ function compareItems(v: InsurerCaseDto): readonly CompareItem[] {
  * shows its data or says plainly that it was not shared, so consent filtering is visible. Nothing
  * here comes from the customer's internal APIs, and there are no live sensor values.
  */
-export function InsurerCaseDetail({ data }: { readonly data: InsurerCaseData }) {
+export function InsurerCaseDetail({
+  data,
+  explanationSlot,
+}: {
+  readonly data: InsurerCaseData;
+  /** Streamed plain-language summary (S8), built from this same consent-filtered projection. */
+  readonly explanationSlot?: ReactNode;
+}) {
   const v = data.view;
   const has = (s: ConsentScope) => v.consent.grantedScopes.includes(s);
   const result =
@@ -265,6 +273,8 @@ export function InsurerCaseDetail({ data }: { readonly data: InsurerCaseData }) 
             </>
           )}
         </Section>
+
+        {explanationSlot}
 
         <Section
           id="before-after"

@@ -1,3 +1,5 @@
+import { buildInsurerContext } from "@symbiosis/ai-explanation";
+import type { ExplanationService } from "@symbiosis/ai-explanation";
 import type { InsuranceError, InsuranceGateway } from "@symbiosis/consent";
 import type { ActorContext, ActorDirectory } from "@symbiosis/tenancy";
 import type { EdgeRequest, EdgeResponse } from "./edge-handler";
@@ -5,6 +7,8 @@ import type { EdgeRequest, EdgeResponse } from "./edge-handler";
 export type InsuranceApiDeps = {
   readonly gateway: InsuranceGateway;
   readonly directory: ActorDirectory;
+  /** Optional explanation layer (S8): inputs are the consent-filtered projection only. */
+  readonly explanations?: ExplanationService;
 };
 
 const ID = /^[A-Za-z0-9_.:-]{1,128}$/;
@@ -95,6 +99,29 @@ export function createInsuranceHandler(
         includeRawTelemetry: include === "raw_telemetry",
       });
       return r.ok ? json(200, r.value) : fromError(r.error);
+    }
+    if (
+      route.length === 3 &&
+      route[0] === "cases" &&
+      route[2] === "explanation" &&
+      ID.test(route[1] ?? "")
+    ) {
+      if (deps.explanations === undefined) return problem(404, "NOT_FOUND", "Unknown route");
+      const caseId = route[1] as string;
+      // Consent is re-checked (and the read audited) by the gateway on every request; the
+      // explanation is built ONLY from what it releases, never from an internal API.
+      const view = await deps.gateway.caseView(actor, caseId);
+      if (!view.ok) return fromError(view.error);
+      const ints = await deps.gateway.interventions(actor);
+      const current = ints.ok
+        ? ints.value.find(
+            (x) => x.caseId === caseId && x.status !== "SUPERSEDED" && x.status !== "RESOLVED",
+          )
+        : undefined;
+      const out = await deps.explanations.explain(buildInsurerContext(view.value, current), {
+        actorId: actor.actorId,
+      });
+      return json(200, out);
     }
     if (route.length === 1 && route[0] === "recommendations") {
       const r = await deps.gateway.recommendations(actor);

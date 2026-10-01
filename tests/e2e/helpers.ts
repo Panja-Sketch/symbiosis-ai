@@ -57,3 +57,43 @@ export async function noHorizontalScroll(page: Page): Promise<void> {
     `page scrolls horizontally (${overflow.scroll} > ${overflow.inner})`,
   ).toBeLessThanOrEqual(overflow.inner);
 }
+
+const API = "http://127.0.0.1:8791";
+const INSPECT = "ACT-COOLING-INSPECT-PRIMARY";
+
+/** A direct application-API call (set-up only; assertions go through the browser). */
+export async function post(path: string, actor: string, body: unknown = {}) {
+  const res = await fetch(`${API}${path}`, {
+    method: "POST",
+    headers: { "X-Demo-Actor-Id": actor, "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  expect(res.status, path).toBeLessThan(300);
+  return (await res.json()) as Record<string, unknown>;
+}
+
+/** Detect, work and verify a case through the APIs, so pages have real data. */
+export async function verifiedCase(note = "Inspected."): Promise<string> {
+  const { caseId } = (await control("detect")) as { caseId: string };
+  await post(`/api/v1/cases/${caseId}/acknowledge`, MGR);
+  const a = await post(`/api/v1/cases/${caseId}/assignments`, MGR, {
+    actionLibraryId: INSPECT,
+    assigneeId: OPERATOR,
+  });
+  const actionId = a.actionId as string;
+  await post(`/api/v1/cases/${caseId}/actions/${actionId}/acknowledge`, OPERATOR);
+  await post(`/api/v1/cases/${caseId}/actions`, OPERATOR, {
+    actionLibraryId: INSPECT,
+    actionId,
+    notes: note,
+  });
+  await control("verify", { scenario: "normal" });
+  return caseId;
+}
+
+export const shareScopes = (scopes: string[]) =>
+  post("/api/v1/sharing-agreements", MGR, {
+    recipientOrganizationId: "ORG-INS-001",
+    facilityIds: ["FAC-SIM-001"],
+    scopes,
+  });

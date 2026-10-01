@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "explanation-config.v1",
+  "promptVersion": "explain-prompt.v1",
+  "outputSchemaVersion": "explanation-output.v1",
+  "provider": "template",
+  "gemini": {
+    "model": "gemini-2.5-flash",
+    "location": "us-central1",
+    "temperature": 0.1,
+    "maxOutputTokens": 1500,
+    "timeoutMs": 8000
+  },
+  "cache": { "ttlSeconds": 600, "fallbackTtlSeconds": 60 }
+}

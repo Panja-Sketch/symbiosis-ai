@@ -21,7 +21,8 @@
     "smoke:s6": "tsx scripts/smoke-s6.ts",
     "web:build": "pnpm --dir apps/web build",
     "test:e2e": "pnpm web:build && playwright test",
-    "smoke:s7": "pnpm web:build && tsx scripts/smoke-s7.ts"
+    "smoke:s7": "pnpm web:build && tsx scripts/smoke-s7.ts",
+    "smoke:s8": "tsx scripts/smoke-s8.ts"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.13.0",
@@ -30,6 +31,7 @@
     "@symbiosis/action-orchestration": "workspace:*",
     "@symbiosis/adapter-esp32": "workspace:*",
     "@symbiosis/adapter-simulator": "workspace:*",
+    "@symbiosis/ai-explanation": "workspace:*",
     "@symbiosis/api": "workspace:*",
     "@symbiosis/audit": "workspace:*",
     "@symbiosis/authz": "workspace:*",

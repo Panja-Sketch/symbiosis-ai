@@ -425,3 +425,43 @@ export type InsurerInterventionDto = {
   readonly generatedAt: string;
   readonly note: string;
 };
+
+// ---- explanations (S8): AI or template prose about facts the system already established ---------
+
+export type ExplanationDto = {
+  readonly explanation: {
+    readonly summary: string;
+    readonly keyFacts: readonly string[];
+    readonly whyItMatters: readonly string[];
+    readonly actionContext: readonly string[];
+    readonly verificationExplanation: readonly string[];
+    readonly interventionExplanation: readonly string[];
+    readonly evidenceExplanation: readonly string[];
+    readonly limitations: readonly string[];
+    readonly sourceFactIds: readonly string[];
+  };
+  readonly meta: {
+    readonly provider: string;
+    readonly model?: string;
+    readonly generatedAt: string;
+    readonly promptVersion: string;
+    readonly schemaVersion: string;
+    readonly audience: "FACILITY" | "INSURER";
+    readonly caseId: string;
+    readonly fallbackUsed: boolean;
+    readonly fallbackReason?: string;
+    readonly attemptedProvider?: string;
+    readonly correlationId: string;
+    readonly cached: boolean;
+    readonly sources: readonly {
+      readonly type: string;
+      readonly id: string;
+      readonly version?: string;
+    }[];
+  };
+  readonly facts: readonly {
+    readonly id: string;
+    readonly label: string;
+    readonly value: string;
+  }[];
+};
