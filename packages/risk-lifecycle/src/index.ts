@@ -251,6 +251,38 @@ export type CoordinatedResult = {
 };
 
 /**
+ * Starts verification of the active event and its case together (ACTION_REPORTED -> VERIFYING,
+ * or INCONCLUSIVE -> VERIFYING for a retry). Both transitions must succeed or nothing is
+ * returned. Starting verification concludes nothing about the physical state.
+ */
+export function startVerification(input: {
+  readonly case: RiskImprovementCase;
+  readonly event: RiskEvent;
+  readonly at: IsoTimestamp;
+}): Result<CoordinatedResult, DomainError> {
+  const { case: c, event, at } = input;
+  if (event.caseId !== c.caseId || event.eventId !== c.activeRiskEventId) {
+    return err(
+      domainError(
+        "VERIFICATION_MISMATCH",
+        "CASE",
+        "The event is not the active risk event of this case",
+      ),
+    );
+  }
+  const eventResult = applyRiskEventCommand(event, { type: "START_VERIFICATION", at });
+  if (!eventResult.ok) return eventResult;
+  const caseResult = applyCaseCommand(c, { type: "START_VERIFICATION", at });
+  if (!caseResult.ok) return caseResult;
+  return ok({
+    case: caseResult.value.value,
+    event: eventResult.value.value,
+    caseRecord: caseResult.value.record,
+    eventRecord: eventResult.value.record,
+  });
+}
+
+/**
  * Applies a verification outcome to the active event and its case together. Both
  * transitions must succeed or nothing is returned. The outcome comes only from a
  * VerificationAssessment; no other input (AI output, button press) can move either state

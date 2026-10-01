@@ -35,6 +35,8 @@ export type DeviceSeen = {
 export interface DeviceRegistry {
   get(deviceId: string): Promise<DeviceRecord | undefined>;
   recordSeen(deviceId: string, seen: DeviceSeen): Promise<void>;
+  /** Devices registered to one facility of one organization (never across tenants). */
+  listForFacility(organizationId: string, facilityId: string): Promise<readonly DeviceRecord[]>;
 }
 
 /**
@@ -54,6 +56,12 @@ export class InMemoryDeviceRegistry implements DeviceRegistry {
 
   async get(deviceId: string): Promise<DeviceRecord | undefined> {
     return this.records.get(deviceId);
+  }
+
+  async listForFacility(organizationId: string, facilityId: string) {
+    return [...this.records.values()].filter(
+      (r) => r.organizationId === organizationId && r.facilityId === facilityId,
+    );
   }
 
   async recordSeen(deviceId: string, seen: DeviceSeen): Promise<void> {
@@ -139,4 +147,15 @@ export function createSyntheticDevRegistry(): {
       },
     ]),
   };
+}
+
+/** Every asset a device may report for: its default asset plus mapping targets. */
+export function deviceAssetIds(device: DeviceRecord): readonly string[] {
+  return [
+    ...new Set([
+      device.assetId,
+      ...Object.values(device.assetMapping?.byField ?? {}),
+      ...Object.values(device.assetMapping?.bySignal ?? {}),
+    ]),
+  ];
 }

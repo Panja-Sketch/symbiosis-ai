@@ -83,6 +83,13 @@ export const AUDIT_ACTIONS = [
   "ACTION_REPORTED",
   "RISK_ESCALATED",
   "RISK_DISMISSED",
+  "VERIFICATION_STARTED",
+  "VERIFICATION_COMPLETED",
+  "RECURRENCE_DETECTED",
+  "CASE_REOPENED",
+  "INTERVENTION_RECOMMENDED",
+  "INTERVENTION_ACKNOWLEDGED",
+  "INTERVENTION_RESOLVED",
 ] as const;
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
 
@@ -98,7 +105,7 @@ export type AuditEntry = {
   readonly actorId: string;
   readonly actorType: "USER" | "SYSTEM";
   readonly action: AuditAction;
-  readonly targetType: "CASE" | "RISK_EVENT" | "ACTION" | "ALERT";
+  readonly targetType: "CASE" | "RISK_EVENT" | "ACTION" | "ALERT" | "VERIFICATION" | "INTERVENTION";
   readonly targetId: string;
   readonly beforeState?: string;
   readonly afterState?: string;

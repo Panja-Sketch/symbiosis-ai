@@ -10,6 +10,8 @@
     "./testing": "./src/fixtures.ts"
   },
   "dependencies": {
-    "@symbiosis/contracts": "workspace:*"
+    "@symbiosis/baselines": "workspace:*",
+    "@symbiosis/contracts": "workspace:*",
+    "@symbiosis/data-quality": "workspace:*"
   }
 }

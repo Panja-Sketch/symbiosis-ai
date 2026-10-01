@@ -1,0 +1,133 @@
+{
+  "schema": "intervention-policy.v1",
+  "policyId": "IPOL-RISK-ENGINEER-PRIORITIZATION",
+  "policyVersion": "1",
+  "dataSufficiency": {
+    "minimumForRemoteConfidence": 0.6
+  },
+  "rules": [
+    {
+      "ruleId": "SV-RECURRED-TWICE",
+      "level": "SITE_VISIT_RECOMMENDED",
+      "reasonCode": "RECURRED_TWICE_AFTER_VERIFIED_IMPROVEMENT",
+      "when": [{ "fact": "recurrenceCount", "op": "gte", "value": 2 }]
+    },
+    {
+      "ruleId": "SV-CRITICAL-UNRESOLVED-NO-REMOTE-EVIDENCE",
+      "level": "SITE_VISIT_RECOMMENDED",
+      "reasonCode": "CRITICAL_UNRESOLVED_WITH_INSUFFICIENT_REMOTE_EVIDENCE",
+      "when": [
+        { "fact": "caseSeverity", "op": "eq", "value": "CRITICAL" },
+        { "fact": "caseUnresolved", "op": "eq", "value": true },
+        { "fact": "insufficientRemoteEvidence", "op": "eq", "value": true }
+      ]
+    },
+    {
+      "ruleId": "SV-REPEATED-UNSUCCESSFUL-VERIFICATION",
+      "level": "SITE_VISIT_RECOMMENDED",
+      "reasonCode": "THREE_CONSECUTIVE_UNSUCCESSFUL_VERIFICATIONS",
+      "when": [{ "fact": "consecutiveUnsuccessfulVerifications", "op": "gte", "value": 3 }]
+    },
+    {
+      "ruleId": "RE-RECURRED",
+      "level": "RISK_ENGINEER_REVIEW",
+      "reasonCode": "RECURRED_AFTER_VERIFIED_IMPROVEMENT",
+      "when": [{ "fact": "recurrenceCount", "op": "gte", "value": 1 }]
+    },
+    {
+      "ruleId": "RE-REPEATED-UNSUCCESSFUL-VERIFICATION",
+      "level": "RISK_ENGINEER_REVIEW",
+      "reasonCode": "TWO_CONSECUTIVE_UNSUCCESSFUL_VERIFICATIONS",
+      "when": [{ "fact": "consecutiveUnsuccessfulVerifications", "op": "gte", "value": 2 }]
+    },
+    {
+      "ruleId": "RE-REPEATED-INCONCLUSIVE",
+      "level": "RISK_ENGINEER_REVIEW",
+      "reasonCode": "REPEATED_INCONCLUSIVE_VERIFICATION",
+      "when": [{ "fact": "inconclusiveCount", "op": "gte", "value": 2 }]
+    },
+    {
+      "ruleId": "RE-CRITICAL-NOT-IMPROVING",
+      "level": "RISK_ENGINEER_REVIEW",
+      "reasonCode": "CRITICAL_RISK_NOT_IMPROVING",
+      "when": [
+        { "fact": "caseSeverity", "op": "eq", "value": "CRITICAL" },
+        { "fact": "caseUnresolved", "op": "eq", "value": true },
+        { "fact": "latestVerificationResult", "op": "eq", "value": "NOT_IMPROVING" }
+      ]
+    },
+    {
+      "ruleId": "RM-VERIFIED-IMPROVED-MONITORING",
+      "level": "REMOTE_MONITORING",
+      "reasonCode": "IMPROVEMENT_CONFIRMED_UNDER_RECURRENCE_WATCH",
+      "when": [
+        { "fact": "latestVerificationResult", "op": "eq", "value": "VERIFIED" },
+        { "fact": "caseUnresolved", "op": "eq", "value": false }
+      ]
+    },
+    {
+      "ruleId": "RR-NOT-IMPROVING",
+      "level": "REMOTE_REVIEW",
+      "reasonCode": "LATEST_VERIFICATION_NOT_IMPROVING",
+      "when": [{ "fact": "latestVerificationResult", "op": "eq", "value": "NOT_IMPROVING" }]
+    },
+    {
+      "ruleId": "RR-PARTIAL",
+      "level": "REMOTE_REVIEW",
+      "reasonCode": "LATEST_VERIFICATION_PARTIAL",
+      "when": [{ "fact": "latestVerificationResult", "op": "eq", "value": "PARTIALLY_VERIFIED" }]
+    },
+    {
+      "ruleId": "RR-INCONCLUSIVE",
+      "level": "REMOTE_REVIEW",
+      "reasonCode": "LATEST_VERIFICATION_INCONCLUSIVE",
+      "when": [{ "fact": "latestVerificationResult", "op": "eq", "value": "INCONCLUSIVE" }]
+    },
+    {
+      "ruleId": "RR-HIGH-UNRESOLVED",
+      "level": "REMOTE_REVIEW",
+      "reasonCode": "HIGH_SEVERITY_UNRESOLVED",
+      "when": [
+        { "fact": "caseSeverity", "op": "eq", "value": "HIGH" },
+        { "fact": "caseUnresolved", "op": "eq", "value": true }
+      ]
+    },
+    {
+      "ruleId": "RR-CRITICAL-UNRESOLVED",
+      "level": "REMOTE_REVIEW",
+      "reasonCode": "CRITICAL_SEVERITY_UNRESOLVED",
+      "when": [
+        { "fact": "caseSeverity", "op": "eq", "value": "CRITICAL" },
+        { "fact": "caseUnresolved", "op": "eq", "value": true }
+      ]
+    },
+    {
+      "ruleId": "RR-ESCALATED",
+      "level": "REMOTE_REVIEW",
+      "reasonCode": "ACKNOWLEDGEMENT_ESCALATED",
+      "when": [
+        { "fact": "escalated", "op": "eq", "value": true },
+        { "fact": "caseUnresolved", "op": "eq", "value": true }
+      ]
+    },
+    {
+      "ruleId": "RR-INTEGRITY",
+      "level": "REMOTE_REVIEW",
+      "reasonCode": "DEVICE_OR_AUTH_INTEGRITY_ISSUE",
+      "when": [
+        { "fact": "integrityIssue", "op": "eq", "value": true },
+        { "fact": "caseUnresolved", "op": "eq", "value": true }
+      ]
+    },
+    {
+      "ruleId": "RR-INSUFFICIENT-REMOTE-EVIDENCE",
+      "level": "REMOTE_REVIEW",
+      "reasonCode": "INSUFFICIENT_REMOTE_EVIDENCE",
+      "when": [{ "fact": "insufficientRemoteEvidence", "op": "eq", "value": true }]
+    }
+  ],
+  "default": {
+    "level": "REMOTE_MONITORING",
+    "reasonCode": "NO_ESCALATION_CONDITION_MET"
+  }
+}

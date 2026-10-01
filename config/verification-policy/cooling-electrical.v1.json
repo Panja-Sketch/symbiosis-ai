@@ -1,0 +1,73 @@
+{
+  "schema": "verification-policy.v1",
+  "policyId": "VPOL-COOLING-ELECTRICAL",
+  "policyVersion": "1",
+  "hazardType": "COOLING_ELECTRICAL_DETERIORATION",
+  "reference": {
+    "source": "CASE_SNAPSHOT_THEN_ACTIVE_SAME_MODE",
+    "preActionLookbackSeconds": 300
+  },
+  "postActionWindow": {
+    "settleSeconds": 0,
+    "durationSeconds": 120
+  },
+  "sampling": {
+    "expectedIntervalSeconds": 5
+  },
+  "minObservations": 12,
+  "acceptableMissingness": {
+    "maxMissingFraction": 0.25,
+    "maxGapSeconds": 30
+  },
+  "sustained": {
+    "seconds": 60,
+    "minObservations": 8
+  },
+  "integrity": {
+    "requireAuthenticated": true,
+    "requiredDeviceHealth": "HEALTHY",
+    "minObservationConfidence": 0.5,
+    "maxUntrustedFraction": 0.2
+  },
+  "minTelemetryConfidence": 0.8,
+  "criteria": {
+    "vibration": {
+      "role": "REQUIRED",
+      "signal": "vibration_rms",
+      "metric": "z_score",
+      "targetMax": 1,
+      "abnormalMin": 2,
+      "passFraction": 0.9,
+      "partialMaxAbnormalFraction": 0.1
+    },
+    "current": {
+      "role": "REQUIRED",
+      "signal": "current",
+      "metric": "percent_deviation",
+      "targetMax": 3,
+      "abnormalMin": 8,
+      "passFraction": 0.9,
+      "partialMaxAbnormalFraction": 0.1
+    },
+    "backupCapacity": {
+      "signal": "equipment_running",
+      "assetIds": ["AST-SIM-FAN-B"],
+      "requiredForActionLibraryIds": ["ACT-COOLING-START-BACKUP"],
+      "passFraction": 0.9
+    },
+    "zoneTemperature": {
+      "role": "SUPPORTING",
+      "signal": "temperature",
+      "assetIds": ["AST-SIM-ZONE-1"],
+      "maxSlopeDegCPerHour": 0,
+      "minSamples": 8,
+      "minSpanSeconds": 30
+    }
+  },
+  "partial": {
+    "enabled": true
+  },
+  "recurrenceWatch": {
+    "seconds": 3600
+  }
+}

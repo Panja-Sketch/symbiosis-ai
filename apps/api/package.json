@@ -13,6 +13,7 @@
     "@symbiosis/device-registry": "workspace:*",
     "@symbiosis/edge-security": "workspace:*",
     "@symbiosis/event-bus": "workspace:*",
+    "@symbiosis/intervention-prioritization": "workspace:*",
     "@symbiosis/tenancy": "workspace:*"
   }
 }

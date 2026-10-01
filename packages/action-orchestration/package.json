@@ -15,6 +15,7 @@
     "@symbiosis/repositories": "workspace:*",
     "@symbiosis/risk-cases": "workspace:*",
     "@symbiosis/risk-lifecycle": "workspace:*",
-    "@symbiosis/tenancy": "workspace:*"
+    "@symbiosis/tenancy": "workspace:*",
+    "@symbiosis/verification": "workspace:*"
   }
 }

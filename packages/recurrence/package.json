@@ -4,5 +4,11 @@
   "private": true,
   "type": "module",
   "main": "src/index.ts",
-  "types": "src/index.ts"
+  "types": "src/index.ts",
+  "dependencies": {
+    "@symbiosis/contracts": "workspace:*",
+    "@symbiosis/risk-cases": "workspace:*",
+    "@symbiosis/risk-lifecycle": "workspace:*",
+    "@symbiosis/verification": "workspace:*"
+  }
 }

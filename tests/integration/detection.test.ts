@@ -302,11 +302,11 @@ describe("Scenario E: insufficient baseline or data", () => {
 });
 
 describe("pipeline scope", () => {
-  it("emits no S5+ events and the simulator still goes through authenticated ingestion", async () => {
+  it("emits no verification, evidence, consent or recurrence events and still uses authenticated ingestion", async () => {
     await warmUp();
     await run("compound-outdoor-heat", 4);
     for (const t of new Set(types(runtime.bus.history()))) {
-      expect(t).not.toMatch(/^(verification|evidence|consent|recurrence|intervention)\./);
+      expect(t).not.toMatch(/^(verification|evidence|consent|recurrence)\./);
     }
     // every observation was authenticated by the edge before reaching the pipeline
     const obs = await runtime.observations.list(ORG);

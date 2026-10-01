@@ -55,11 +55,18 @@ describe("S4 stays within its boundaries", () => {
     }
   });
 
-  it("contains no verification policy execution, verification commands or verification events", () => {
-    for (const f of s4Files) {
+  it("the human-command path cannot produce a verification: no verification commands, events or verified states", () => {
+    // S5: the read model and HTTP pages may display results, but nothing a person can invoke
+    // (operations, actions, alerting, escalation, audit, authz, tenancy) may start, complete or
+    // record a verification, emit verification events, or name a verified state.
+    const commandSide = s4Files.filter(
+      (f) => !/(view\.ts|html\.ts|risk-pipeline\.ts|app-handler\.ts)$/.test(f),
+    );
+    expect(commandSide.length).toBeGreaterThan(10);
+    for (const f of commandSide) {
       const code = stripComments(readFileSync(f, "utf8"));
       expect(code, rel(f)).not.toMatch(
-        /validateVerificationAssessment|START_VERIFICATION|RECORD_VERIFICATION|COMPLETE_VERIFICATION|verification\.(started|completed)|VERIFIED_IMPROVED|PARTIALLY_VERIFIED|NOT_IMPROVING|INCONCLUSIVE/,
+        /validateVerificationAssessment|START_VERIFICATION|RECORD_VERIFICATION|COMPLETE_VERIFICATION|completeVerification|startVerification|verification\.(started|completed)|VERIFIED_IMPROVED|"VERIFIED"|"VERIFYING"/,
       );
     }
   });

@@ -54,16 +54,19 @@ describe("hardware independence (spec principle 7)", () => {
 describe("S4 stays within scope", () => {
   const all = [...sources("packages"), ...sources("apps"), ...sources("adapters")];
 
-  it("defines no verification, evidence, consent, recurrence or intervention events (S5+)", () => {
+  it("defines the S5 events and still no evidence, consent or sharing events (S6+)", () => {
     const text = readFileSync(join(root, "packages/contracts/src/events.ts"), "utf8");
     const union = text.slice(
       text.indexOf("export type PlatformEvent ="),
       text.indexOf("export type PlatformEventType"),
     );
-    expect(union.match(/^\s*\| /gm)).toHaveLength(19);
-    expect(text).not.toMatch(
-      /"(verification|evidence|consent|recurrence|intervention|sharing)[._]/i,
-    );
+    // 19 S2-S4 events + verification.started/completed, recurrence.detected, case.reopened,
+    // intervention.recommendation_updated
+    expect(union.match(/^\s*\| /gm)).toHaveLength(24);
+    expect(text).toMatch(/"verification\.started\.v1"/);
+    expect(text).toMatch(/"verification\.completed\.v1"/);
+    expect(text).toMatch(/"recurrence\.detected\.v1"/);
+    expect(text).not.toMatch(/"(evidence|consent|sharing)[._]/i);
     expect(text).not.toMatch(/"risk\.(verif|recurr)/i);
   });
 

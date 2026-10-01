@@ -1,9 +1,10 @@
 import type { Readings } from "./index";
 
 /**
- * Deterministic S3 detection scenarios. They only describe what a device would report; every
- * scenario still goes through signing, authentication, normalization and quality like real
- * hardware. No mitigation, action or verification behavior (S4+).
+ * Deterministic detection and post-action scenarios. They only describe what a device would
+ * report; every scenario still goes through signing, authentication, normalization and quality
+ * like real hardware. A scenario never decides anything: verification is computed from the
+ * resulting trusted observations (S5), not from the scenario name.
  */
 export const SCENARIOS = [
   "normal",
@@ -12,6 +13,10 @@ export const SCENARIOS = [
   "context-only",
   "compound-outdoor-heat",
   "compound-rising-temperature",
+  /** After maintenance: vibration back within the baseline's tolerance band, but not at target. */
+  "partial-improvement",
+  /** Healthy readings with the backup equipment observed running. */
+  "backup-running",
 ] as const;
 export type ScenarioName = (typeof SCENARIOS)[number];
 
@@ -40,6 +45,10 @@ export function scenarioReadings(scenario: ScenarioName, step: number): Readings
       return { ...normal, outdoor_temperature_c: 42 };
     case "compound-outdoor-heat":
       return { ...normal, vibration_rms_ms2: 0.35, current_ma: 350, outdoor_temperature_c: 42 };
+    case "partial-improvement":
+      return { ...normal, vibration_rms_ms2: 0.215 };
+    case "backup-running":
+      return { ...normal, chiller_b_running: true };
     case "compound-rising-temperature":
       return {
         ...normal,

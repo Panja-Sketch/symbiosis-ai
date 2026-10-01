@@ -6,6 +6,7 @@ export * from "./result";
 export * from "./errors";
 export * from "./transition";
 export * from "./verification";
+export * from "./intervention";
 export * from "./recommendation";
 export * from "./risk-event";
 export * from "./action";

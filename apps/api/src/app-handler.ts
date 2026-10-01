@@ -1,4 +1,8 @@
 import type { Operations, OperationsError } from "@symbiosis/action-orchestration";
+import type {
+  InterventionError,
+  InterventionService,
+} from "@symbiosis/intervention-prioritization";
 import { can } from "@symbiosis/authz";
 import { permissionsFor } from "@symbiosis/authz";
 import type { ActorContext, ActorDirectory } from "@symbiosis/tenancy";
@@ -7,6 +11,7 @@ import { renderCaseHtml, renderCaseListHtml, renderErrorHtml } from "./html";
 
 export type AppApiDeps = {
   readonly operations: Operations;
+  readonly interventions: InterventionService;
   readonly directory: ActorDirectory;
   /**
    * Local-only maintenance hook: runs the escalation evaluator and alert retries once. Absent
@@ -21,6 +26,9 @@ const STATUS: Record<OperationsError["code"], number> = {
   INVALID_REQUEST: 400,
   CONFLICT: 409,
 };
+
+const fromInterventionError = (e: InterventionError): EdgeResponse =>
+  json(STATUS[e.code], { error: { code: e.code, message: e.message } });
 
 const json = (status: number, body: unknown): EdgeResponse => ({ status, body });
 const problem = (status: number, code: string, message: string): EdgeResponse =>
@@ -134,6 +142,34 @@ export function createAppHandler(
       if (deps.runTick === undefined) return problem(404, "NOT_FOUND", "Unknown route");
       if (!can(actor, "OPS_TICK")) return problem(403, "FORBIDDEN", "Missing permission OPS_TICK");
       return json(200, await deps.runTick());
+    }
+
+    // ---- verifications and intervention recommendations (S5) -----------------------------
+    if (route[0] === "verifications" && route.length === 2 && ID.test(route[1] ?? "")) {
+      if (method !== "GET") return problem(405, "METHOD_NOT_ALLOWED", "GET only");
+      const r = await deps.operations.getVerification(actor, route[1] as string);
+      return r.ok ? json(200, r.value) : fromError(r.error);
+    }
+    if (route[0] === "interventions") {
+      if (route.length === 1) {
+        if (method !== "GET") return problem(405, "METHOD_NOT_ALLOWED", "GET only");
+        const r = await deps.interventions.list(actor);
+        return r.ok ? json(200, { interventions: r.value }) : fromInterventionError(r.error);
+      }
+      if (ID.test(route[1] ?? "")) {
+        const id = route[1] as string;
+        if (route.length === 2) {
+          if (method !== "GET") return problem(405, "METHOD_NOT_ALLOWED", "GET only");
+          const r = await deps.interventions.get(actor, id);
+          return r.ok ? json(200, r.value) : fromInterventionError(r.error);
+        }
+        if (route.length === 3 && route[2] === "acknowledge") {
+          if (method !== "POST") return problem(405, "METHOD_NOT_ALLOWED", "POST only");
+          const r = await deps.interventions.acknowledge(actor, id);
+          return r.ok ? json(200, r.value) : fromInterventionError(r.error);
+        }
+      }
+      return problem(404, "NOT_FOUND", "Unknown route");
     }
 
     if (route[0] !== "cases" || route.length < 2 || !ID.test(route[1] ?? "")) {

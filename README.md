@@ -7,13 +7,18 @@ architecture (single source of truth).
 ## Status
 
 Phases **S0** (foundation), **S1** (domain core), **S2** (local ingestion), **S3** (detection +
-baselines) and **S4** (operations workflow) are complete. A simulated device is authenticated,
-normalized and assessed; a deterministic rule detects persistent compound deterioration and opens
-a Risk Improvement Case; an alert goes out through a local notification port (ConsoleEmail) and
-the event becomes ALERTED; a person acknowledges, an approved action is assigned and reported, and
-the case waits as **ACTION REPORTED / VERIFICATION PENDING**. Unacknowledged alerts escalate on a
-configured deadline. The system deliberately stops there: **no verification, evidence, consent,
-final UI, AI or cloud integration yet.** Progress is tracked in
+baselines), **S4** (operations workflow) and **S5** (verification + recurrence + intervention
+prioritization) are complete. A simulated device is authenticated, normalized and assessed; a
+deterministic rule detects persistent compound deterioration and opens a Risk Improvement Case; an
+alert goes out through a local notification port (ConsoleEmail); a person acknowledges, an approved
+action is assigned and reported, and the case waits as **VERIFICATION PENDING**. A reported action
+is **never** evidence that the risk improved: a deterministic verification over trusted
+post-action sensor readings (versioned policy in `config/verification-policy/`) concludes
+`VERIFIED`, `PARTIALLY_VERIFIED`, `NOT_IMPROVING` or `INCONCLUSIVE`, history is kept, and if the
+same hazard returns inside the recurrence-watch window the **same** case is `REOPENED`. A
+deterministic, versioned risk-engineer intervention recommendation (decision support only) is
+recalculated on material events. The system deliberately stops there: **no evidence package,
+consent, final UI, AI or cloud integration yet.** Progress is tracked in
 [docs/IMPLEMENTATION_STATE.md](docs/IMPLEMENTATION_STATE.md).
 
 ## Layout
@@ -41,6 +46,7 @@ pnpm dev          # api + worker (one process, in-memory bus) and the simulator
 pnpm smoke:s2     # self-checking ingestion run over real HTTP, exits non-zero on failure
 pnpm smoke:s3     # baseline -> isolated anomalies -> compound deterioration -> one case
 pnpm smoke:s4     # detected -> alert -> acknowledge -> assign -> report -> VERIFICATION PENDING
+pnpm smoke:s5     # ... -> trusted post-action data -> VERIFIED -> hazard returns -> same case REOPENED
 ```
 
 `pnpm dev` listens on `http://127.0.0.1:8787` (override with `EDGE_PORT`) and prints each
@@ -84,3 +90,23 @@ It is not authentication. Alerts are printed by ConsoleEmail; nothing is emailed
 deadlines, retry settings and recipient roles are in `config/escalation/`, and the approved,
 recommend-only actions are in `config/action-library/`. `OPS_TICK_INTERVAL_MS` sets the dev
 scheduler stand-in (default 10 s).
+
+### Verification, recurrence and intervention recommendations (S5)
+
+Verification is driven by the scheduler seam: `runtime.tick()` (in `pnpm dev` every
+`OPS_TICK_INTERVAL_MS`; also `POST /api/v1/ops/tick`, ORG_ADMIN) starts a verification for each
+case whose action was reported, then completes every verification whose post-action window has
+ended. Nothing is concluded before the window ends, and tests use simulated time. The policy
+(window, minimum observations, required signals, missingness, sustained duration, hysteresis,
+recurrence-watch window) is `config/verification-policy/cooling-electrical.v1.json`; the
+intervention policy is `config/intervention-policy/risk-engineer-prioritization.v1.json`.
+`SIMULATOR_SCENARIO` also accepts `partial-improvement` and `backup-running`.
+
+Added API (same development identity): `GET /api/v1/verifications/:id`,
+`GET /api/v1/interventions`, `GET /api/v1/interventions/:id`,
+`POST /api/v1/interventions/:id/acknowledge`. The case page now shows "Did it work?" (pending or the
+result with criteria, before/after values, completeness, confidence and evidence-reference count),
+"Is it staying fixed?" (recurrence watch and count) and the deterministic intervention
+recommendation (Remote Monitoring, Remote Review, Risk Engineer Review, Site Visit Recommended). A
+recommendation is decision support only: it schedules nobody and changes no underwriting, premium
+or coverage.

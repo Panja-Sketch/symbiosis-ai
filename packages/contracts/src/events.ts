@@ -3,7 +3,9 @@ import type { Alert, AlertKind, NotificationChannel, NotificationResult } from "
 import type { ObservationEvaluation, RiskDetection } from "./risk";
 import type { UnassessedObservation, CanonicalObservation, CanonicalSignal } from "./canonical";
 import type { AssetMapping, DeviceHealth, EdgeTelemetryPayload } from "./edge";
-import type { IsoTimestamp } from "./primitives";
+import type { IsoTimestamp, TimeWindow } from "./primitives";
+import type { InterventionLevel, InterventionStatus } from "./intervention";
+import type { RequiredSignal, VerificationResult } from "./verification";
 
 export const EVENT_SCHEMA_VERSION = "1.0" as const;
 
@@ -107,6 +109,8 @@ export const CASE_CHANGES = [
   "ACTION_REQUIRED",
   "ACTION_REPORTED",
   "CASE_CLOSED",
+  "VERIFICATION_STARTED",
+  "VERIFICATION_COMPLETED",
 ] as const;
 export type CaseChange = (typeof CASE_CHANGES)[number];
 
@@ -214,6 +218,71 @@ export type ActionReportedPayload = {
   readonly attachmentCount: number;
 };
 
+export type VerificationStartedPayload = {
+  readonly verificationId: string;
+  readonly caseId: string;
+  readonly riskEventId: string;
+  readonly policyId: string;
+  readonly policyVersion: string;
+  readonly actionIds: readonly string[];
+  readonly postActionWindow: TimeWindow;
+  readonly requiredSignals: readonly RequiredSignal[];
+  readonly startedAt: IsoTimestamp;
+};
+
+/** Result of deterministic verification over trusted post-action observations (S5). */
+export type VerificationCompletedPayload = {
+  readonly verificationId: string;
+  readonly caseId: string;
+  readonly riskEventId: string;
+  readonly policyId: string;
+  readonly policyVersion: string;
+  readonly result: VerificationResult;
+  readonly confidence: number;
+  readonly completeness: number;
+  readonly telemetryConfidence: number;
+  readonly reasonCodes: readonly string[];
+  readonly evidenceIds: readonly string[];
+  readonly evaluatedAt: IsoTimestamp;
+};
+
+export type RecurrenceDetectedPayload = {
+  readonly caseId: string;
+  readonly previousRiskEventId: string;
+  readonly newRiskEventId: string;
+  readonly previousVerificationId: string;
+  readonly detectionId: string;
+  readonly hazardType: string;
+  readonly primaryAssetId: string;
+  readonly severity: CaseSeverity;
+  readonly recurrenceCount: number;
+  readonly recurrenceWatchEndsAt: IsoTimestamp;
+  readonly detectedAt: IsoTimestamp;
+  readonly reasonCodes: readonly string[];
+};
+
+export type CaseReopenedPayload = {
+  readonly caseId: string;
+  readonly riskEventId: string;
+  readonly previousState: CaseState;
+  readonly state: CaseState;
+  readonly severity: CaseSeverity;
+  readonly recurrenceCount: number;
+};
+
+export type InterventionRecommendationUpdatedPayload = {
+  readonly interventionId: string;
+  readonly caseId?: string;
+  readonly level: InterventionLevel;
+  readonly previousLevel?: InterventionLevel;
+  readonly status: InterventionStatus;
+  readonly policyId: string;
+  readonly policyVersion: string;
+  readonly reasonCodes: readonly string[];
+  readonly supersededInterventionId?: string;
+  readonly generatedAt: IsoTimestamp;
+};
+
 export type RiskObservationEvaluatedEvent = EventEnvelope<
   "risk.observation_evaluated.v1",
   RiskObservationEvaluatedPayload
@@ -248,6 +317,24 @@ export type ActionAcknowledgedEvent = EventEnvelope<
 >;
 export type ActionReportedEvent = EventEnvelope<"action.reported.v1", ActionReportedPayload>;
 
+export type VerificationStartedEvent = EventEnvelope<
+  "verification.started.v1",
+  VerificationStartedPayload
+>;
+export type VerificationCompletedEvent = EventEnvelope<
+  "verification.completed.v1",
+  VerificationCompletedPayload
+>;
+export type RecurrenceDetectedEvent = EventEnvelope<
+  "recurrence.detected.v1",
+  RecurrenceDetectedPayload
+>;
+export type CaseReopenedEvent = EventEnvelope<"case.reopened.v1", CaseReopenedPayload>;
+export type InterventionRecommendationUpdatedEvent = EventEnvelope<
+  "intervention.recommendation_updated.v1",
+  InterventionRecommendationUpdatedPayload
+>;
+
 /** All platform events defined so far. Later phases extend this union. */
 export type PlatformEvent =
   | TelemetryReceivedEvent
@@ -268,7 +355,12 @@ export type PlatformEvent =
   | RiskDismissedEvent
   | ActionAssignedEvent
   | ActionAcknowledgedEvent
-  | ActionReportedEvent;
+  | ActionReportedEvent
+  | VerificationStartedEvent
+  | VerificationCompletedEvent
+  | RecurrenceDetectedEvent
+  | CaseReopenedEvent
+  | InterventionRecommendationUpdatedEvent;
 
 export type PlatformEventType = PlatformEvent["event_type"];
 export type EventOfType<T extends PlatformEventType> = Extract<PlatformEvent, { event_type: T }>;

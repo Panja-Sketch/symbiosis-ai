@@ -368,13 +368,21 @@ export function applyCaseCommand(
   });
 }
 
-/** States in which a continuing detection of the same hazard may be recorded. S4 adds
- * ACTION_REPORTED (the workflow keeps waiting for verification). VERIFYING and the verification
- * outcome states belong to S5. */
+/**
+ * States in which a continuing detection of the same hazard may be recorded (state preserved,
+ * severity may only rise). S4 added ACTION_REPORTED; S5 adds VERIFYING and the unsuccessful
+ * outcome states, so a hazard that continues while a verification or its follow-up is open is
+ * never lost. VERIFIED_IMPROVED is deliberately NOT here: a qualifying detection against a
+ * verified case is a recurrence and takes the reopen path (spec 8.3). CLOSED is terminal.
+ */
 const DETECTION_RECORDABLE: readonly CaseState[] = [
   "OPEN",
   "ACTION_REQUIRED",
   "ACTION_REPORTED",
+  "VERIFYING",
+  "PARTIALLY_VERIFIED",
+  "NOT_IMPROVING",
+  "INCONCLUSIVE",
   "REOPENED",
 ];
 

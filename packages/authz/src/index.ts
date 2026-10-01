@@ -11,6 +11,8 @@ export const PERMISSIONS = [
   "ACTION_REPORT",
   "RISK_DISMISS",
   "OPS_TICK",
+  "INTERVENTION_READ",
+  "INTERVENTION_ACKNOWLEDGE",
 ] as const;
 export type Permission = (typeof PERMISSIONS)[number];
 
@@ -28,9 +30,11 @@ const ROLE_PERMISSIONS: Readonly<Record<Role, readonly Permission[]>> = {
     "ACTION_ACKNOWLEDGE",
     "ACTION_REPORT",
     "RISK_DISMISS",
+    "INTERVENTION_READ",
+    "INTERVENTION_ACKNOWLEDGE",
   ],
   OPERATOR: ["CASE_READ", "CASE_ACKNOWLEDGE", "ACTION_ACKNOWLEDGE", "ACTION_REPORT"],
-  READ_ONLY_AUDITOR: ["CASE_READ"],
+  READ_ONLY_AUDITOR: ["CASE_READ", "INTERVENTION_READ"],
   // Insurer-side roles never act on the operations workflow (spec 2.2/2.3).
   RISK_ENGINEER: [],
   UNDERWRITER: [],

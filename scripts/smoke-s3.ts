@@ -155,10 +155,8 @@ check(
 
 console.log("\n-- scope --");
 check(
-  "no S5+ events emitted (verification, evidence, consent, recurrence)",
-  [...new Set(histTypes())].every(
-    (t) => !/^(verification|evidence|consent|recurrence|intervention)\./.test(t),
-  ),
+  "no verification, evidence, consent or recurrence events (nothing acts on a case in S3)",
+  [...new Set(histTypes())].every((t) => !/^(verification|evidence|consent|recurrence)\./.test(t)),
 );
 check("no dead-lettered events", runtime.bus.deadLetters().length === 0);
 

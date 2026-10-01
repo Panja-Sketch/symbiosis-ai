@@ -398,8 +398,27 @@ export function createAlerting(deps: AlertingDeps): Alerting {
  */
 export function startAlerting(deps: AlertingDeps, alerting: Alerting): Unsubscribe {
   const detections = new Map<string, readonly string[]>();
+  const latestReasons = new Map<string, readonly string[]>();
   deps.bus.subscribe("risk.detected.v1", (e) => {
     detections.set(e.payload.detectionId, e.payload.reasonCodes);
+  });
+  // A recurrence opens a new risk event on the same case; its INITIAL alert is a new alert.
+  deps.bus.subscribe("recurrence.detected.v1", (e) => {
+    detections.set(e.payload.detectionId, e.payload.reasonCodes);
+    latestReasons.set(e.payload.caseId, e.payload.reasonCodes);
+  });
+  deps.bus.subscribe("case.reopened.v1", async (event) => {
+    const caseRecord = await deps.cases.get(event.organization_id, event.payload.caseId);
+    const riskEvent = await deps.riskEvents.get(event.organization_id, event.payload.riskEventId);
+    if (caseRecord === undefined || riskEvent === undefined) return;
+    await alerting.requestAlert({
+      caseRecord,
+      event: riskEvent,
+      kind: "INITIAL",
+      correlationId: event.correlation_id,
+      causationId: event.event_id,
+      reasonCodes: latestReasons.get(event.payload.caseId) ?? [],
+    });
   });
   return deps.bus.subscribe("case.created.v1", async (event) => {
     const caseRecord = await deps.cases.get(event.organization_id, event.payload.caseId);

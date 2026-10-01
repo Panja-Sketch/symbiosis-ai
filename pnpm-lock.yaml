@@ -211,6 +211,9 @@ importers:
       '@symbiosis/event-bus':
         specifier: workspace:*
         version: link:packages/event-bus
+      '@symbiosis/intervention-prioritization':
+        specifier: workspace:*
+        version: link:packages/intervention-prioritization
       '@symbiosis/normalization':
         specifier: workspace:*
         version: link:packages/normalization
@@ -232,6 +235,9 @@ importers:
       '@symbiosis/tenancy':
         specifier: workspace:*
         version: link:packages/tenancy
+      '@symbiosis/verification':
+        specifier: workspace:*
+        version: link:packages/verification
       '@symbiosis/worker':
         specifier: workspace:*
         version: link:apps/worker
@@ -308,6 +314,9 @@ importers:
       '@symbiosis/event-bus':
         specifier: workspace:*
         version: link:../../packages/event-bus
+      '@symbiosis/intervention-prioritization':
+        specifier: workspace:*
+        version: link:../../packages/intervention-prioritization
       '@symbiosis/tenancy':
         specifier: workspace:*
         version: link:../../packages/tenancy
@@ -343,12 +352,18 @@ importers:
       '@symbiosis/data-quality':
         specifier: workspace:*
         version: link:../../packages/data-quality
+      '@symbiosis/device-registry':
+        specifier: workspace:*
+        version: link:../../packages/device-registry
       '@symbiosis/event-bus':
         specifier: workspace:*
         version: link:../../packages/event-bus
       '@symbiosis/normalization':
         specifier: workspace:*
         version: link:../../packages/normalization
+      '@symbiosis/recurrence':
+        specifier: workspace:*
+        version: link:../../packages/recurrence
       '@symbiosis/repositories':
         specifier: workspace:*
         version: link:../../packages/repositories
@@ -361,6 +376,9 @@ importers:
       '@symbiosis/risk-lifecycle':
         specifier: workspace:*
         version: link:../../packages/risk-lifecycle
+      '@symbiosis/verification':
+        specifier: workspace:*
+        version: link:../../packages/verification
 
   packages/action-orchestration:
     dependencies:
@@ -394,6 +412,9 @@ importers:
       '@symbiosis/tenancy':
         specifier: workspace:*
         version: link:../tenancy
+      '@symbiosis/verification':
+        specifier: workspace:*
+        version: link:../verification
 
   packages/ai-explanation: {}
 
@@ -477,7 +498,32 @@ importers:
 
   packages/evidence: {}
 
-  packages/intervention-prioritization: {}
+  packages/intervention-prioritization:
+    dependencies:
+      '@symbiosis/audit':
+        specifier: workspace:*
+        version: link:../audit
+      '@symbiosis/authz':
+        specifier: workspace:*
+        version: link:../authz
+      '@symbiosis/clock':
+        specifier: workspace:*
+        version: link:../clock
+      '@symbiosis/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@symbiosis/event-bus':
+        specifier: workspace:*
+        version: link:../event-bus
+      '@symbiosis/repositories':
+        specifier: workspace:*
+        version: link:../repositories
+      '@symbiosis/tenancy':
+        specifier: workspace:*
+        version: link:../tenancy
+      '@symbiosis/verification':
+        specifier: workspace:*
+        version: link:../verification
 
   packages/loss-model: {}
 
@@ -525,7 +571,20 @@ importers:
         specifier: workspace:*
         version: link:../verification
 
-  packages/recurrence: {}
+  packages/recurrence:
+    dependencies:
+      '@symbiosis/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@symbiosis/risk-cases':
+        specifier: workspace:*
+        version: link:../risk-cases
+      '@symbiosis/risk-lifecycle':
+        specifier: workspace:*
+        version: link:../risk-lifecycle
+      '@symbiosis/verification':
+        specifier: workspace:*
+        version: link:../verification
 
   packages/repositories:
     dependencies:
@@ -570,9 +629,15 @@ importers:
 
   packages/verification:
     dependencies:
+      '@symbiosis/baselines':
+        specifier: workspace:*
+        version: link:../baselines
       '@symbiosis/contracts':
         specifier: workspace:*
         version: link:../contracts
+      '@symbiosis/data-quality':
+        specifier: workspace:*
+        version: link:../data-quality
 
 packages:
 

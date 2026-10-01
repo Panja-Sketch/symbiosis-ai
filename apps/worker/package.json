@@ -11,11 +11,14 @@
     "@symbiosis/clock": "workspace:*",
     "@symbiosis/contracts": "workspace:*",
     "@symbiosis/data-quality": "workspace:*",
+    "@symbiosis/device-registry": "workspace:*",
     "@symbiosis/event-bus": "workspace:*",
     "@symbiosis/normalization": "workspace:*",
+    "@symbiosis/recurrence": "workspace:*",
     "@symbiosis/repositories": "workspace:*",
     "@symbiosis/risk-cases": "workspace:*",
     "@symbiosis/risk-detection": "workspace:*",
-    "@symbiosis/risk-lifecycle": "workspace:*"
+    "@symbiosis/risk-lifecycle": "workspace:*",
+    "@symbiosis/verification": "workspace:*"
   }
 }

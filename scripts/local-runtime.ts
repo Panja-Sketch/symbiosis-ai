@@ -19,6 +19,17 @@ import type { Clock } from "@symbiosis/clock";
 import { parseBaselineConfig } from "@symbiosis/baselines";
 import type { BaselineConfig } from "@symbiosis/baselines";
 import { parseDataQualityConfig } from "@symbiosis/data-quality";
+import {
+  createInterventionService,
+  parseInterventionPolicy,
+  startInterventions,
+} from "@symbiosis/intervention-prioritization";
+import type {
+  InterventionPolicy,
+  InterventionService,
+} from "@symbiosis/intervention-prioritization";
+import { parseVerificationPolicy } from "@symbiosis/verification";
+import type { VerificationPolicy } from "@symbiosis/verification";
 import { createSyntheticDevRegistry } from "@symbiosis/device-registry";
 import type { DeviceRegistry, DeviceKeyStore } from "@symbiosis/device-registry";
 import { InMemoryReplayGuard } from "@symbiosis/edge-security";
@@ -35,12 +46,20 @@ import {
   InMemoryBaselineRepository,
   InMemoryCaseRepository,
   InMemoryDetectionStateRepository,
+  InMemoryInterventionRepository,
   InMemoryObservationRepository,
   InMemoryRiskEventRepository,
+  InMemoryVerificationRepository,
 } from "@symbiosis/repositories";
 import { parseRuleConfig } from "@symbiosis/risk-detection";
 import type { RuleConfig } from "@symbiosis/risk-detection";
-import { startRiskPipeline, startTelemetryWorker } from "@symbiosis/worker";
+import {
+  createVerificationRunner,
+  resolveEvidence,
+  startRiskPipeline,
+  startTelemetryWorker,
+} from "@symbiosis/worker";
+import type { EvidenceResolution, VerificationRunner } from "@symbiosis/worker";
 
 /**
  * Local-mode composition root (spec section 39). In the cloud, `api` and `worker` are separate
@@ -57,6 +76,8 @@ export type LocalRuntimeOptions = {
   readonly ruleConfig?: RuleConfig;
   readonly escalationPolicy?: EscalationPolicy;
   readonly actionLibrary?: ActionLibrary;
+  readonly verificationPolicy?: VerificationPolicy;
+  readonly interventionPolicy?: InterventionPolicy;
   /** Replaces ConsoleEmail (tests inject a scripted sender). */
   readonly notificationSender?: NotificationSender;
   /** Where ConsoleEmail writes; defaults to console.log. */
@@ -73,13 +94,24 @@ export type LocalRuntime = {
   readonly riskEvents: InMemoryRiskEventRepository;
   readonly alerts: InMemoryAlertRepository;
   readonly actions: InMemoryActionRepository;
+  readonly verifications: InMemoryVerificationRepository;
+  readonly interventions: InMemoryInterventionRepository;
+  readonly verificationRunner: VerificationRunner;
+  readonly interventionService: InterventionService;
+  readonly verificationPolicy: VerificationPolicy;
+  /** Proves each evidence reference of a verification names a real stored record. */
+  resolveEvidence(
+    verificationId: string,
+    organizationId: string,
+  ): Promise<readonly EvidenceResolution[]>;
   readonly audit: InMemoryAuditLog;
   readonly operations: Operations;
   readonly directory: ReturnType<typeof createSyntheticActorDirectory>;
-  /** One escalation + alert-retry pass (what a scheduler tick calls). */
+  /** One scheduler pass: alert retries, escalation, then verification start/evaluation. */
   tick(): Promise<{
     escalated: readonly { riskEventId: string; caseId: string }[];
     retried: number;
+    verification: Awaited<ReturnType<VerificationRunner["tick"]>>;
   }>;
   readonly registry: DeviceRegistry;
   readonly keys: DeviceKeyStore;
@@ -109,6 +141,21 @@ export function loadEscalationPolicy(): EscalationPolicy {
   return parseEscalationPolicy(JSON.parse(readFileSync(path, "utf8")));
 }
 
+export function loadVerificationPolicy(): VerificationPolicy {
+  const path = join(repoRoot, "config", "verification-policy", "cooling-electrical.v1.json");
+  return parseVerificationPolicy(JSON.parse(readFileSync(path, "utf8")));
+}
+
+export function loadInterventionPolicy(): InterventionPolicy {
+  const path = join(
+    repoRoot,
+    "config",
+    "intervention-policy",
+    "risk-engineer-prioritization.v1.json",
+  );
+  return parseInterventionPolicy(JSON.parse(readFileSync(path, "utf8")));
+}
+
 export function loadActionLibrary(): ActionLibrary {
   const path = join(repoRoot, "config", "action-library", "cooling-actions.v1.json");
   return parseActionLibrary(JSON.parse(readFileSync(path, "utf8")));
@@ -125,10 +172,15 @@ export async function createLocalRuntime(options: LocalRuntimeOptions = {}): Pro
   const riskEvents = new InMemoryRiskEventRepository();
   const alerts = new InMemoryAlertRepository();
   const actions = new InMemoryActionRepository();
+  const verifications = new InMemoryVerificationRepository();
+  const interventions = new InMemoryInterventionRepository();
   const audit = new InMemoryAuditLog();
   const directory = createSyntheticActorDirectory();
   const policy = options.escalationPolicy ?? loadEscalationPolicy();
   const library = options.actionLibrary ?? loadActionLibrary();
+  const verificationPolicy = options.verificationPolicy ?? loadVerificationPolicy();
+  const interventionPolicy = options.interventionPolicy ?? loadInterventionPolicy();
+  const baselineConfig = options.baselineConfig ?? loadBaselineConfig();
   const { registry, keys } = createSyntheticDevRegistry();
 
   startTelemetryWorker({
@@ -148,9 +200,39 @@ export async function createLocalRuntime(options: LocalRuntimeOptions = {}): Pro
     detectionStates,
     cases,
     riskEvents,
+    verifications,
     audit,
     rule: options.ruleConfig ?? loadRuleConfig(),
-    baselineConfig: options.baselineConfig ?? loadBaselineConfig(),
+    baselineConfig,
+  });
+
+  const interventionDeps = {
+    bus,
+    ids,
+    clock,
+    audit,
+    cases,
+    verifications,
+    interventions,
+    policy: interventionPolicy,
+  };
+  const interventionService = createInterventionService(interventionDeps);
+  startInterventions(interventionDeps, interventionService);
+
+  const verificationRunner = createVerificationRunner({
+    bus,
+    ids,
+    clock,
+    audit,
+    cases,
+    riskEvents,
+    actions,
+    observations,
+    baselines,
+    verifications,
+    registry,
+    policy: verificationPolicy,
+    baselineConfig,
   });
 
   const alertingDeps = {
@@ -172,6 +254,8 @@ export async function createLocalRuntime(options: LocalRuntimeOptions = {}): Pro
     riskEvents,
     actions,
     alerts,
+    verifications,
+    interventions,
     audit,
     bus,
     ids,
@@ -202,7 +286,10 @@ export async function createLocalRuntime(options: LocalRuntimeOptions = {}): Pro
         });
       },
     });
-    return { escalated: escalation.escalated, retried };
+    // Verification starts for reported actions and completes once a window has ended. It is the
+    // only code that can produce a verification result.
+    const verification = await verificationRunner.tick();
+    return { escalated: escalation.escalated, retried, verification };
   };
 
   const edgeHandler = createEdgeHandler({
@@ -216,7 +303,12 @@ export async function createLocalRuntime(options: LocalRuntimeOptions = {}): Pro
   });
   const handler = createApiHandler({
     edge: edgeHandler,
-    app: createAppHandler({ operations, directory, runTick: tick }),
+    app: createAppHandler({
+      operations,
+      interventions: interventionService,
+      directory,
+      runTick: tick,
+    }),
   });
   const server = await listen(createEdgeServer(handler), options.port ?? 0);
   return {
@@ -229,6 +321,26 @@ export async function createLocalRuntime(options: LocalRuntimeOptions = {}): Pro
     riskEvents,
     alerts,
     actions,
+    verifications,
+    interventions,
+    verificationRunner,
+    interventionService,
+    verificationPolicy,
+    resolveEvidence: async (verificationId, organizationId) => {
+      const attempt = await verifications.get(organizationId, verificationId);
+      if (attempt === undefined) return [];
+      return resolveEvidence(
+        {
+          observations,
+          baselines,
+          actions,
+          audit,
+          registry,
+          knownPolicies: [verificationPolicy],
+        },
+        attempt,
+      );
+    },
     audit,
     operations,
     directory,

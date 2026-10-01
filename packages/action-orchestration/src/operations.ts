@@ -1,5 +1,6 @@
 import { err, isNonEmptyString, ok } from "@symbiosis/contracts";
 import type {
+  VerificationAttempt,
   CaseChange,
   CaseState,
   DomainError,
@@ -19,7 +20,9 @@ import type {
   ActionRepository,
   AlertRepository,
   CaseRepository,
+  InterventionRepository,
   RiskEventRepository,
+  VerificationRepository,
 } from "@symbiosis/repositories";
 import { applyCaseCommand } from "@symbiosis/risk-cases";
 import { applyRiskEventCommand } from "@symbiosis/risk-lifecycle";
@@ -48,6 +51,8 @@ export type OperationsDeps = {
   readonly riskEvents: RiskEventRepository;
   readonly actions: ActionRepository;
   readonly alerts: AlertRepository;
+  readonly verifications: VerificationRepository;
+  readonly interventions: InterventionRepository;
   readonly audit: AuditLog;
   readonly bus: EventBus;
   readonly ids: IdGenerator;
@@ -100,11 +105,37 @@ export interface Operations {
     reason: string,
   ): Promise<Result<WorkflowOutcome, OperationsError>>;
   getCaseView(actor: ActorContext, caseId: string): Promise<Result<CaseView, OperationsError>>;
+  /** One verification attempt (with its assessment, criteria and evidence references). */
+  getVerification(
+    actor: ActorContext,
+    verificationId: string,
+  ): Promise<Result<VerificationAttempt, OperationsError>>;
   listCases(actor: ActorContext): Promise<Result<readonly CaseViewSummary[], OperationsError>>;
 }
 
 const laterIso = (...isos: string[]) =>
   new Date(Math.max(...isos.map((i) => Date.parse(i)))).toISOString();
+
+/**
+ * Risk-event states from which a human may assign or report an approved action: the first cycle
+ * (ACKNOWLEDGED), further actions while waiting (ACTION_REPORTED) and a follow-up cycle after an
+ * unsuccessful verification outcome. Outcome states are never silently closed (S5).
+ */
+const ACTIONABLE_EVENT_STATES: readonly RiskEvent["state"][] = [
+  "ACKNOWLEDGED",
+  "ACTION_REPORTED",
+  "PARTIALLY_VERIFIED",
+  "NOT_IMPROVING",
+  "INCONCLUSIVE",
+];
+/** Case states that move to ACTION_REQUIRED when an action is assigned or reported. */
+const CASE_NEEDS_REQUIRE_ACTION: readonly CaseState[] = [
+  "OPEN",
+  "REOPENED",
+  "PARTIALLY_VERIFIED",
+  "NOT_IMPROVING",
+  "INCONCLUSIVE",
+];
 
 const MAX_NOTE = 2000;
 const MAX_ATTACHMENTS = 10;
@@ -116,7 +147,8 @@ const MAX_ATTACHMENTS = 10;
  * so a failure never leaves an action complete while the event or case disagrees.
  *
  * Invariant: nothing here can produce a verification outcome. Reporting an action moves the
- * event and case to ACTION_REPORTED and nothing further; physical verification is S5.
+ * event and case to ACTION_REPORTED and nothing further; only the verification runner, over
+ * trusted sensor observations, can move them on (S5).
  */
 export function createOperations(deps: OperationsDeps): Operations {
   async function loadCase(
@@ -287,7 +319,7 @@ export function createOperations(deps: OperationsDeps): Operations {
       if (!le.ok) return le;
       const c = lc.value;
       const event = le.value;
-      if (event.state !== "ACKNOWLEDGED" && event.state !== "ACTION_REPORTED") {
+      if (!ACTIONABLE_EVENT_STATES.includes(event.state)) {
         return fail(
           "CONFLICT",
           `Acknowledge the risk before assigning actions (event is ${event.state})`,
@@ -318,7 +350,7 @@ export function createOperations(deps: OperationsDeps): Operations {
       if (!created.ok) return fail("INVALID_REQUEST", created.error.message, created.error);
 
       let next = c;
-      if (c.state === "OPEN" || c.state === "REOPENED") {
+      if (CASE_NEEDS_REQUIRE_ACTION.includes(c.state)) {
         const r = applyCaseCommand(c, {
           type: "REQUIRE_ACTION",
           at,
@@ -428,7 +460,7 @@ export function createOperations(deps: OperationsDeps): Operations {
       const le = await loadEvent(c);
       if (!le.ok) return le;
       const event = le.value;
-      if (event.state !== "ACKNOWLEDGED" && event.state !== "ACTION_REPORTED") {
+      if (!ACTIONABLE_EVENT_STATES.includes(event.state)) {
         return fail(
           "CONFLICT",
           `Acknowledge the risk before reporting an action (event is ${event.state})`,
@@ -482,7 +514,7 @@ export function createOperations(deps: OperationsDeps): Operations {
         return fail("CONFLICT", `Action already ${action.status}`, reported.error);
       }
       let nextEvent = event;
-      if (event.state === "ACKNOWLEDGED") {
+      if (event.state !== "ACTION_REPORTED") {
         const t = applyRiskEventCommand(event, {
           type: "REPORT_ACTION",
           at,
@@ -493,7 +525,7 @@ export function createOperations(deps: OperationsDeps): Operations {
         nextEvent = t.value.value;
       }
       let nextCase = c;
-      if (nextCase.state === "OPEN" || nextCase.state === "REOPENED") {
+      if (CASE_NEEDS_REQUIRE_ACTION.includes(nextCase.state)) {
         const r = applyCaseCommand(nextCase, {
           type: "REQUIRE_ACTION",
           at,
@@ -521,6 +553,20 @@ export function createOperations(deps: OperationsDeps): Operations {
       await deps.actions.save(c.organizationId, reported.value.value);
       if (nextEvent !== event) await deps.riskEvents.save(nextEvent);
       if (nextCase !== c) await deps.cases.save(nextCase);
+      const reportedEvent = createEnvelope(deps.ids, {
+        ...base(c, correlationId),
+        type: "action.reported.v1",
+        payload: {
+          actionId: action.actionId,
+          caseId: c.caseId,
+          riskEventId: event.eventId,
+          actionLibraryId: lib.value.actionLibraryId,
+          reportedBy: actor.actorId,
+          reportedAt: at,
+          hasNotes: notes !== undefined && notes.length > 0,
+          attachmentCount: attachments?.length ?? 0,
+        },
+      });
       await audit(actor, c, {
         action: "ACTION_REPORTED",
         targetType: "ACTION",
@@ -534,24 +580,11 @@ export function createOperations(deps: OperationsDeps): Operations {
           eventState: nextEvent.state,
           caseState: nextCase.state,
           attachmentCount: attachments?.length ?? 0,
+          // lets the verification that follows keep causation to this event
+          emittedEventId: reportedEvent.event_id,
         },
       });
-      await deps.bus.publish(
-        createEnvelope(deps.ids, {
-          ...base(c, correlationId),
-          type: "action.reported.v1",
-          payload: {
-            actionId: action.actionId,
-            caseId: c.caseId,
-            riskEventId: event.eventId,
-            actionLibraryId: lib.value.actionLibraryId,
-            reportedBy: actor.actorId,
-            reportedAt: at,
-            hasNotes: notes !== undefined && notes.length > 0,
-            attachmentCount: attachments?.length ?? 0,
-          },
-        }),
-      );
+      await deps.bus.publish(reportedEvent);
       if (nextCase !== c)
         await publishCaseUpdated(c, nextCase, "ACTION_REPORTED", correlationId, action.actionId);
       return ok(outcome(nextCase, nextEvent, action.actionId));
@@ -612,13 +645,15 @@ export function createOperations(deps: OperationsDeps): Operations {
       const lc = await loadCase(actor, caseId, "CASE_READ");
       if (!lc.ok) return lc;
       const c = lc.value;
-      const [event, actions, alerts, auditEntries] = await Promise.all([
+      const [event, actions, alerts, auditEntries, attempts, interventions] = await Promise.all([
         c.activeRiskEventId
           ? deps.riskEvents.get(c.organizationId, c.activeRiskEventId)
           : undefined,
         deps.actions.listByCase(c.organizationId, c.caseId),
         deps.alerts.listByCase(c.organizationId, c.caseId),
         deps.audit.listByCase(c.organizationId, c.caseId),
+        deps.verifications.listByCase(c.organizationId, c.caseId),
+        deps.interventions.listByCase(c.organizationId, c.caseId),
       ]);
       return ok(
         buildCaseView({
@@ -627,9 +662,20 @@ export function createOperations(deps: OperationsDeps): Operations {
           actions,
           alerts,
           audit: auditEntries,
+          verifications: attempts,
+          interventions,
           library: deps.library,
         }),
       );
+    },
+
+    async getVerification(actor, verificationId) {
+      if (!can(actor, "CASE_READ")) return fail("FORBIDDEN", "Missing permission CASE_READ");
+      const attempt = await deps.verifications.get(actor.organizationId, verificationId);
+      if (attempt === undefined || !canAccessFacility(actor, attempt.facilityId)) {
+        return fail("NOT_FOUND", "Verification not found");
+      }
+      return ok(attempt);
     },
 
     async listCases(actor) {

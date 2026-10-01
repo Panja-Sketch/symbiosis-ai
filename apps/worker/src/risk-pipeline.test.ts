@@ -18,6 +18,7 @@ import {
   InMemoryCaseRepository,
   InMemoryDetectionStateRepository,
   InMemoryRiskEventRepository,
+  InMemoryVerificationRepository,
 } from "@symbiosis/repositories";
 import { parseRuleConfig } from "@symbiosis/risk-detection";
 import { startRiskPipeline } from "./risk-pipeline";
@@ -91,6 +92,7 @@ beforeEach(async () => {
     detectionStates: states,
     cases,
     riskEvents,
+    verifications: new InMemoryVerificationRepository(),
     audit,
     rule,
     baselineConfig,
@@ -258,14 +260,14 @@ describe("risk pipeline: case creation and correlation", () => {
     expect(types().filter((t) => t.startsWith("verification"))).toEqual([]);
   });
 
-  it("leaves a case in a verification state untouched (S5 owns it) but keeps the detection on the bus", async () => {
+  it("records a continuing detection on a case that is VERIFYING (state preserved, no duplicate case)", async () => {
     await deliver(compound(0), 0);
     const [c] = await cases.list(ORG);
     await cases.save({ ...c!, state: "VERIFYING" });
     await deliver(compound(5), 5);
     expect(await cases.list(ORG)).toHaveLength(1);
     expect((await cases.list(ORG))[0]?.state).toBe("VERIFYING");
-    expect(types().filter((t) => t === "case.updated.v1")).toHaveLength(0);
+    expect(types().filter((t) => t === "case.updated.v1")).toHaveLength(1);
     expect(types().filter((t) => t === "risk.detected.v1")).toHaveLength(2);
   });
 

@@ -73,21 +73,42 @@ describe("RECORD_DETECTION (S3: continuing detection of the same hazard)", () =>
     expect(after.latestVerificationId).toBeUndefined();
   });
 
-  it("is rejected in verification states, which belong to S5", () => {
+  it("is recorded while verifying and after unsuccessful outcomes, state preserved (S5)", () => {
     let c = step(newCase(), { type: "REQUIRE_ACTION", at: T(1) });
     c = step(c, { type: "REPORT_ACTION", at: T(2), actionId: "ACT-1" });
     c = step(c, { type: "START_VERIFICATION", at: T(3) });
-    const verifying = applyCaseCommand(c, detect("HIGH", 9));
-    expect(verifying.ok).toBe(false);
-    if (!verifying.ok) expect(verifying.error.code).toBe("ILLEGAL_LIFECYCLE_TRANSITION");
+    const verifying = step(c, detect("HIGH", 5));
+    expect(verifying.state).toBe("VERIFYING");
+    expect(verifying.severity).toBe("HIGH");
+    for (const result of ["NOT_IMPROVING", "PARTIALLY_VERIFIED", "INCONCLUSIVE"] as const) {
+      const done = step(c, {
+        type: "RECORD_VERIFICATION",
+        at: T(6),
+        assessment: sampleAssessment({ eventId: "EVT-1", result }),
+      });
+      expect(done.state).toBe(result);
+      expect(step(done, detect("CRITICAL", 9))).toMatchObject({
+        state: result,
+        severity: "CRITICAL",
+      });
+    }
+  });
 
+  it("is rejected for VERIFIED_IMPROVED (a recurrence, not a continuation) and CLOSED", () => {
+    let c = step(newCase(), { type: "REQUIRE_ACTION", at: T(1) });
+    c = step(c, { type: "REPORT_ACTION", at: T(2), actionId: "ACT-1" });
+    c = step(c, { type: "START_VERIFICATION", at: T(3) });
     c = step(c, {
       type: "RECORD_VERIFICATION",
       at: T(4),
       assessment: sampleAssessment({ eventId: "EVT-1" }),
     });
     expect(c.state).toBe("VERIFIED_IMPROVED");
-    expect(applyCaseCommand(c, detect("HIGH", 9)).ok).toBe(false);
+    const verified = applyCaseCommand(c, detect("HIGH", 9));
+    expect(verified.ok).toBe(false);
+    if (!verified.ok) expect(verified.error.code).toBe("ILLEGAL_LIFECYCLE_TRANSITION");
+    const closed = step(c, { type: "CLOSE", at: T(5), actorId: "U", reason: "r" });
+    expect(applyCaseCommand(closed, detect("HIGH", 9)).ok).toBe(false);
   });
 
   it("validates its input and does not allow timestamps to regress", () => {

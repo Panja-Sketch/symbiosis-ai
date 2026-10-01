@@ -23,10 +23,18 @@ describe("local role permissions (not production authorization)", () => {
   });
 
   it("auditors read only; insurer-side roles have no operations permissions", () => {
-    expect(permissionsFor(["READ_ONLY_AUDITOR"])).toEqual(["CASE_READ"]);
+    expect(permissionsFor(["READ_ONLY_AUDITOR"])).toEqual(["CASE_READ", "INTERVENTION_READ"]);
     for (const r of ["RISK_ENGINEER", "UNDERWRITER", "BROKER_RISK_MANAGER"] as const) {
       expect(permissionsFor([r])).toEqual([]);
     }
+  });
+
+  it("intervention recommendations: managers and admins act, auditors read, operators have no access (S5)", () => {
+    expect(can(actor(["FACILITY_MANAGER"]), "INTERVENTION_ACKNOWLEDGE")).toBe(true);
+    expect(can(actor(["ORG_ADMIN"]), "INTERVENTION_READ")).toBe(true);
+    expect(can(actor(["READ_ONLY_AUDITOR"]), "INTERVENTION_READ")).toBe(true);
+    expect(can(actor(["READ_ONLY_AUDITOR"]), "INTERVENTION_ACKNOWLEDGE")).toBe(false);
+    expect(can(actor(["OPERATOR"]), "INTERVENTION_READ")).toBe(false);
   });
 
   it("an actor with no roles can do nothing", () => {

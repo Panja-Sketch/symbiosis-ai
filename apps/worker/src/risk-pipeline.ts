@@ -11,11 +11,13 @@ import type {
   CaseRepository,
   DetectionStateRepository,
   RiskEventRepository,
+  VerificationRepository,
 } from "@symbiosis/repositories";
 import { applyCaseCommand } from "@symbiosis/risk-cases";
 import { detectionStateKey, emptyDetectionState, evaluateSample } from "@symbiosis/risk-detection";
 import type { RuleConfig } from "@symbiosis/risk-detection";
 import { openCaseFromDetection } from "@symbiosis/risk-lifecycle";
+import { decideRecurrence, reopenCaseForRecurrence } from "@symbiosis/recurrence";
 
 export type RiskPipelineDeps = {
   readonly bus: EventBus;
@@ -25,6 +27,7 @@ export type RiskPipelineDeps = {
   readonly detectionStates: DetectionStateRepository;
   readonly cases: CaseRepository;
   readonly riskEvents: RiskEventRepository;
+  readonly verifications: VerificationRepository;
   readonly audit: AuditLog;
   readonly rule: RuleConfig;
   readonly baselineConfig: BaselineConfig;
@@ -32,8 +35,10 @@ export type RiskPipelineDeps = {
 
 /**
  * S3 pipeline: telemetry.quality_assessed -> baseline learning + rule evaluation ->
- * risk.observation_evaluated* -> (risk.detected -> case.created | case.updated).
- * Deterministic and AI-free. Emits nothing about alerts, actions or verification (S4+).
+ * risk.observation_evaluated* -> (risk.detected -> case.created | case.updated | recurrence).
+ * Deterministic and AI-free. Before ordinary case correlation, a qualifying detection that
+ * matches a VERIFIED_IMPROVED case inside its recurrence-watch window reopens that case instead of
+ * creating a second one (S5, spec 8.3). Alerts, actions and verification are other components.
  */
 export function startRiskPipeline(deps: RiskPipelineDeps): Unsubscribe {
   return deps.bus.subscribe("telemetry.quality_assessed.v1", (event) => process(deps, event));
@@ -103,6 +108,111 @@ async function process(
     });
     await deps.bus.publish(detected);
 
+    // Recurrence first (S5): a persistent compound detection against a verified case inside its
+    // watch window reopens that same case; it never creates a second Risk Improvement Case.
+    const verifiedCases = await deps.cases.findVerifiedImproved(
+      org,
+      fac,
+      detection.hazardType,
+      detection.primaryAssetId,
+    );
+    const decision = decideRecurrence({
+      detection,
+      candidates: await Promise.all(
+        verifiedCases.map(async (caseRecord) => ({
+          caseRecord,
+          verification:
+            caseRecord.latestVerificationId === undefined
+              ? undefined
+              : await deps.verifications.get(org, caseRecord.latestVerificationId),
+        })),
+      ),
+    });
+    if (decision.kind === "REOPEN") {
+      const reopened = reopenCaseForRecurrence({
+        caseRecord: decision.caseRecord,
+        detection,
+        newEventId: deps.ids.next("RE"),
+      });
+      // Failing closed: never fall through to opening a duplicate case.
+      if (!reopened.ok) throw new Error(`cannot reopen case: ${reopened.error.message}`);
+      const { case: reopenedCase, newEvent, previousRiskEventId } = reopened.value;
+      await deps.riskEvents.save(newEvent);
+      await deps.cases.save(reopenedCase);
+      const auditBase = {
+        organizationId: org,
+        facilityId: fac,
+        caseId: reopenedCase.caseId,
+        actorId: "SYSTEM-RECURRENCE",
+        actorType: "SYSTEM" as const,
+        correlationId: event.correlation_id,
+        at: detection.detectedAt,
+      };
+      await deps.audit.append({
+        ...auditBase,
+        action: "RECURRENCE_DETECTED",
+        targetType: "CASE",
+        targetId: reopenedCase.caseId,
+        beforeState: decision.caseRecord.state,
+        afterState: reopenedCase.state,
+        details: {
+          detectionId: detection.detectionId,
+          previousRiskEventId,
+          newRiskEventId: newEvent.eventId,
+          previousVerificationId: decision.verification.verificationId,
+          recurrenceCount: reopenedCase.recurrenceCount,
+          severity: detection.severity,
+          confidence: detection.confidence,
+          reasonCodes: detection.reasonCodes,
+        },
+      });
+      await deps.audit.append({
+        ...auditBase,
+        action: "CASE_REOPENED",
+        targetType: "CASE",
+        targetId: reopenedCase.caseId,
+        beforeState: decision.caseRecord.state,
+        afterState: reopenedCase.state,
+        details: { riskEventId: newEvent.eventId, recurrenceCount: reopenedCase.recurrenceCount },
+      });
+      const recurrence = createEnvelope(deps.ids, {
+        ...base,
+        type: "recurrence.detected.v1",
+        causationId: detected.event_id,
+        payload: {
+          caseId: reopenedCase.caseId,
+          previousRiskEventId,
+          newRiskEventId: newEvent.eventId,
+          previousVerificationId: decision.verification.verificationId,
+          detectionId: detection.detectionId,
+          hazardType: detection.hazardType,
+          primaryAssetId: detection.primaryAssetId,
+          severity: detection.severity,
+          recurrenceCount: reopenedCase.recurrenceCount,
+          recurrenceWatchEndsAt: decision.watchEndsAt,
+          detectedAt: detection.detectedAt,
+          reasonCodes: detection.reasonCodes,
+        },
+      });
+      await deps.bus.publish(recurrence);
+      await deps.bus.publish(
+        createEnvelope(deps.ids, {
+          ...base,
+          type: "case.reopened.v1",
+          causationId: recurrence.event_id,
+          payload: {
+            caseId: reopenedCase.caseId,
+            riskEventId: newEvent.eventId,
+            previousState: decision.caseRecord.state,
+            state: reopenedCase.state,
+            severity: reopenedCase.severity,
+            recurrenceCount: reopenedCase.recurrenceCount,
+          },
+        }),
+      );
+      continue;
+    }
+
     const existing = await deps.cases.findActive(
       org,
       fac,
@@ -144,6 +254,7 @@ async function process(
           detectionId: detection.detectionId,
           riskEventId: opened.value.event.eventId,
           severity: detection.severity,
+          confidence: detection.confidence,
           reasonCodes: detection.reasonCodes,
         },
       });
@@ -194,6 +305,7 @@ async function process(
       details: {
         detectionId: detection.detectionId,
         severity: detection.severity,
+        confidence: detection.confidence,
         reasonCodes: detection.reasonCodes,
       },
     });

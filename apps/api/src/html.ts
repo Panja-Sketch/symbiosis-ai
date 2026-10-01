@@ -1,11 +1,12 @@
 import type { CaseView, CaseViewSummary } from "@symbiosis/action-orchestration";
 
 /**
- * MINIMAL S4 WORKFLOW-PROOF PAGES. They exist to show: detected -> alert -> acknowledgement ->
- * action report -> verification pending. They are server-rendered, read-only HTML with no
- * scripts, and are NOT the final UI: S7 builds the Operations Workspace, Risk Evidence
- * Workspace, portfolio view and Trust Center (Next.js). Nothing here can claim physical
- * improvement, because that check does not exist until S5.
+ * MINIMAL WORKFLOW-PROOF PAGES (S4, extended in S5). They show: detected -> alert ->
+ * acknowledgement -> action report -> verification pending -> result, recurrence status and the
+ * intervention recommendation. Server-rendered, read-only HTML with no scripts; NOT the final UI
+ * (S7 builds the workspaces and Trust Center). Result wording comes only from the case view
+ * model, which derives it from persisted verification records, so this file never contains a
+ * result label of its own.
  */
 const esc = (v: unknown) =>
   String(v)
@@ -70,6 +71,42 @@ export function renderCaseHtml(v: CaseView, actorId: string): string {
         `<li><code>${esc(r.auditId)}</code> ${esc(r.action)} <span class="muted">${esc(r.at)}</span></li>`,
     )
     .join("");
+  const stat = (s?: { sampleCount: number; mean?: number }) =>
+    s === undefined || s.sampleCount === 0
+      ? "-"
+      : `${esc(s.mean ?? "-")} (n=${esc(s.sampleCount)})`;
+  const verificationHtml =
+    v.verification === undefined
+      ? ""
+      : `<table>
+<tr><th>Verification</th><td><code>${esc(v.verification.verificationId)}</code></td><th>Policy</th><td>${esc(v.verification.policyId)} v${esc(v.verification.policyVersion)}</td></tr>
+<tr><th>Window</th><td colspan="3">${esc(v.verification.postActionWindow.start)} to ${esc(v.verification.postActionWindow.end)}</td></tr>
+${
+  v.verification.result === undefined
+    ? ""
+    : `<tr><th>Data completeness</th><td>${esc(v.verification.dataCompleteness)}</td><th>Telemetry confidence</th><td>${esc(v.verification.telemetryConfidence)}</td></tr>
+<tr><th>Confidence</th><td>${esc(v.verification.confidence)}</td><th>Evidence references</th><td>${esc(v.verification.evidenceReferenceCount)}</td></tr>`
+}
+</table>
+${
+  v.verification.criteria.length === 0
+    ? ""
+    : `<table><tr><th>Criterion</th><th>Role</th><th>Outcome</th><th>Reference</th><th>Before</th><th>After</th><th>Reasons</th></tr>${v.verification.criteria
+        .map(
+          (c) =>
+            `<tr><td>${esc(c.criterionId)}<br><span class="muted">${esc(c.assetId ?? "")} ${esc(c.signal ?? "")}</span></td><td>${esc(c.role)}</td><td><strong>${esc(c.outcome)}</strong></td><td>${esc(c.referenceMean ?? "-")} ${esc(c.referenceModes.join(","))}</td><td>${stat(c.before)}</td><td>${stat(c.observed)}</td><td>${esc(c.reasonCodes.join(", "))}</td></tr>`,
+        )
+        .join("")}</table>`
+}`;
+  const i = v.intervention;
+  const interventionHtml =
+    i === undefined
+      ? "<p>No recommendation yet.</p>"
+      : `<table>
+<tr><th>Level</th><td><strong>${esc(i.label)}</strong> (${esc(i.status)})</td><th>Policy</th><td>${esc(i.policyId)} v${esc(i.policyVersion)}</td></tr>
+<tr><th>Reason codes</th><td colspan="3">${esc(i.reasonCodes.join(", "))}</td></tr>
+<tr><th>Data sufficiency</th><td>${esc(i.dataSufficiency)}</td><th>Generated</th><td>${esc(i.generatedAt)}</td></tr>
+</table><p class="muted">Decision support only: it does not schedule anyone and changes no coverage or underwriting.</p>`;
   const body = `
 <p><a href="/ui/cases?actor=${esc(actorId)}">&larr; all cases</a></p>
 <h1>Risk Improvement Case: ${esc(v.title)}</h1>
@@ -103,6 +140,17 @@ ${v.whatWasDone.actions.length === 0 ? "<p>No actions reported yet.</p>" : `<tab
 <h2>Did it work?</h2>
 <p class="pending">${esc(v.didItWork.label)}</p>
 <p>${esc(v.didItWork.detail)}</p>
+${verificationHtml}
+
+<h2>Is it staying fixed?</h2>
+<table>
+<tr><th>Recurrence watch</th><td>${esc(v.stayingFixed.watch)}${v.stayingFixed.watchEndsAt ? ` until ${esc(v.stayingFixed.watchEndsAt)}` : ""}</td></tr>
+<tr><th>Recurrence count</th><td>${esc(v.stayingFixed.recurrenceCount)}</td></tr>
+<tr><th>Last recurrence</th><td>${v.stayingFixed.lastRecurrence ? `${esc(v.stayingFixed.lastRecurrence.at)} (risk event <code>${esc(v.stayingFixed.lastRecurrence.riskEventId)}</code>)` : "none"}</td></tr>
+</table>
+
+<h2>Intervention recommendation</h2>
+${interventionHtml}
 
 <h2>Evidence</h2>
 <p class="muted">Operational audit references only. No evidence package exists yet.</p><ul>${refs}</ul>

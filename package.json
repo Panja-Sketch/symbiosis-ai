@@ -16,7 +16,8 @@
     "format:check": "prettier --check .",
     "smoke:s2": "tsx scripts/smoke-s2.ts",
     "smoke:s3": "tsx scripts/smoke-s3.ts",
-    "smoke:s4": "tsx scripts/smoke-s4.ts"
+    "smoke:s4": "tsx scripts/smoke-s4.ts",
+    "smoke:s5": "tsx scripts/smoke-s5.ts"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",
@@ -34,6 +35,7 @@
     "@symbiosis/edge-security": "workspace:*",
     "@symbiosis/escalation": "workspace:*",
     "@symbiosis/event-bus": "workspace:*",
+    "@symbiosis/intervention-prioritization": "workspace:*",
     "@symbiosis/normalization": "workspace:*",
     "@symbiosis/notifications": "workspace:*",
     "@symbiosis/repositories": "workspace:*",
@@ -41,6 +43,7 @@
     "@symbiosis/risk-detection": "workspace:*",
     "@symbiosis/risk-lifecycle": "workspace:*",
     "@symbiosis/tenancy": "workspace:*",
+    "@symbiosis/verification": "workspace:*",
     "@symbiosis/worker": "workspace:*",
     "@types/node": "^26.6.3",
     "eslint": "^9.39.5",

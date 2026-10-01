@@ -24,6 +24,11 @@ for (const type of [
   "risk.escalated.v1",
   "action.assigned.v1",
   "action.reported.v1",
+  "verification.started.v1",
+  "verification.completed.v1",
+  "recurrence.detected.v1",
+  "case.reopened.v1",
+  "intervention.recommendation_updated.v1",
 ] as const) {
   runtime.bus.subscribe(type, (event) => {
     console.log(`[bus] ${event.event_type} ${event.event_id} corr=${event.correlation_id}`);
@@ -36,7 +41,16 @@ console.log(`[api+worker] listening on ${runtime.server.baseUrl} (in-memory, syn
 const tickMs = Number(process.env.OPS_TICK_INTERVAL_MS ?? 10_000);
 const timer = setInterval(() => {
   void runtime.tick().then((r) => {
-    if (r.escalated.length > 0 || r.retried > 0) console.log("[tick]", JSON.stringify(r));
+    const v = r.verification;
+    if (
+      r.escalated.length > 0 ||
+      r.retried > 0 ||
+      v.started.length > 0 ||
+      v.completed.length > 0 ||
+      v.failures.length > 0
+    ) {
+      console.log("[tick]", JSON.stringify(r));
+    }
   });
 }, tickMs);
 console.log(`[api+worker] ops tick every ${tickMs} ms; try /ui/cases?actor=USR-FACILITY-MGR-001`);

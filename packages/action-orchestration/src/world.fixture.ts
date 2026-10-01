@@ -8,7 +8,9 @@ import {
   InMemoryActionRepository,
   InMemoryAlertRepository,
   InMemoryCaseRepository,
+  InMemoryInterventionRepository,
   InMemoryRiskEventRepository,
+  InMemoryVerificationRepository,
 } from "@symbiosis/repositories";
 import { applyRiskEventCommand, openCaseFromDetection } from "@symbiosis/risk-lifecycle";
 import type { RiskEventCommand } from "@symbiosis/risk-lifecycle";
@@ -69,6 +71,8 @@ export async function makeWorld(eventCommands: RiskEventCommand[] | "ALERTED" = 
   const riskEvents = new InMemoryRiskEventRepository();
   const actions = new InMemoryActionRepository();
   const alerts = new InMemoryAlertRepository();
+  const verifications = new InMemoryVerificationRepository();
+  const interventions = new InMemoryInterventionRepository();
   const audit = new InMemoryAuditLog();
   const directory = createSyntheticActorDirectory();
   const operations = createOperations({
@@ -76,6 +80,8 @@ export async function makeWorld(eventCommands: RiskEventCommand[] | "ALERTED" = 
     riskEvents,
     actions,
     alerts,
+    verifications,
+    interventions,
     audit,
     bus,
     ids,
@@ -103,7 +109,20 @@ export async function makeWorld(eventCommands: RiskEventCommand[] | "ALERTED" = 
   }
   await cases.save(opened.value.case);
   await riskEvents.save(event);
-  return { clock, bus, ids, cases, riskEvents, actions, alerts, audit, directory, operations };
+  return {
+    clock,
+    bus,
+    ids,
+    cases,
+    riskEvents,
+    actions,
+    alerts,
+    verifications,
+    interventions,
+    audit,
+    directory,
+    operations,
+  };
 }
 
 export type World = Awaited<ReturnType<typeof makeWorld>>;

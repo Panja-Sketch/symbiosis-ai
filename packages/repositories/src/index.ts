@@ -8,8 +8,10 @@ import type {
   CanonicalObservation,
   DetectionState,
   MitigationAction,
+  RiskEngineerInterventionRecommendation,
   RiskEvent,
   RiskImprovementCase,
+  VerificationAttempt,
 } from "@symbiosis/contracts";
 
 export const PACKAGE_NAME = "@symbiosis/repositories" as const;
@@ -24,6 +26,18 @@ export interface ObservationRepository {
   /** Stores the observation; returns false (and stores nothing) if its dedupe key exists. */
   insertIfAbsent(observation: CanonicalObservation): Promise<boolean>;
   list(organizationId: string): Promise<readonly CanonicalObservation[]>;
+  get(organizationId: string, observationId: string): Promise<CanonicalObservation | undefined>;
+  /**
+   * Observations of one facility whose observed_at lies in [fromIso, toIso] (inclusive), for the
+   * given assets, oldest first. Always organization- and facility-scoped.
+   */
+  listForWindow(query: {
+    readonly organizationId: string;
+    readonly facilityId: string;
+    readonly assetIds: readonly string[];
+    readonly fromIso: string;
+    readonly toIso: string;
+  }): Promise<readonly CanonicalObservation[]>;
 }
 
 export class InMemoryObservationRepository implements ObservationRepository {
@@ -39,6 +53,33 @@ export class InMemoryObservationRepository implements ObservationRepository {
   async list(organizationId: string): Promise<readonly CanonicalObservation[]> {
     return [...this.byKey.values()].filter((o) => o.organizationId === organizationId);
   }
+
+  async get(organizationId: string, observationId: string) {
+    return [...this.byKey.values()].find(
+      (o) => o.organizationId === organizationId && o.observationId === observationId,
+    );
+  }
+
+  async listForWindow(query: {
+    readonly organizationId: string;
+    readonly facilityId: string;
+    readonly assetIds: readonly string[];
+    readonly fromIso: string;
+    readonly toIso: string;
+  }): Promise<readonly CanonicalObservation[]> {
+    const from = Date.parse(query.fromIso);
+    const to = Date.parse(query.toIso);
+    return [...this.byKey.values()]
+      .filter(
+        (o) =>
+          o.organizationId === query.organizationId &&
+          o.facilityId === query.facilityId &&
+          query.assetIds.includes(o.assetId) &&
+          Date.parse(o.observedAt) >= from &&
+          Date.parse(o.observedAt) <= to,
+      )
+      .sort((a, b) => Date.parse(a.observedAt) - Date.parse(b.observedAt));
+  }
 }
 
 /**
@@ -48,6 +89,8 @@ export class InMemoryObservationRepository implements ObservationRepository {
 export interface BaselineRepository {
   save(baseline: Baseline): Promise<void>;
   getActive(key: BaselineKey): Promise<Baseline | undefined>;
+  /** Any version (also a superseded one), if it belongs to the organization. */
+  getById(organizationId: string, baselineId: string): Promise<Baseline | undefined>;
   /** Active (non-superseded) baselines of a facility, for risk evaluation. */
   listActive(organizationId: string, facilityId: string): Promise<readonly Baseline[]>;
   /** All versions for a key, oldest first. */
@@ -72,6 +115,11 @@ export class InMemoryBaselineRepository implements BaselineRepository {
     return [...this.byId.values()]
       .filter((b) => baselineKeyString(b.key) === k)
       .sort((a, b) => a.version - b.version);
+  }
+
+  async getById(organizationId: string, baselineId: string) {
+    const b = this.byId.get(baselineId);
+    return b !== undefined && b.key.organizationId === organizationId ? b : undefined;
   }
 
   async getActive(key: BaselineKey): Promise<Baseline | undefined> {
@@ -137,6 +185,18 @@ export interface CaseRepository {
     hazardType: string,
     primaryAssetId: string,
   ): Promise<RiskImprovementCase | undefined>;
+  /**
+   * VERIFIED_IMPROVED cases of the same episode identity (organization + facility + hazard +
+   * primary asset), most recently updated first. Recurrence matching starts from these.
+   */
+  findVerifiedImproved(
+    organizationId: string,
+    facilityId: string,
+    hazardType: string,
+    primaryAssetId: string,
+  ): Promise<readonly RiskImprovementCase[]>;
+  /** Every case across tenants, for the system-level verification tick only. */
+  listAllForSystemTick(): Promise<readonly RiskImprovementCase[]>;
 }
 
 export class InMemoryCaseRepository implements CaseRepository {
@@ -169,6 +229,28 @@ export class InMemoryCaseRepository implements CaseRepository {
         c.state !== "CLOSED" &&
         c.state !== "VERIFIED_IMPROVED",
     );
+  }
+
+  async findVerifiedImproved(
+    organizationId: string,
+    facilityId: string,
+    hazardType: string,
+    primaryAssetId: string,
+  ): Promise<readonly RiskImprovementCase[]> {
+    return [...this.cases.values()]
+      .filter(
+        (c) =>
+          c.organizationId === organizationId &&
+          c.facilityId === facilityId &&
+          c.hazardType === hazardType &&
+          c.assetIds[0] === primaryAssetId &&
+          c.state === "VERIFIED_IMPROVED",
+      )
+      .sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt));
+  }
+
+  async listAllForSystemTick(): Promise<readonly RiskImprovementCase[]> {
+    return [...this.cases.values()];
   }
 }
 
@@ -249,5 +331,84 @@ export class InMemoryActionRepository implements ActionRepository {
     return [...this.actions.values()].filter(
       (a) => a.organizationId === organizationId && a.caseId === caseId,
     );
+  }
+}
+
+/**
+ * Verification attempts. History is never overwritten: an IN_PROGRESS attempt may be replaced
+ * by its COMPLETED form once, and a COMPLETED attempt can never be saved again.
+ */
+export interface VerificationRepository {
+  save(attempt: VerificationAttempt): Promise<void>;
+  get(organizationId: string, verificationId: string): Promise<VerificationAttempt | undefined>;
+  /** Oldest first. */
+  listByCase(organizationId: string, caseId: string): Promise<readonly VerificationAttempt[]>;
+  /** Every attempt across tenants, for the system-level verification tick only. */
+  listAllForSystemTick(): Promise<readonly VerificationAttempt[]>;
+}
+
+export class InMemoryVerificationRepository implements VerificationRepository {
+  private readonly attempts = new Map<string, VerificationAttempt>();
+
+  async save(attempt: VerificationAttempt): Promise<void> {
+    const key = `${attempt.organizationId}|${attempt.verificationId}`;
+    if (this.attempts.get(key)?.status === "COMPLETED") {
+      throw new Error(`verification ${attempt.verificationId} is completed and immutable`);
+    }
+    this.attempts.set(key, attempt);
+  }
+
+  async get(organizationId: string, verificationId: string) {
+    return this.attempts.get(`${organizationId}|${verificationId}`);
+  }
+
+  async listByCase(
+    organizationId: string,
+    caseId: string,
+  ): Promise<readonly VerificationAttempt[]> {
+    return [...this.attempts.values()]
+      .filter((a) => a.organizationId === organizationId && a.caseId === caseId)
+      .sort((a, b) => Date.parse(a.startedAt) - Date.parse(b.startedAt));
+  }
+
+  async listAllForSystemTick(): Promise<readonly VerificationAttempt[]> {
+    return [...this.attempts.values()];
+  }
+}
+
+/** Intervention recommendations; superseded ones stay for audit. Organization-scoped. */
+export interface InterventionRepository {
+  save(recommendation: RiskEngineerInterventionRecommendation): Promise<void>;
+  get(
+    organizationId: string,
+    interventionId: string,
+  ): Promise<RiskEngineerInterventionRecommendation | undefined>;
+  /** Oldest first. */
+  list(organizationId: string): Promise<readonly RiskEngineerInterventionRecommendation[]>;
+  listByCase(
+    organizationId: string,
+    caseId: string,
+  ): Promise<readonly RiskEngineerInterventionRecommendation[]>;
+}
+
+export class InMemoryInterventionRepository implements InterventionRepository {
+  private readonly items = new Map<string, RiskEngineerInterventionRecommendation>();
+
+  async save(r: RiskEngineerInterventionRecommendation): Promise<void> {
+    this.items.set(`${r.organizationId}|${r.interventionId}`, r);
+  }
+
+  async get(organizationId: string, interventionId: string) {
+    return this.items.get(`${organizationId}|${interventionId}`);
+  }
+
+  async list(organizationId: string) {
+    return [...this.items.values()]
+      .filter((r) => r.organizationId === organizationId)
+      .sort((a, b) => Date.parse(a.generatedAt) - Date.parse(b.generatedAt));
+  }
+
+  async listByCase(organizationId: string, caseId: string) {
+    return (await this.list(organizationId)).filter((r) => r.caseId === caseId);
   }
 }
