@@ -4,7 +4,7 @@ Allowed status: NOT_STARTED | IN_PROGRESS | BLOCKED | COMPLETE
 
 | Phase | Name                                                    | Status      |
 | ----- | ------------------------------------------------------- | ----------- |
-| S0    | Repository foundation                                   | IN_PROGRESS |
+| S0    | Repository foundation                                   | COMPLETE    |
 | S1    | Domain core                                             | NOT_STARTED |
 | S2    | Local ingestion                                         | NOT_STARTED |
 | S3    | Detection + baselines                                   | NOT_STARTED |
