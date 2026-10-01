@@ -391,3 +391,39 @@ source of truth; this log records choices made while implementing it. Not a sess
 
 - **Decision:** `symbiosis-web` and `symbiosis-api` are public (the API must be reachable by devices and browsers; every route authenticates in application code); `symbiosis-worker` is private (`--no-allow-unauthenticated`): only the Pub/Sub push identity and the Scheduler identity hold `run.invoker`, and the container verifies their OIDC tokens again. Five dedicated runtime identities, no Owner/Editor (matrix in `docs/GCP_RUNTIME.md`). Images are bundled by `esbuild` (workspace TypeScript inlined; cloud SDKs external and installed lockfile-exact with `pnpm deploy --prod`), run on distroless non-root Node 22, are built by Cloud Build, tagged with the commit SHA and deployed **by digest**. Liveness is `/livez` (`/healthz` is reserved by Cloud Run's front end and never reaches the container), readiness `/readyz`, version `/version`.
 - **Web:** cloud mode (`SYMBIOSIS_AUTH_MODE=token`) shows a sign-in page; the browser signs in with Firebase, posts the ID token to `/auth/session`, which has the API verify it before storing it in an `HttpOnly`, `Secure`, `SameSite=Lax` cookie (55 minutes; a client component refreshes it while a tab is open); server code forwards it as `Authorization: Bearer`. The persona comes from the roles the API returns; there is no identity or persona switcher in the cloud. Names for people and organizations are not available in the cloud UI (the dev directory does not exist), so ids are shown.
+
+## D-078 — ESP32 firmware: PlatformIO, pinned Arduino-ESP32, portable host-tested core (S10, 2026-10-01)
+
+- **Decision:** One PlatformIO project (`firmware/esp32-lab`), platform `espressif32@6.9.0` (Arduino-ESP32 2.0.17), **no third-party libraries**. The three I2C sensors use register-level drivers; everything that is not hardware (SHA-256/HMAC, signing material, nonce, sequence, payload serialization, retry classification, health, send gate, vibration metric, conversions, debounce, bounded queue) lives in `lib/symcore`, compiled and tested on the host. Five build environments over one source tree: `bringup`, `sensor_test`, `signing_test`, `cloud_test`, `demo`.
+- **Crypto:** one portable SHA-256/HMAC implementation is used on host and device, proven against the standard vectors, the S2 known-answer vector, and Node `crypto` over block-boundary lengths and key sizes, and re-proven at every boot (`kat PASS`; a failure disables sending). Chosen over mbedtls so the code that is host-tested is the code that runs.
+- **Reason:** Minimal dependency surface, reproducible builds, and the spec's rule that firmware must reproduce the signing contract byte for byte.
+
+## D-079 — Sequence: persistent reservation ceiling in NVS, time-seeded when empty (S10, 2026-10-01)
+
+- **Decision:** NVS holds `seq_hi`, a ceiling. The counter writes `n + 63` before using `n` past the ceiling (one flash write per 64 requests) and resumes at the ceiling after any reset, so it is above every number previously sent. An empty store (first boot or erased flash) seeds from trusted epoch seconds, which stays above any earlier sequence because the device sends far fewer than 1 request/s. A store read ERROR stops sending; the counter never starts from zero and is never lowered after a server error. Operator recovery from a 409 sequence error is **key rotation** (`pnpm provision:device --rotate-key` with a new key id), because replay state is per device and key (D-017). No server-side sequence-reset endpoint exists or was added.
+- **Reason:** D-017 requires monotonic sequences across reboots without weakening replay protection or wearing flash.
+
+## D-080 — Time: SNTP only, one send gate, no back-dated samples (S10, 2026-10-01)
+
+- **Decision:** `sym::send_block_reason` is the single gate (KAT passed, key loaded, not latched, Wi-Fi up, clock synced and plausible, sequence ready). Samples are queued only with a trusted wall-clock time; nothing is signed or timestamped from an unsynced clock. `observed_at` is the sample time; `X-Timestamp`, nonce and sequence are produced at send time. A clock-skew rejection triggers a bounded re-sync.
+- **Reason:** The server window is 300 s / 60 s; a guessed time would either be rejected or poison observation times.
+
+## D-081 — Physical device identity, mapping and provenance (S10, 2026-10-01)
+
+- **Decision:** The bench device is registered through `createBenchDeviceRecord` (in `adapters/esp32`, the only place allowed to name the hardware): default asset `AST-SIM-FAN-A` (vibration, current), zone signals to `AST-SIM-ZONE-1`, `chiller_b_running` to `AST-SIM-FAN-B`, expected signals without `load_percent`/`outdoor_temperature`. These are the existing logical assets the verification policy names, so no policy change. Provenance is the existing `source: HARDWARE` -> `sourceType HARDWARE` -> evidence `PROTOTYPE_HARDWARE` chain; no new fields. Firmware sends `fan_a_load_pct` never (not measured) and omits any reading it could not produce.
+- **Known limit:** the worker selects the source adapter from the authenticated body's `source`; the registry does not bind a device to allowed sources (S11 candidate). Hardware and simulator share logical assets, so they must not run concurrently (see docs/HARDWARE.md).
+
+## D-082 — Operator-only physical-device provisioning (S10, 2026-10-01)
+
+- **Decision:** `provisionDevice` (adapters/gcp) generates a 32-byte key (`crypto.randomBytes`), creates the S9-named secret (never overwriting an existing one), grants `secretAccessor` on that secret to the API service account only, then creates the registry record with an **atomic Firestore create** (duplicate device id refused); a failure after the secret was created deletes that secret. The key is returned in memory to `scripts/provision-device.ts`, which writes only git-ignored files (`.secrets/devices/*.json`, `firmware/esp32-lab/include/secrets.h`) and prints no key. `--rotate-key` registers a NEW key id for an existing device.
+- **Reason:** Fresh device id distinct from simulators, no accidental duplicates, key never in logs, a retry-safe failure mode.
+
+## D-083 — No cloud-to-equipment control; Fan B state is the observed gate level (S10, 2026-10-01)
+
+- **Decision:** Only `io.cpp` drives the two MOSFET gates, from the local rocker/button; network modules neither include it nor reference the pins, and the HTTP response is only classified. The uplink runs on its own FreeRTOS task so a multi-second HTTPS call never stalls input polling. `chiller_b_running` is the level read back from the Fan B gate pin (device state, not rotor proof; the operator action is never verification). Static tests enforce all of this on the firmware and on the server (`tests/unit/firmware-hygiene.test.ts`).
+- **Reason:** AI advises, deterministic code decides, humans act, sensors verify.
+
+## D-084 — TLS roots and honest test reporting (S10, 2026-10-01)
+
+- **Decision:** The firmware verifies the Cloud Run certificate chain against pinned Google Trust Services roots R4 and R1 (SHA-256 fingerprints in `ca_certs.h`); there is no insecure fallback. `pnpm smoke:s10` reports `SKIPPED_HARDWARE` (never a pass) for every check that needs a physical device, and exits 3 under `--require-hardware`. The firmware host tests and the firmware-vs-server compatibility test fail loudly when no C++ compiler exists if `SYMBIOSIS_REQUIRE_FIRMWARE_HOST=1`; otherwise they skip with a warning.
+- **Reason:** A CI run without hardware must not look like a hardware pass.

@@ -14,5 +14,5 @@ Allowed status: NOT_STARTED | IN_PROGRESS | BLOCKED | COMPLETE
 | S7    | Persona UI                                              | COMPLETE    |
 | S8    | Gemini                                                  | COMPLETE    |
 | S9    | GCP adapters                                            | COMPLETE    |
-| S10   | Hardware                                                | NOT_STARTED |
+| S10   | Hardware                                                | IN_PROGRESS |
 | S11   | Hardening                                               | NOT_STARTED |

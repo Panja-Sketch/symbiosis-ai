@@ -2,101 +2,102 @@
 
 ## Current phase
 
-S9 — Google Cloud production adapters and deployment foundation (finished; S10 not started)
+S10 — physical ESP32 hardware integration (IN PROGRESS: software side done and verified; **the physical bench gates H0-H8 and the cloud/physical hero loop have NOT been run**)
 
 ## Current phase status
 
-COMPLETE
+IN_PROGRESS. Do **not** mark S10 COMPLETE until `docs/HARDWARE.md` has a real result for every gate H0-H8 and the physical hero loop has been proven. S11 is not started.
 
 ## Last completed phase
 
-S9 — Google Cloud production adapters and deployment foundation (S0 to S8 completed earlier)
+S9 — Google Cloud production adapters and deployment foundation (S0 to S9 COMPLETE).
 
-## Completed work
+## Completed work (S10 software side)
 
-- **Runtime selection (D-069, D-070):** `adapters/gcp` (all cloud SDKs) and `packages/runtime` (config, shared composition, cloud platform, health, entrypoints). `SYMBIOSIS_RUNTIME=local|emulator|gcp`; `gcp` fails startup on any missing/invalid setting, refuses emulator hosts, demo identity and a static Vertex token, refuses to run on Cloud Run unless `gcp`, and verifies Firestore and the evidence bucket at boot. `scripts/local-runtime.ts` now uses the same `composeServices` as the cloud, so S2-S8 behavior is unchanged (all earlier smokes/E2E identical).
-- **Identity (D-071):** `IdentityResolver` seam; Firebase ID token verified server-side (signature, issuer, audience, expiry, revocation) -> UID link -> stored actor (org, facilities, roles). No demo header, `/ui` pages or dev identity listing in the cloud. Web sign-in (HttpOnly session cookie, token refresh, sign-out) in `apps/web`; no persona switcher in the cloud. Four synthetic demo users (`pnpm seed:gcp`; passwords only in git-ignored `.secrets/demo-users.json`).
-- **Firestore (D-072):** all repositories, audit log (per-organization gap-free sequence), actor/organization directories, device registry, replay guard, event inbox; tenant-prefixed ids; atomic uniqueness via `create()`/transactions; `storedAt` vs domain time. One shared contract suite runs on in-memory and the Firestore emulator (found and fixed a concurrency bug in the in-memory revoke).
-- **Pub/Sub (D-073):** `PubSubBus` (publish rejects on failure), push consumer in the private worker with OIDC verification, event inbox for duplicates, retry 10-300 s, dead letter after 5 attempts, DLQ pull subscription, Scheduler tick every minute.
-- **Cloud Storage (D-074):** `GcsEvidenceObjectStore` (never overwrites, read-back SHA check, key validation); bucket private. **Secret Manager (D-075):** device keys, fail closed. **Vertex (D-076):** ADC only; model corrected to `gemini-3.1-flash-lite` on the `global` endpoint after live testing; the cloud no longer lets the project region choose the Gemini location.
-- **Cloud Run (D-077):** `symbiosis-web` (public), `symbiosis-api` (public, application-level auth), `symbiosis-worker` (private). Distroless non-root images by digest; `/livez`, `/readyz`, `/version`; structured redacted logs. Reproducible scripts in `infrastructure/` (`gcloud/01-identities-and-iam.sh`, `gcloud/02-deploy.sh`, `cloudbuild/cloudbuild.yaml`, `firestore/firestore.rules`, `firebase-web-config.json` (public config)). Runbook, IAM matrix, resource map: `docs/GCP_RUNTIME.md`.
-- Not implemented (by design): any S10 hardware work, DLQ reprocessing, alert policies, mail delivery, cross-repository transactions.
+- **Contract extracted from code, not from the old roadmap** (see firmware README "Signing protocol"): `POST /edge/v1/telemetry|heartbeat`; headers `X-Device-Id`, `X-Key-Id`, `X-Timestamp` (epoch seconds, window 300 s old / 60 s ahead), `X-Nonce` (`[A-Za-z0-9_-]{16,64}`), `X-Seq` (decimal, strictly increasing per device+key, gaps allowed, telemetry and heartbeat share it), `X-Signature`; material `METHOD\nPATH\nTS\nNONCE\nSEQ\nhex(SHA-256(raw body))`, no trailing LF; HMAC-SHA256 with the raw 32-byte key (64 hex in Secret Manager), lowercase hex; success is 202 (telemetry) / 200 (heartbeat); 401/403/409/400 mapping as in `apps/api/src/edge-handler.ts`.
+- **Firmware** (`firmware/esp32-lab`, PlatformIO, platform `espressif32@6.9.0` = Arduino-ESP32 2.0.17, toolchain xtensa 8.4.0+2021r2-patch5, **no third-party libraries**): portable core `lib/symcore` (SHA-256/HMAC, signing material, nonce, sequence, payload, retry, health, send gate, vibration, conversions, debounce, bounded queue) plus `src/` (register-level SHT41/MPU6050/INA219 drivers, io, net/SNTP, TLS transport with pinned Google Trust Services roots, uplink FreeRTOS task, modes). Five environments: `bringup`, `sensor_test`, `signing_test`, `cloud_test` (with replay probe), `demo`. All five **compile clean, no warnings** (demo: flash 73 %, RAM 18 %). Pins locked: SDA 21, SCL 22, Fan B MOSFET 26, fault-motor MOSFET 27, rocker 32, button 33.
+- **Server side**: `createBenchDeviceRecord` in `adapters/esp32` (device -> `AST-SIM-FAN-A` default, zone signals -> `AST-SIM-ZONE-1`, `chiller_b_running` -> `AST-SIM-FAN-B`; expected signals exclude `load_percent`/`outdoor_temperature`). Provenance uses the existing HARDWARE -> PROTOTYPE_HARDWARE chain, unchanged. Only other backend change: `FirestoreDeviceRegistry.create` (atomic).
+- **Provisioning** (`adapters/gcp/src/provision.ts`, `scripts/provision-device.ts`, `pnpm provision:device`): fresh key, Secret Manager, atomic Firestore create, rollback, rotation, key never printed. **Run against the real project**: `DEV-PHX-BENCH-001` / `KEY-PHX-BENCH-001` / `ORG-SIM-001` / `FAC-SIM-001`. The key is in Secret Manager and in the git-ignored `.secrets/devices/DEV-PHX-BENCH-001.KEY-PHX-BENCH-001.json` and `firmware/esp32-lab/include/secrets.h` on the operator's machine (Wi-Fi fields there are still placeholders).
+- **Tests/tools**: `firmware/esp32-lab/test/host` (31 tests), `tests/integration/firmware-compat.test.ts` (firmware-signed requests through the real edge handler), `tests/unit/firmware-hygiene.test.ts`, `adapters/gcp/src/provision.test.ts`, `adapters/esp32/src/esp32.test.ts`, `scripts/smoke-s10.ts`, `scripts/mutation-s10.mjs`.
+- Docs: firmware README (wiring, setup, provisioning, signing, NVS, recovery, calibration, hero steps, troubleshooting), `docs/HARDWARE.md`, D-078 to D-084, README, GCP_RUNTIME.
 
-## Files changed
+## NOT done (needs the physical device)
 
-Commits `4b4d55a` (adapters, runtime, web sign-in, builds, contract suite), `219efc1` (smoke, livez, provider error logging, scripts, docs), `3066a7e`/`43e248b` (docs state, smoke rerun handling), the Gemini-location fix commit, and the final handoff commit. New: `adapters/gcp/**`, `packages/runtime/**`, `tests/contract/**`, `tests/support/firestore-emulator.ts`, `scripts/{build-service.mjs,seed-gcp.ts,smoke-s9.ts,vertex-live.ts,mutation-s9.mjs}`, `Dockerfile.service`, `Dockerfile.web`, `.dockerignore`, `.gcloudignore`, `infrastructure/**`, web sign-in files, `docs/GCP_RUNTIME.md`. Modified: `apps/api` handlers (identity seam), `packages/tenancy` (resolver), `packages/repositories` (revoke atomicity), `packages/ai-explanation` (token supplier, global host, `GEMINI_LOCATION`), `config/explanation/explanation.v1.json` (model/location), `scripts/local-runtime.ts`, web lib/components, five boundary tests (D-069), README, `.env.example`, DECISIONS (D-069 to D-077).
+- Flashing and running on the bench: **H0 to H8 are all NOT RUN** (the H7 vector is proven on the host and compiled into every build, but not observed on a device).
+- Real ESP32 telemetry to the deployed API, the on-device **replay probe**, canonical-observation check of real data.
+- Calibration (spec H4): whether the real Fan A current moves >= 8 % with the motor on and whether the zone-temperature slope branch can fire (the rig has no outdoor temperature). If not, a separate versioned demo config under `config/demo/` is needed; none was created.
+- Physical hero loop (baseline, deterioration, human mitigation, verification, evidence package, recurrence, consent and insurer view). Sequence-recovery drill, offline buffering drill on the device.
 
 ## Commands executed
 
-`pnpm install/lint/typecheck/test/format:check/test:e2e`, `pnpm smoke:s2` to `smoke:s8`, `pnpm seed:gcp`, `pnpm smoke:s9`, `node scripts/mutation-s9.mjs`, `scripts/vertex-live.ts`, `gcloud` (read-only reconnaissance; IAM, Pub/Sub, Scheduler, Secret Manager, Firestore index, Cloud Build, Cloud Run deploys), Firebase management REST (web app), Identity Toolkit sign-in REST for demo users.
+`pwd`, `git status`, `git log`, PlatformIO builds (5 envs), host C++ build with zig (`python -m ziglang c++` in a scratch venv), `pnpm install`, `pnpm lint/typecheck/test/format:check/test:e2e`, `pnpm smoke:s2` to `smoke:s8`, `pnpm smoke:s10` (host part; cloud part read-only), `node scripts/mutation-s10.mjs`, `pnpm provision:device` (real project), a live negative-security probe of the deployed API (see below), `openssl s_client`/`curl` to pin the TLS roots.
 
 ## Exact test results
 
 - `pnpm lint`, `pnpm typecheck`, `pnpm format:check`: exit 0.
-- `pnpm test` (with `SYMBIOSIS_REQUIRE_EMULATOR=1`): **64 test files, 965 tests, 965 passed, 0 failed** (S8 baseline 61 / 895). New: `tests/contract/repositories.contract.test.ts` 32 (16 in-memory + 16 Firestore emulator), `adapters/gcp/src/gcp.test.ts` 27, `packages/runtime/src/config.test.ts` 11. Five older boundary tests were updated, not skipped (D-069).
-- **E2E (Playwright): 26 passed, 0 failed** (unchanged from S8; run before the last runtime-only commit).
-- **Local smokes (all exit 0):** `smoke:s2` 9/0, `s3` 21/0, `s4` 31/0, `s5` 35/0, `s6` 32/0, `s7` 15/0, `s8` 17/0 (PASS/FAIL).
-- **`pnpm smoke:s9` against the real project: 60 passed, 0 failed** (final run, after the last deploy): Firebase real-token verification, forged/unsigned/wrong-project rejected; Firestore write/read + tenant isolation; Pub/Sub publish, worker consumption and duplicate dropped (processed=1, dropped=1, from Cloud Logging); Cloud Storage write, SHA-256, no overwrite, bucket private with no public principal; Secret Manager read (value never shown) and per-secret IAM; live Vertex with the S8 validator; worker private; anonymous/forged/demo-header requests denied; authenticated customer succeeds; hero case end to end in real time (signed device -> Pub/Sub -> worker -> case -> alert -> ack -> action -> VERIFICATION PENDING -> verified by a deterministic tick -> immutable package with valid integrity reloaded from Cloud Storage -> Gemini explanation from Cloud Run via workload identity); insurer denied, consented, then denied again right after revocation. The run happened inside the recurrence watch of an earlier smoke case, so it also proved recurrence reopening the SAME case.
-- **Mutation checks (all detected, all restored; script `scripts/mutation-s9.mjs`):** M1 GCP mode falls back to memory (1 failed), M2 token not verified (2), M3 organization from the request (1), M4 Firestore tenant filter removed (1, emulator), M5 evidence overwrite allowed (1), M6 duplicate processed twice (1), M7 secret value logged (survived at first: the test only used values the value-scrubber also catches; test strengthened, then 1 failed), M8 static AI token accepted (1), M9 storage failure treated as success (1), M10 insurer bypasses consent (3).
-- **Dead-letter proof (live, manual):** a malformed message published to `symbiosis-events` was rejected by the worker 5 times (logged `push delivery malformed`, about 15-20 s apart) and then appeared in `symbiosis-events-dlq-pull`; nothing else was affected.
-- **Incident found and fixed during the session:** the mutation script was run while a Cloud Build upload was starting, so one deployed revision (api/worker/web `-00002`) contained mutant M2. It was caught by the smoke (valid tokens suddenly unauthorized), replaced by a clean rebuild from a committed tree (`-00003`, then `-00004`), and never served a forged identity (the mutant mapped every token to a UID with no actor link). Rule: never run mutation checks while a build or deploy is being prepared.
+- `pnpm test` (`SYMBIOSIS_REQUIRE_EMULATOR=1`, `SYMBIOSIS_REQUIRE_FIRMWARE_HOST=1`, `SYM_CXX` set): **68 files, 993 tests, 993 passed** (S9: 965; +28: 6 firmware-compat, 10 hygiene, 9 provisioning, 3 ESP32 adapter). Without a C++ compiler the firmware-compat cases skip with a warning (fail if `SYMBIOSIS_REQUIRE_FIRMWARE_HOST=1`).
+- Firmware host tests: **31 tests, 8,761 checks, 0 failures**; the S2 vector (body hash, signing material, signature) is reproduced and compared with the JSON fixtures byte for byte; SHA-256/HMAC also agree with Node `crypto` over lengths 0..1000 and several key sizes.
+- **E2E (Playwright): 26 passed.** Local smokes `s2` to `s8`: all exit 0 (PASSED).
+- `pnpm smoke:s10`: host part 3 PASS; physical part `SKIPPED_HARDWARE` (explicitly not a hardware pass). With `SMOKE_S10_CLOUD=1` against the project and the simulator device as a stand-in: device/secret/mapping checks PASS and every hardware check correctly `SKIPPED_HARDWARE` (no HARDWARE observations).
+- **Live API, deployed Cloud Run, firmware signer, real provisioned key**: wrong key -> 401 `SIGNATURE_MISMATCH`; altered body -> 401 `SIGNATURE_MISMATCH`; -400 s timestamp -> 401 `STALE_TIMESTAMP`; +120 s -> 401 `FUTURE_TIMESTAMP`; no key in any response. (A valid request was deliberately not sent: it would create fake "hardware" data.) Replay/nonce/sequence rejection is proven in-process against the real handler and must be proven on the device by the `cloud_test` replay probe.
+- **Mutation checks** (`scripts/mutation-s10.mjs`, all DETECTED, all restored): 1 sequence reset on reboot, 2 nonce reuse, 3 body hash omitted, 4 wrong material order, 5 key logged, 6 healthy with failed required sensor, 7 replay accepted, 8 firmware mislabels hardware as SIMULATOR (and 8b server adapter), 9 cloud-to-actuator path (firmware include and API response), 10 send before clock sync. Two mutants first failed to compile (not a detection); they were rewritten to compile and then detected.
 
 ## Deployed state
 
-Region `us-central1`, project `symbiosis-ai-2026`. Final revisions and images (tag = commit SHA; deployed by digest):
-
-| Service            | Revision                    | Image digest                                                                    |
-| ------------------ | --------------------------- | ------------------------------------------------------------------------------- |
-| `symbiosis-api`    | `symbiosis-api-00004-gdw`   | `sha256:d94f0b4b663e058cd67313a1ffb5e9accd03d1ec80e650df786f6b7e360e49cd`       |
-| `symbiosis-web`    | `symbiosis-web-00004-mgk`   | `sha256:e59c2a28bbfe26b3032c59741479b675341dd50fcf80d751f7958ca237d734d7`       |
-| `symbiosis-worker` | `symbiosis-worker-00004-86k`| `sha256:bf690595360b0414b11c0564d0f135da5db88fe52f933d304b447c445258e760`       |
-
-URLs: API `https://symbiosis-api-554089078085.us-central1.run.app`, web `https://symbiosis-web-554089078085.us-central1.run.app`, worker (private, not invocable anonymously) `https://symbiosis-worker-554089078085.us-central1.run.app`. Identities, IAM matrix and the rest of the map: `docs/GCP_RUNTIME.md`. A synthetic hero case (`COOLING_ELECTRICAL_DETERIORATION on AST-SIM-FAN-A`), its verification, evidence package and audit entries exist in the demo tenant `ORG-SIM-001` as demo records.
+Unchanged from S9 (no Cloud Run revision, image or IAM change in S10): revisions `symbiosis-api-00004-gdw`, `symbiosis-web-00004-mgk`, `symbiosis-worker-00004-86k`; API `https://symbiosis-api-554089078085.us-central1.run.app`. New data only: the `DEV-PHX-BENCH-001` registry document and its secret.
 
 ## Known issues
 
-- Services persist related records one after another (no cross-repository transaction); recovery is idempotent redelivery plus `tick()` repair (D-072).
-- One worker instance, concurrency 1; Pub/Sub is unordered; DLQ has no reprocessing tool and no alert policy (Cloud Monitoring metrics/logs only; none created).
-- Notifications are `ConsoleEmail` log lines. The cloud UI shows ids instead of names.
-- The retirement schedule of `gemini-3.1-flash-lite` could not be confirmed from the documentation (D-076); the model is configurable and the template is the fallback.
-- Broad pre-existing roles remain on the Compute default and `firebase-adminsdk` service accounts (not used by the services); the Firebase web API key has no referrer restriction. The Cloud Build upload tarball and logs live in the default buckets.
-- Firestore contract tests need Java plus a Firestore emulator jar (found in the firebase-tools cache here); without it they skip loudly, and `SYMBIOSIS_REQUIRE_EMULATOR=1` turns that into a failure. No Pub/Sub emulator was available, so the Pub/Sub adapter is unit-tested with fakes and proven live by the smoke.
-- Smoke part C writes a synthetic demo case and a revoked agreement document is deleted afterwards; audit entries remain (append-only).
-- S5/S6/S7/S8 open items stay open (no package signature, `REVOKED` also means expired, consent per organization and facility, TypeScript pinned `~6.0`).
+- No physical result exists yet (above). The firmware has never executed on a board; driver details (MPU6050 clone ids, INA219 shunt value, MOSFET polarity, SHT41 timing) are untested on hardware.
+- The worker picks the source adapter from the authenticated body's `source`; the registry does not bind a device to allowed sources. Hardware and simulator share the logical assets `AST-SIM-*`, so do not run both at once, and wait out the 1 h recurrence watch of any earlier synthetic case on those assets.
+- Device key is plain in flash (prototype). Fan B state is the gate read-back, not rotor proof. Sample queue is RAM only (about 10 min). Single Wi-Fi network, no OTA, no MQTT.
+- Firmware host/compat tests need a C++ compiler; CI without one skips them (loudly). A scratch toolchain was used here (zig in a venv, PlatformIO core at `C:\pio-sym`, both outside the repo; delete `C:\pio-sym` to reclaim about 1.5 GB).
+- S5/S6/S7/S8/S9 open items remain open (see git history of this file).
 
 ## Architectural decisions made
 
-`docs/DECISIONS.md` (D-001 to D-077; S9 is D-069 to D-077).
+`docs/DECISIONS.md` (D-001 to D-084; S10 is D-078 to D-084).
 
 ## Current git status
 
-Clean after the S9 handoff commit; `main` pushed to `origin/main`.
+Clean after the S10 handoff commit; `main` pushed to `origin/main` (see `git log`).
 
 ## Last known good commit SHA
 
-See `git log`: the final S9 handoff commit (documentation only) sits on top of the Gemini-location fix commit, the last code change, which is what the deployed `-00004` revisions were built from.
+See `git log`: the S10 handoff commit sits on top of the firmware and provisioning commits.
 
 ## Exact next task
 
-S10 — hardware integration (ESP32 firmware and provisioning against the unchanged signed `/edge/v1` protocol; PROJECT_SPEC section on hardware and Phase S10). Do not start until explicitly instructed. Suggested first slice: provision the real device record and a fresh device key in Secret Manager through an operator script (never the browser), point one real ESP32 at `https://symbiosis-api-554089078085.us-central1.run.app/edge/v1/telemetry`, and reuse `firmware-contracts/` known-answer vectors and the cloud smoke's device steps as the acceptance test. Remember the firmware must persist its sequence number across reboots (D-017).
+Run the physical bench (needs the board), in this order, filling the Result column in `docs/HARDWARE.md`:
+
+1. Put Wi-Fi credentials in `firmware/esp32-lab/include/secrets.h` (it already holds the provisioned device id, key id and key).
+2. `pio run -e bringup -t upload` -> H0, H1 (scan), H2-H6 by hand; `sensor_test` for calibration numbers.
+3. `pio run -e signing_test -t upload` -> H7 on the device.
+4. `pio run -e cloud_test -t upload` -> H8: heartbeat, telemetry 202, `REPLAY_PROBE PASS`; then `SMOKE_S10_CLOUD=1 GCP_PROJECT_ID=symbiosis-ai-2026 pnpm smoke:s10 --confirm-project symbiosis-ai-2026 --device-id DEV-PHX-BENCH-001`.
+5. Calibrate (firmware README), decide whether a `config/demo/` configuration is needed, record the decision in `docs/DECISIONS.md`.
+6. `pio run -e demo -t upload`, run the hero scenario (README "Hero scenario on the bench"), re-run the smoke, do the consent/insurer steps by hand.
+7. Only then set S10 COMPLETE in `docs/IMPLEMENTATION_STATE.md` and write the completion report. Do not start S11.
 
 ## Exact commands needed to resume
 
 ```
 git status && git log --oneline -10
-pnpm install && pnpm exec playwright install chromium
-pnpm lint && pnpm typecheck && SYMBIOSIS_REQUIRE_EMULATOR=1 pnpm test && pnpm format:check
+pnpm install
+pnpm lint && pnpm typecheck && SYMBIOSIS_REQUIRE_EMULATOR=1 SYMBIOSIS_REQUIRE_FIRMWARE_HOST=1 pnpm test && pnpm format:check
 pnpm smoke:s2 && pnpm smoke:s3 && pnpm smoke:s4 && pnpm smoke:s5 && pnpm smoke:s6 && pnpm smoke:s7 && pnpm smoke:s8
 pnpm test:e2e
-pnpm dev     # local mode: web http://127.0.0.1:3000, api http://127.0.0.1:8787
-# cloud (opt-in, real project): see docs/GCP_RUNTIME.md
+# firmware (host C++ compiler or SYM_CXX; PlatformIO for device builds)
+pnpm test:firmware && pnpm smoke:s10
+cd firmware/esp32-lab && pio run -e demo
+# cloud (opt-in, real project)
 SMOKE_S9=1 GCP_PROJECT_ID=symbiosis-ai-2026 pnpm smoke:s9 --confirm-project symbiosis-ai-2026
+SMOKE_S10_CLOUD=1 GCP_PROJECT_ID=symbiosis-ai-2026 pnpm smoke:s10 --confirm-project symbiosis-ai-2026 --device-id DEV-PHX-BENCH-001
 ```
 
 ## Cloud resources touched
 
-Project `symbiosis-ai-2026`: created 5 service accounts (`symbiosis-web|api|worker|pubsub-push|scheduler`), project/topic/bucket/secret/service IAM bindings (see `docs/GCP_RUNTIME.md`), Pub/Sub subscriptions `symbiosis-events-worker` (push, DLQ policy) and `symbiosis-events-dlq-pull`, Cloud Scheduler job `symbiosis-tick`, one Firestore composite index, Secret Manager secret `symbiosis-device-key-DEV-SIM-001-KEY-SIM-001`, Firebase web app `Symbiosis web` (a duplicate created by mistake was removed), four Firebase Auth demo users, Firestore documents (seed + smoke data), three Cloud Run services, images in Artifact Registry `symbiosis`, Cloud Build jobs. Reused unchanged: Firestore database and its deny-all rules, evidence bucket, topics, Artifact Registry repository, Firebase project and Email/Password sign-in.
+Project `symbiosis-ai-2026`: **created** Secret Manager secret `symbiosis-device-key-DEV-PHX-BENCH-001-KEY-PHX-BENCH-001` (one version; `secretAccessor` for `symbiosis-api@` on that secret only) and the Firestore document `devices/DEV-PHX-BENCH-001`. **Read only**: Firestore (devices, observations, cases, verifications, evidence packages), Secret Manager metadata (`getSecret`), Cloud Storage listing/reads in the smoke. **Live requests** to the API: four deliberately invalid signed requests (all rejected before any state change). No Cloud Run, Pub/Sub, Scheduler or IAM-policy change beyond the one secret binding.
 
 ## Secrets referenced (NAME ONLY)
 
-Secret Manager: `symbiosis-device-key-DEV-SIM-001-KEY-SIM-001`. Local git-ignored file `.secrets/demo-users.json` (demo-user passwords). Environment variable names: see `.env.example` (all empty placeholders). No credential, token or password is in the repository; the Firebase web config in `infrastructure/firebase-web-config.json` is public project configuration.
+Secret Manager: `symbiosis-device-key-DEV-SIM-001-KEY-SIM-001`, `symbiosis-device-key-DEV-PHX-BENCH-001-KEY-PHX-BENCH-001`. Git-ignored local files: `.secrets/demo-users.json`, `.secrets/devices/DEV-PHX-BENCH-001.KEY-PHX-BENCH-001.json`, `firmware/esp32-lab/include/secrets.h` (Wi-Fi SSID/password, API URL, device id/key id/key). Environment names: `SYM_WIFI_SSID`, `SYM_WIFI_PASSWORD`, `SYM_CXX`, `SYM_PIO`, `SYMBIOSIS_REQUIRE_FIRMWARE_HOST`, `SMOKE_S10_CLOUD`, `GCP_PROJECT_ID`. No credential is in the repository.

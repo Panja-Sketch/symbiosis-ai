@@ -161,3 +161,13 @@ touches the real project is opt-in: `pnpm seed:gcp`, `pnpm smoke:s9`, `scripts/v
 - The Compute default service account and `firebase-adminsdk` service account still carry broad
   project roles from project creation; the Firebase web API key is unrestricted by referrer.
 - The audit log has no hash chain; per-organization sequence contention limits sustained write rate.
+
+## Physical device provisioning (S10)
+
+`pnpm provision:device` (operator, ADC) creates the secret `symbiosis-device-key-<deviceId>-<keyId>`
+(automatic replication, `secretAccessor` for `symbiosis-api@` only) and the Firestore `devices/<id>`
+record (atomic create; duplicate ids refused). Rotation (`--rotate-key` with a new key id) is the
+recovery path for a sequence error. Registered so far: `DEV-PHX-BENCH-001` (key id
+`KEY-PHX-BENCH-001`, organization `ORG-SIM-001`, facility `FAC-SIM-001`), health `UNKNOWN` until its
+first heartbeat. No Cloud Run revision changed in S10. To remove a device: delete the Firestore
+document `devices/<id>` and the secret (all versions).
