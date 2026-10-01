@@ -2,7 +2,7 @@
 
 ## Current phase
 
-S6 — Evidence + consent (finished; S7 not started)
+S7 — Persona UI (finished; S8 not started)
 
 ## Current phase status
 
@@ -10,81 +10,73 @@ COMPLETE
 
 ## Last completed phase
 
-S6 — Evidence + consent (S0 to S5 completed earlier)
+S7 — Persona UI (S0 to S6 completed earlier)
 
 ## Completed work
 
-- **Evidence package (`packages/evidence`, D-047 to D-049):** every completed verification (all four results, faithfully) produces an immutable `evidence-package.v1` built by a pure builder from existing trusted records only: payload (spec-19 facts, no id or timestamp so the hash is a pure function of the records), hashed artifacts (the referenced observations, baselines, actions, audit entries, policy and device snapshot), a SHA-256 `evidence-manifest.v1` and `manifestSha256`. Canonical form `symbiosis-canonical-json.v1` (sorted keys, no whitespace, plain JSON only). `verifyEvidencePackage` recomputes everything from the package alone; `EvidenceService.load` also checks canonical bytes and the index record. A missing referenced record, device snapshot or completion audit entry fails explicitly (no package, no event). Stored through `EvidenceObjectStore` (in-memory; Cloud Storage is S9) and an `EvidencePackageRepository` index; neither can overwrite. Creation is idempotent per verification, retried by `tick()` (`createMissing`).
-- **Snapshot fix:** the verification runner freezes the device facts it used onto the completed attempt (`deviceSnapshots`); `DEVICE:<id>` evidence now resolves to that copy (also in S5 `resolveEvidence`). Other mutable records are embedded as hashed snapshots, so later registry, case or event changes never rewrite a package.
-- **Case linkage:** new documentation commands in `risk-cases` (`RECORD_EVIDENCE_PACKAGE`, `SET_SHARING_STATE`) that preserve state, severity, verification references and `updatedAt`; invariant: a sharing state other than `NOT_SHARED` requires `latestEvidencePackageId`.
-- **Consent (`packages/consent`, D-050 to D-053):** `SharingAgreement` (spec shape plus `createdAt`/`revokedBy`/`revocationReason`), ten scopes (`INTERVENTION_RECOMMENDATION` added; `RAW_TELEMETRY` separate, off by default, granting needs `SHARING_GRANT_RAW_TELEMETRY`), pure deny-by-default `evaluateAccess`, `SharingService` (create, revoke, list, reconcile, package reaction), `InsuranceGateway` (six read paths), scope-filtered projections. Sharing state is derived (`NOT_SHARED`, `SHAREABLE`, `SHARED`, `REVOKED`; a package alone is never `SHARED`; `REVOKED` also covers expiry).
-- **Events (`.v1`):** `evidence.package_created` (caused by `verification.completed`), `evidence.shareable`, `consent.granted`, `consent.revoked`, `evidence.shared`. Audit actions: `EVIDENCE_PACKAGE_CREATED/READ`, `SHARING_AGREEMENT_CREATED/REVOKED`, `EVIDENCE_SHARED`, `SHARING_STATE_CHANGED`, `INSURER_EVIDENCE_READ`, `INSURER_ACCESS_DENIED`.
-- **API/UI (D-054):** `GET /api/v1/evidence/:id`, `POST /api/v1/sharing-agreements`, `POST /api/v1/sharing-agreements/:id/revoke` (+ `GET /api/v1/sharing-agreements[/:id]`); insurer `GET /insurance/v1/sites`, `/sites/:id/cases`, `/cases/:id`, `/cases/:id/evidence` (`?include=raw_telemetry`, `?package=`), `/recommendations`, `/interventions`. New synthetic organizations and insurer actors (`USR-RISK-ENGINEER-001`, `USR-UNDERWRITER-001`, `USR-OTHER-INSURER-RE-001`); permissions `EVIDENCE_READ`, `SHARING_MANAGE`, `SHARING_GRANT_RAW_TELEMETRY`, `INSURANCE_EVIDENCE_READ`. The case page shows the evidence package, live hash verification, source label, sharing state, grant and revoke forms; `/ui/insurer/cases[/:id]` shows only consented evidence.
-- **Runtime:** `tick()` = alert retries, escalation, verification, `evidence.createMissing()`, `sharing.reconcileAll()`; `pnpm smoke:s6` added.
-- Not implemented (by design): S7 persona workspaces, Trust Center, Gemini, Firebase/Firestore/Pub/Sub/Cloud Storage/Secret Manager/Cloud Run, firmware, PDF export, package signing.
+- **Next.js web app (`apps/web`, D-056):** Next 16.3 (App Router, Turbopack), React 19, plain responsive CSS, no UI framework. Server components fetch; Server Actions forward one command and redirect with a fixed notice or the API's own error; every control is a plain form. `pnpm dev` now also starts it on `:3000`; `pnpm web:build`, `pnpm test:e2e`, `pnpm smoke:s7` added.
+- **API boundary (D-057):** the web app imports no `@symbiosis/*` package, repository or script (a boundary test enforces this, plus: no rule-like code, no clock use, no AI/cloud names, fetch only in `lib/api.ts`, insurer pages never call facility endpoints). It uses `/api/v1` for the facility persona and `/insurance/v1` for the insurer persona over HTTP, server side only. DTOs are web-owned (`lib/types.ts`) and a compile-time test checks the backend read models stay assignable to them.
+- **Demo identity (D-058):** `HttpOnly` cookie with an actor id only; the API resolves it (`/api/v1/me`) from its server-side directory; "Demo identity" badge and "Local demo" banner; switcher fed by the new local-only `GET /api/v1/dev/identities`. Persona (navigation only) is derived from permissions; 403/`ACCESS_DENIED`/404 render as words.
+- **Backend additions (D-059), the only domain-adjacent changes:** `GET /api/v1/dev/identities` and `CaseView.nextSteps {canAcknowledge, canAssignOrReport}` (state-only read projection sharing the workflow's own constants). No lifecycle, verification, consent, evidence or intervention rule changed.
+- **Routes:** `/`, `/operations`, `/operations/cases/[id]`, `/operations/evidence`, `/risk-evidence`, `/risk-evidence/sites`, `/risk-evidence/sites/[id]`, `/risk-evidence/cases/[id]`, `/risk-evidence/interventions`, `/trust`. Navigation differs by persona (facility: Operations, Evidence & sharing, Trust; insurer: Risk Evidence, Sites, Interventions, Trust).
+- **Case detail (D-060):** DETECT-to-MONITOR flow strip, next-step line, nine questions of spec 25 plus a timeline; "Reported complete" and "Verified improved" shown side by side; before/after bars (backend means, zero-based, no percentages); criteria, policy, completeness, telemetry confidence; reopened history; evidence panel with live SHA-256 check and synthetic label; plain-language sharing with grant/revoke, nine standard scopes pre-ticked and `RAW_TELEMETRY` only in a separate advanced section (never ticked, only for roles allowed to grant it). Operators see "Evidence is not available to your role".
+- **Insurer workspace:** consent-filtered overview cards, sites, cases, interventions, case evidence; absent scopes shown as "Not shared with you"; four deterministic intervention levels with translated reason codes, evidence sufficiency, supporting record count and an always-present decision-support note (wording is "recommended", never dispatched/scheduled); no live telemetry; the UI never requests raw telemetry.
+- **Responsive/accessibility:** semantic headings and landmarks, labelled controls, skip link, visible focus, status = icon + text, tables become cards under 760 px, no horizontal scroll at 1366/820/390 px (tested), axe-core WCAG 2.1 A/AA clean on every main screen.
+- **Proof UI superseded (D-061):** the S4 to S6 `/ui/*` pages stay as a documented fallback, untouched and still tested.
+- Not implemented (by design): Gemini/AI of any kind (S8), Firebase and cloud adapters (S9), dark mode, a full Trust Center beyond `/trust`, PDF export, package signing.
 
 ## Files changed
 
-Commit `422f915` (`feat(s6): implement evidence and consent sharing`): 59 files, +7984/-101. New: `packages/contracts/src/{evidence,consent}.ts`, `packages/evidence/src/{canonical,hash,store,builder,verify,service}.ts`, `packages/consent/src/{access,sharing,projection,gateway}.ts`, `apps/api/src/insurance-handler.ts`, `scripts/smoke-s6.ts`, `tests/integration/{evidence,consent,s6-world}`, `tests/unit/evidence-boundaries.test.ts`, package tests (evidence canonical, consent access and projection, repositories S6, risk-cases documentation, tenancy organizations), `docs/EVIDENCE_STANDARD.md` (written). Modified: contracts (events, audit actions, verification attempt snapshot), repositories (evidence index, agreements, share ledger), risk-cases, tenancy (organizations, insurer actors), authz, action-orchestration case view, verification runner (device snapshots), api handler/html/server/edge types, local and dev runtime, root package.json, README, DECISIONS (D-047 to D-055), IMPLEMENTATION_STATE, and the six earlier test assertions listed in D-055.
+Commit `feat(s7): implement Symbiosis persona web experience` (see Last known good commit). New: `apps/web` (config, `src/app/**` 10 routes + layout/error/loading/not-found/actions/globals.css, `src/components/**`, `src/lib/**`), `scripts/s7-backend.ts`, `scripts/smoke-s7.ts`, `playwright.config.ts`, `tests/e2e/*` (3 specs + helpers), `tests/integration/s7-web.test.tsx`, `s7-backend.test.ts`, `tests/unit/web-boundary.test.ts`, `web-contract.test.ts`, `apps/web/src/lib/lib.test.ts`. Modified: `apps/api/src/app-handler.ts` (dev identities), `packages/action-orchestration/src/{view,operations}.ts` (nextSteps, shared constants), `scripts/local-runtime.ts`, `scripts/dev.mjs`, `scripts/dev-runtime.ts` (hint), root `package.json`/lockfile, `tsconfig.json`, `vitest.config.ts`, `.gitignore`, two S6 boundary tests (D-063), README, DECISIONS (D-056 to D-063), IMPLEMENTATION_STATE.
 
 ## Commands executed
 
-`pnpm install --offline`, `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm format:check` (prettier --write once), `pnpm exec vitest run --reporter=json` (counts), `pnpm smoke:s2` to `smoke:s6`, a mutation script (below), grep audits (cloud SDK, Gemini, secrets, co-author trailers), `git status/log/diff`.
+`pnpm install`, `pnpm exec playwright install chromium`, `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm format:check`, `pnpm test:e2e`, `pnpm smoke:s2` to `smoke:s7`, `pnpm dev` (started and checked `:3000` and `:8787`), screenshots reviewed, `git status/diff/log`.
 
 ## Exact test results
 
-- `pnpm lint`: exit 0. `pnpm typecheck`: exit 0. `pnpm format:check`: clean.
-- `pnpm test`: **52 test files, 796 tests, 796 passed, 0 failed** (S5 baseline 43 files / 666 tests). New: integration evidence 29, integration consent/insurer API/UI 25, evidence boundaries 16, consent access 20, consent projection 10, evidence canonical 11, repositories S6 8, risk-cases documentation 6, tenancy organizations 4, plus 1 added authz test.
-- **Smoke: `smoke:s2` 9 PASS / 0 FAIL, `smoke:s3` 21 / 0, `smoke:s4` 31 / 0, `smoke:s5` 35 / 0, `smoke:s6` 32 / 0** (all exit 0). `smoke:s6` covers steps 1 to 18 of the brief. Event order: `verification.completed > evidence.package_created > evidence.shareable > consent.granted > evidence.shared > consent.revoked`.
-- **Mutation checks (all detected, all restored; baseline 796/796 after):** M1 unresolved evidence ids allowed: 3 tests failed; M2 insurer read without consent: 22; M3 revoked consent keeps working: 9; M4 raw telemetry through an ordinary evidence scope: 2; M5 hashing ignores changed content: 21; M6 verify ignores a changed artifact hash: 1; M7 package upgrades the result: 5; M8 package alone marks SHARED: 2; M9 device snapshot not frozen: 41; M10 wrong recipient accepted: 2; M11 expired agreement stays active: 4; M12 unauditable read released (fail open): 1; M13 facility scope ignored: 1.
-- Audits: no cloud SDK, Gemini, Firebase, secrets or S7 code (only an interface comment names Cloud Storage); only workspace dependencies added; dependency graph acyclic (asserted by test); insurer HTTP handler reaches data only through the consent gateway (asserted); no co-author trailers.
-
-## Package hash behavior
-
-Same trusted records plus the same injected clock and ids produce byte-identical packages and hashes (tested across two runs). Changing one value in the payload, an artifact snapshot, an artifact hash, the manifest, the package id or dropping an artifact fails `verifyEvidencePackage`; a fully recomputed forgery is caught by the stored index. A historical package still verifies after the device registry, the case and the risk events change.
-
-## Consent and revocation proof
-
-`smoke:s6` and `tests/integration/consent.test.ts`: before consent the insurer is denied; after a scoped grant exactly the granted sections appear (each scope releases only its own section); raw telemetry, another facility, another insurer organization, an expired or not-yet-effective agreement and a missing scope are denied; revocation denies the next read at the same instant on every endpoint (`AGREEMENT_REVOKED`), keeps the agreement, the package, the hashes and the audit history, and moves the case to `REVOKED`; a second revoke is a 409 and cannot change `revokedAt`; one revoked agreement does not affect another.
-
-## Insurer-access proof
-
-Every gateway method requires `INSURANCE_EVIDENCE_READ` and re-evaluates the stored agreements at the current time with the actor's own organization as recipient (asserted statically and by tests); responses for unknown, uncovered and other-tenant cases are identical; every allowed and denied read is audited with actor, agreements and scopes; if the audit write fails nothing is released; a package failing integrity verification is withheld (500).
+- `pnpm lint`, `pnpm typecheck`, `pnpm format:check`: exit 0.
+- `pnpm test`: **57 test files, 832 tests, 832 passed, 0 failed** (S6 baseline 52 / 796). New: web integration over the real API 14, backend projections 3, web boundary 8, web DTO contract 3, web helpers 8. Three S6-era assertions were adapted (D-063).
+- **E2E (Playwright, Chromium, production build against the real backend): 17 passed, 0 failed** (hero journey incl. identity switching, grant, insurer view, revoke; five verification outcomes incl. reopened; wrong-persona and cross-tenant denial; consent filtering; no-dispatch wording; axe on 9 screens; keyboard focus; no horizontal scroll at laptop, tablet and phone; phone case-detail flow). Run twice in a row, stable.
+- **Smoke: `smoke:s2` 9 PASS / 0 FAIL, `s3` 21 / 0, `s4` 31 / 0, `s5` 35 / 0, `s6` 32 / 0, `s7` 15 / 0** (all exit 0).
+- Audits: no Gemini, cloud SDK, Firebase or secrets; web code imports no domain package; only app dependencies added (next, react, react-dom, types; dev: Playwright, axe-core).
 
 ## Known issues
 
-- **No package signature:** hashes show change, not authorship; signing (`EVIDENCE_SIGNING_SECRET_NAME`) is later hardening. No PDF.
-- **`REVOKED` also means "expired"**: the four-value vocabulary cannot distinguish; the stored state catches up on the next tick (reads are enforced immediately).
-- **Packages are created on the bus cascade after verification:** a failure dead-letters and relies on the `tick()` retry (`createMissing`); an event-publish failure after the package is stored would not be redelivered (the in-memory bus cannot fail here; S9 needs an outbox or transaction).
-- **Consent grants are per organization and facility** (no per-case or per-package consent, no insurer-side organization hierarchy, no invitation flow).
-- **Insurer case facts are partly live:** `recommendation` and the current recurrence count come from the live case; everything else comes from the frozen package.
-- **Pre-agreement packages are releasable** once an agreement is active (the window governs access time).
-- Device snapshots exist only for attempts completed since S6; an older attempt without one cannot yield a package that cites a device (explicit failure).
-- S5 items still open: verification starts on the scheduler tick, no retry-without-action, intervention triggers `recommendation.overdue`/`telemetry.quality_changed`/`device.health_changed` not wired, atomicity by ordering rather than a transaction.
-- Local only: development identity, in-memory stores, `POST /ops/tick`, ConsoleEmail. Carried over: TypeScript pinned `~6.0`; Windows `process.exit()` crash avoided via `process.exitCode`.
+- **Case list is N+1 over HTTP** (one `GET /cases/:id` per case, server side). Fine for the demo; a list projection is the fix if portfolios grow.
+- **Light theme only;** no dark mode. Dates are UTC.
+- **Feedback after an action travels in the URL** (`?notice=` key from a fixed table, `?msg=` API error text shown as plain text). Harmless but not tamper-proof; a flash cookie or session store can replace it in S9.
+- **Summary-card groupings** (e.g. unsuccessful outcomes count as "action required") are presentation choices documented in `lib/summary.ts` and D-060.
+- **Operators and auditors cannot read evidence** (API permission); the UI says so. Sharing defaults tick all nine standard scopes; the user must still press the button.
+- **No client-side live refresh:** pages show the state at load; there is no polling (by design).
+- E2E depends on a locally installed Chromium (`pnpm exec playwright install chromium`) and ports 3100, 8791, 8792 (smoke uses 3101, 8793, 8794).
+- S6/S5 items still open (see git history of this file): no package signature, `REVOKED` also means expired, consent per organization and facility, local-only identity/in-memory stores. TypeScript pinned `~6.0`; Windows `process.exit()` crash avoided via `process.exitCode`.
 
 ## Architectural decisions made
 
-See `docs/DECISIONS.md` (D-001 to D-055; S6 is D-047 to D-055).
+See `docs/DECISIONS.md` (D-001 to D-063; S7 is D-056 to D-063).
 
 ## Current git status
 
-Clean after the S6 handoff commit; `main` pushed to `origin/main`.
+Clean after the S7 handoff commit; `main` pushed to `origin/main`.
 
 ## Last known good commit SHA
 
-`422f915956c1ae6bffdef500a7274928fa0fe7e3` (S6 implementation, `feat(s6): implement evidence and consent sharing`). Check `git log` for the later handoff commit, which changes only documentation.
+(Filled in by the handoff commit below.) Check `git log` for `feat(s7): implement Symbiosis persona web experience`.
 
 ## Exact next task
 
-S7 — Persona UI (PROJECT_SPEC sections 24, 25, 45): Operations Workspace, Risk Evidence Workspace, portfolio view and Trust Center, as the real Next.js `apps/web` (D-005), consuming the existing application and insurance APIs and the case-detail evidence and sharing sections; no new domain logic. Do not start until explicitly instructed. Suggested first slice: the Next.js shell with the development-identity switcher and the Operations case-detail page (all spec-25 sections including Evidence and Sharing) over `/api/v1`, then the insurer evidence workspace over `/insurance/v1`.
+S8 — Gemini (PROJECT_SPEC section 21 and the AI governance rules in `docs/AI_GOVERNANCE.md`): explanation-only AI behind `packages/ai-explanation`, grounded in deterministic case facts, labelled as AI-generated, never in verification, lifecycle, severity or intervention-level selection, with a deterministic fallback when the model is absent. Do not start until explicitly instructed. Suggested first slice: the `ExplanationProvider` port with a deterministic template provider and the Gemini adapter behind it, a "plain-language summary" panel on case detail that reads only the existing `CaseView` and is clearly marked as generated, and tests that assert the AI output can never change a state.
 
 ## Exact commands needed to resume
 
 ```
 git status && git log --oneline -10
-pnpm install && pnpm lint && pnpm typecheck && pnpm test && pnpm format:check
-pnpm smoke:s2 && pnpm smoke:s3 && pnpm smoke:s4 && pnpm smoke:s5 && pnpm smoke:s6
+pnpm install && pnpm exec playwright install chromium
+pnpm lint && pnpm typecheck && pnpm test && pnpm format:check
+pnpm smoke:s2 && pnpm smoke:s3 && pnpm smoke:s4 && pnpm smoke:s5 && pnpm smoke:s6 && pnpm smoke:s7
+pnpm test:e2e
+pnpm dev     # web http://127.0.0.1:3000, api http://127.0.0.1:8787
 ```
 
 ## Cloud resources touched
@@ -93,4 +85,4 @@ None
 
 ## Secrets referenced (NAME ONLY)
 
-None referenced in code. Placeholder names in `.env.example`: GCP_PROJECT_ID, GCP_REGION, FIREBASE_PROJECT_ID, DEVICE_KEY_SECRET_NAME, SMTP_SECRET_NAME, EVIDENCE_SIGNING_SECRET_NAME, EDGE_PORT, EDGE_BASE_URL, SIMULATOR_INTERVAL_MS, SIMULATOR_DEVICE_ID, SIMULATOR_KEY_ID, SIMULATOR_DEVICE_KEY_HEX, SIMULATOR_SCENARIO, OPS_TICK_INTERVAL_MS. The simulator default key is the public synthetic dev key from `@symbiosis/device-registry`; local actor and organization ids are synthetic; no real device key, credential or email address exists in the repository.
+None referenced in code. Placeholder names in `.env.example`: GCP_PROJECT_ID, GCP_REGION, FIREBASE_PROJECT_ID, DEVICE_KEY_SECRET_NAME, SMTP_SECRET_NAME, EVIDENCE_SIGNING_SECRET_NAME, EDGE_PORT, EDGE_BASE_URL, SIMULATOR_INTERVAL_MS, SIMULATOR_DEVICE_ID, SIMULATOR_KEY_ID, SIMULATOR_DEVICE_KEY_HEX, SIMULATOR_SCENARIO, OPS_TICK_INTERVAL_MS. The web app reads `SYMBIOSIS_API_URL` (a URL, not a secret) and `WEB_PORT` (dev launcher). The cookie `symbiosis_demo_actor` holds a synthetic actor id only.

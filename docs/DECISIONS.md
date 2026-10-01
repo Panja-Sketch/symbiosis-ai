@@ -282,3 +282,43 @@ source of truth; this log records choices made while implementing it. Not a sess
 
 - **Decision:** Tests that encoded "S6 not started" were changed deliberately, keeping their intent: the platform-event count (24 to 29) and the "no evidence/consent events" assertion (now: the five S6 events exist, still no `sharing.*` or UI events); the S5 route-surface test (evidence routes are now allowed); the authz test (auditors also read evidence; insurer roles hold exactly `INSURANCE_EVIDENCE_READ`); the case view sharing label (`SHARING_LABELS` instead of "Not available until S6"); and the V1 integration test (the completed verification now has a package, nothing is shared). The S5 sources guard (no hashing/manifest vocabulary in the verification code) is unchanged and still passes.
 - **Reason:** Keep every earlier invariant while allowing the new phase.
+
+## D-056 — Next.js web app; the S0 deferral (D-005) ends (S7, 2026-10-01)
+
+- **Decision:** `apps/web` is a Next.js 16 (App Router, React 19, Turbopack) app with plain CSS and semantic HTML; no UI framework or component library was added (nothing in the brief needed one). Pages are server components that fetch over HTTP; the only client component is the navigation highlighter. Mutations are Server Actions (`app/actions.ts`) that forward one command to the API and redirect back with a fixed notice or the API's own error. `pnpm dev` now starts the web app on `:3000` next to the API (`:8787`) and the simulator; `pnpm web:build` builds it. The web app has no JavaScript-only paths: every control is a plain form.
+- **Reason:** Spec 11.1 and the S7 brief. Dependencies stay modest (next, react, react-dom; dev: Playwright, axe-core).
+
+## D-057 — API boundary and DTOs (S7, 2026-10-01)
+
+- **Decision:** `apps/web` imports **no** `@symbiosis/*` package, repository or script (asserted by `tests/unit/web-boundary.test.ts`, which also forbids rule-like code, clock use, AI/cloud names, and any fetch outside `lib/api.ts`). It reaches the backend only through `lib/api.ts` (HTTP, server side, `X-Demo-Actor-Id`), using `/api/v1` for the facility persona and `/insurance/v1` for the insurer persona; the insurer pages never call a facility endpoint. The web app keeps its own DTO types (`lib/types.ts`); `tests/unit/web-contract.test.ts` asserts at compile time that the backend read models (`CaseView`, `InsurerCaseView`, `InsurerInterventionView`) are assignable to them. Labels and reason-code phrases are static lookups with a readable fallback (`lib/labels.ts`); unknown codes are shown humanized, never guessed.
+- **Reason:** "AI advises, deterministic code decides" and the no-duplicated-rules requirement.
+
+## D-058 — Development identity in the web app (S7, 2026-10-01)
+
+- **Decision:** An `HttpOnly` cookie (`symbiosis_demo_actor`) holds only an actor id. Every request resolves it through the API (`/api/v1/me`), which looks it up in the server-side directory; organization, facilities and roles never come from the browser. The switcher lists identities from the new local-only, read-only `GET /api/v1/dev/identities` (absent unless the runtime supplies it; it returns actor ids, roles, permissions and organization names, nothing secret). The shell shows a "Demo identity" badge and a "Local demo" banner. The persona (facility or insurer) is derived from the actor's permissions for navigation only; authorization is the API's, and a 403/`ACCESS_DENIED`/404 is rendered as words ("Not available to this identity", "Sharing was revoked", "Not found"). `returnTo` after switching is a same-site path and keeps a manager and an operator on the same case.
+- **Reason:** S7 local mode; Firebase is S9.
+
+## D-059 — Two minimal backend read projections (S7, 2026-10-01)
+
+- **Decision:** (1) `GET /api/v1/dev/identities` (D-058). (2) `CaseView.nextSteps = {canAcknowledge, canAssignOrReport}`, computed in `buildCaseView` from the persisted risk-event state using the same constants the workflow commands use (`ACTIONABLE_EVENT_STATES` moved to `view.ts` and shared; `ACKNOWLEDGEABLE_EVENT_STATES` mirrors the lifecycle table). The UI shows a control only when `nextSteps` and the actor's permission both allow it; the API still enforces everything (tested: it refuses what `nextSteps` says is not yet possible). No lifecycle, verification, consent or intervention rule changed.
+- **Reason:** without (2) the UI would have to copy a lifecycle rule. Everything else the screens need (before/after, criteria, recurrence, audit references, packages, agreements) already existed.
+
+## D-060 — Screen semantics (S7, 2026-10-01)
+
+- **Decision:** Status is always icon + text (`lib/labels.ts` `STATUS`): Risk detected, Action required, Action reported · verification pending, Verified improved, Partially verified, Not improving, Inconclusive, Reopened · recurring. A reported action and a verified improvement are shown side by side as different facts. The case list calls the backend per case (`GET /cases`, then `GET /cases/:id`) rather than extending the summary projection; "last update" is the newest audit reference. Summary-card counts are groupings of backend states (unsuccessful outcomes count as "action required"; documented in `lib/summary.ts`). Before/after uses backend means only, bars start at zero on one scale, and no percentage change is computed. Insurer sections whose scope was not granted say "Not shared with you" instead of disappearing, which makes consent filtering visible; the insurer UI never requests raw telemetry. Intervention wording is "recommended" only; every panel carries the decision-support note. The timeline is the case's audit references through a milestone table; unlisted audit actions are internal and hidden, nothing is invented. Sharing defaults to the nine standard scopes ticked; `RAW_TELEMETRY` is inside a separate advanced section, unticked, and offered only to roles with `SHARING_GRANT_RAW_TELEMETRY`. Light theme only (dark mode deferred).
+- **Reason:** S7 brief UX requirements.
+
+## D-061 — E2E and smoke approach; supersession of the proof UI (S7, 2026-10-01)
+
+- **Decision:** Playwright (Chromium) tests in `tests/e2e/*.spec.ts` (separate from Vitest, which only matches `*.test.*`) run against the production Next build and the **real** local backend on a simulated clock (`scripts/s7-backend.ts`: same runtime as `pnpm dev`, plus a control port that only feeds simulator telemetry, advances time and resets; it holds no domain logic and the web app never calls it). `pnpm test:e2e` builds then runs; `pnpm smoke:s7` builds then runs a 15-check browser smoke through the same harness. axe-core (WCAG 2.1 A/AA) runs on every main screen. The S4–S6 server-rendered `/ui/*` pages in `apps/api` are **superseded** by the web app but kept unchanged as a documented fallback and debugging surface (their tests still pass); they are not extended, and may be removed in S11.
+- **Reason:** Meaningful, deterministic browser coverage without duplicating backend smokes; deleting working fallbacks was not necessary.
+
+## D-062 — Test config adjustments (S7, 2026-10-01)
+
+- **Decision:** `vitest.config.ts` includes `.test.tsx`; root `tsconfig.json` sets `jsx: react-jsx` and adds the Playwright config (no DOM lib: the web code needs none, and adding it breaks the simulator's `fetch` typing). `apps/web/tsconfig.json` is the one Next uses. Root dev dependencies gained `react`, `react-dom`, `@types/react*`, `@playwright/test`, `@axe-core/playwright`. `apps/web/next-env.d.ts` and Playwright output are git-ignored.
+- **Reason:** Keep one `pnpm typecheck` covering web code and tests.
+
+## D-063 — Earlier assertions updated for S7 (S7, 2026-10-01)
+
+- **Decision:** Three S6-era tests encoded "no Next.js/React yet" or "every app has `src/index.ts`" and were changed deliberately, keeping their intent: `tests/unit/evidence-boundaries.test.ts` no longer forbids `react` in the root `package.json` or `apps/web` and instead keeps forbidding Gemini, Firebase, Pub/Sub, Cloud Storage and `next` in the root, and any React/cloud imports in `packages/` and `apps/api`; `tests/unit/workspace.smoke.test.ts` accepts `src/app/layout.tsx` as the entry of the Next.js `apps/web` (the placeholder `src/index.ts` was removed).
+- **Reason:** The tests guarded "S7 not started", which is no longer true; the remaining invariants stay.

@@ -8,7 +8,7 @@ import { permissionsFor } from "@symbiosis/authz";
 import { EVIDENCE_CONSENT_SCOPES } from "@symbiosis/contracts";
 import type { ConsentError, InsuranceGateway, SharingService } from "@symbiosis/consent";
 import type { EvidenceError, EvidenceService } from "@symbiosis/evidence";
-import type { ActorContext, ActorDirectory } from "@symbiosis/tenancy";
+import type { ActorContext, ActorDirectory, OrganizationRecord } from "@symbiosis/tenancy";
 import { RESULT_LABELS } from "@symbiosis/verification";
 import type { EdgeRequest, EdgeResponse } from "./edge-handler";
 import type { CaseEvidenceExtras } from "./html";
@@ -33,6 +33,15 @@ export type AppApiDeps = {
    * means the route does not exist. Cloud mode will use Cloud Scheduler instead (S9).
    */
   readonly runTick?: () => Promise<unknown>;
+  /**
+   * Local-only: the synthetic identities the web app's development identity switcher may offer
+   * (S7). Absent means the route does not exist. It lists directory entries only; choosing one
+   * still goes through the same server-side directory lookup as every other request.
+   */
+  readonly devIdentities?: {
+    readonly actors: readonly ActorContext[];
+    readonly organizations: readonly OrganizationRecord[];
+  };
 };
 
 const STATUS: Record<OperationsError["code"], number> = {
@@ -237,6 +246,21 @@ export function createAppHandler(
     const query = new URLSearchParams(queryString);
     const method = request.method.toUpperCase();
     const isUi = path.startsWith("/ui/");
+
+    if (method === "GET" && path === "/api/v1/dev/identities" && deps.devIdentities !== undefined) {
+      const { actors, organizations } = deps.devIdentities;
+      return json(200, {
+        identity: "DEVELOPMENT_ONLY",
+        actors: actors.map((a) => ({
+          actorId: a.actorId,
+          organizationId: a.organizationId,
+          facilityIds: a.facilityIds,
+          roles: a.roles,
+          permissions: permissionsFor(a.roles),
+        })),
+        organizations,
+      });
+    }
 
     const actor = await actorFor(request, query);
     if (actor === undefined) {

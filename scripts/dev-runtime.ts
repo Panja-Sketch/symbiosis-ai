@@ -58,7 +58,9 @@ const timer = setInterval(() => {
     }
   });
 }, tickMs);
-console.log(`[api+worker] ops tick every ${tickMs} ms; try /ui/cases?actor=USR-FACILITY-MGR-001`);
+console.log(
+  `[api+worker] ops tick every ${tickMs} ms; web app: pnpm dev serves it on :3000; fallback proof page /ui/cases?actor=USR-FACILITY-MGR-001`,
+);
 
 const shutdown = () => {
   clearInterval(timer);

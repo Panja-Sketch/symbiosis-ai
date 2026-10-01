@@ -49,6 +49,8 @@ import type { IdGenerator } from "@symbiosis/event-bus";
 import { ConsoleEmail, createAlerting, startAlerting } from "@symbiosis/notifications";
 import type { NotificationSender } from "@symbiosis/notifications";
 import {
+  SYNTHETIC_ACTORS,
+  SYNTHETIC_ORGANIZATIONS,
   createSyntheticActorDirectory,
   createSyntheticOrganizationDirectory,
 } from "@symbiosis/tenancy";
@@ -398,6 +400,7 @@ export async function createLocalRuntime(options: LocalRuntimeOptions = {}): Pro
       insurance: insuranceGateway,
       directory,
       runTick: tick,
+      devIdentities: { actors: SYNTHETIC_ACTORS, organizations: SYNTHETIC_ORGANIZATIONS },
     }),
     insurance: createInsuranceHandler({ gateway: insuranceGateway, directory }),
   });

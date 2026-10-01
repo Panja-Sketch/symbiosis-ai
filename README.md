@@ -8,7 +8,7 @@ architecture (single source of truth).
 
 Phases **S0** (foundation), **S1** (domain core), **S2** (local ingestion), **S3** (detection +
 baselines), **S4** (operations workflow), **S5** (verification + recurrence + intervention
-prioritization) and **S6** (evidence + consent) are complete. A simulated device is authenticated, normalized and assessed; a
+prioritization) **S6** (evidence + consent) and **S7** (persona UI) are complete. A simulated device is authenticated, normalized and assessed; a
 deterministic rule detects persistent compound deterioration and opens a Risk Improvement Case; an
 alert goes out through a local notification port (ConsoleEmail); a person acknowledges, an approved
 action is assigned and reported, and the case waits as **VERIFICATION PENDING**. A reported action
@@ -22,7 +22,7 @@ evidence package** (canonical JSON, SHA-256 manifest, frozen device facts, expli
 synthetic-data label) that preserves its actual result; the insured controls what an insurer
 sees through scoped, revocable **sharing agreements**, raw telemetry is off by default, and
 every insurer read is authorization-checked and audited. The system deliberately stops there:
-**no final UI (S7), AI (S8) or cloud integration (S9) yet.** Progress is tracked in
+S7 added the Next.js persona web app; **no AI (S8) or cloud integration (S9) yet.** Progress is tracked in
 [docs/IMPLEMENTATION_STATE.md](docs/IMPLEMENTATION_STATE.md).
 
 ## Layout
@@ -43,20 +43,22 @@ pnpm test
 pnpm format:check
 ```
 
-## Running locally (S2-S6)
+## Running locally (S2-S7)
 
 ```
-pnpm dev          # api + worker (one process, in-memory bus) and the simulator
+pnpm dev          # api + worker (one process, in-memory bus), the simulator and the web app (:3000)
 pnpm smoke:s2     # self-checking ingestion run over real HTTP, exits non-zero on failure
 pnpm smoke:s3     # baseline -> isolated anomalies -> compound deterioration -> one case
 pnpm smoke:s4     # detected -> alert -> acknowledge -> assign -> report -> VERIFICATION PENDING
 pnpm smoke:s5     # ... -> trusted post-action data -> VERIFIED -> hazard returns -> same case REOPENED
 pnpm smoke:s6     # ... VERIFIED -> evidence package + hashes -> SHAREABLE -> consent -> insurer read -> revoke
+pnpm smoke:s7     # builds the web app, then drives both personas in a real browser (incl. phone width)
+pnpm test:e2e     # builds the web app, then the 17 Playwright browser tests
 ```
 
 `pnpm dev` listens on `http://127.0.0.1:8787` (override with `EDGE_PORT`) and prints each
-telemetry event as the simulator's signed packets flow through. The **web app is not part of
-`pnpm dev` yet** (Next.js arrives in S7); api and worker share a process only because the local
+telemetry event as the simulator signed packets flow through. The **web app** also starts, on
+`http://127.0.0.1:3000` (`WEB_PORT`); api and worker share a process only because the local
 event bus is in-memory. Everything uses a public, obviously synthetic dev device (`DEV-SIM-001`);
 no real credentials exist in the repo.
 
@@ -143,3 +145,28 @@ Scopes: `RECOMMENDATION`, `EVENT_SUMMARY`, `ACTION_SUMMARY`, `BEFORE_AFTER_METRI
 expired or not-yet-effective agreement, another recipient, another facility or a missing scope
 is denied on the very next read. Everything is synthetic and local (in-memory stores and object
 store); no cloud service is used.
+
+### Persona web app (S7)
+
+`apps/web` is a Next.js 16 app (App Router, React 19, plain CSS; decisions D-056 to D-063). Open
+`http://127.0.0.1:3000` after `pnpm dev` and pick a **demo identity** (a development identity, not
+authentication; the shell labels it). It never reads a repository: server components and Server
+Actions call `/api/v1` (facility) and `/insurance/v1` (insurer) over HTTP, and the browser never
+talks to the API. `SYMBIOSIS_API_URL` (default `http://127.0.0.1:8787`) points it at the API.
+
+| Route                                                                         | Persona  | Purpose                                                                                                                                                         |
+| ----------------------------------------------------------------------------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/`                                                                           | both     | The product claim, the DETECT to MONITOR flow, one door per persona                                                                                             |
+| `/operations`                                                                 | facility | Summary cards, filterable case list                                                                                                                             |
+| `/operations/cases/[id]`                                                      | facility | Case detail: what happened, why it matters, what to do, accountability, what was done, did it work?, is it staying fixed?, evidence, sharing, timeline          |
+| `/operations/evidence`                                                        | facility | Evidence packages and who can see them                                                                                                                          |
+| `/risk-evidence`, `/risk-evidence/sites[/id]`, `/cases/[id]`, `/interventions` | insurer  | Consented evidence only: outcomes, recurrence, recommendations, package metadata                                                                                |
+| `/trust`                                                                      | both     | How conclusions are reached, what a package proves, what is not claimed                                                                                         |
+
+A reported action and a verified improvement are always shown as different facts. The insurer
+screens say "Not shared with you" for any scope the customer did not grant, and revoking sharing
+removes access on the insurer's next request. The earlier `/ui/*` pages in `apps/api` are
+superseded; they remain as a fallback and debugging surface. Browser tests use the real backend on
+a simulated clock through `scripts/s7-backend.ts`; the identity switcher lists
+`GET /api/v1/dev/identities` (local only). The layout is responsive (tables become cards on
+phones) and was checked with axe-core (WCAG 2.1 A/AA).

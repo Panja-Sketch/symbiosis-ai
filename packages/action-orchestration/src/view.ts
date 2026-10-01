@@ -33,6 +33,22 @@ export type CaseViewSummary = {
 
 export { VERIFICATION_PENDING_LABEL };
 
+/**
+ * Risk-event states from which a human may assign or report an approved action: the first cycle
+ * (ACKNOWLEDGED), further actions while waiting (ACTION_REPORTED) and a follow-up cycle after an
+ * unsuccessful verification outcome. Outcome states are never silently closed (S5). Shared by the
+ * workflow commands and the read model so the UI never has to guess.
+ */
+export const ACTIONABLE_EVENT_STATES: readonly RiskEventState[] = [
+  "ACKNOWLEDGED",
+  "ACTION_REPORTED",
+  "PARTIALLY_VERIFIED",
+  "NOT_IMPROVING",
+  "INCONCLUSIVE",
+];
+/** Risk-event states from which the risk can be acknowledged (the lifecycle transition table). */
+export const ACKNOWLEDGEABLE_EVENT_STATES: readonly RiskEventState[] = ["ALERTED", "ESCALATED"];
+
 /** Human-readable labels of the four intervention levels (spec 23A.1). */
 export const INTERVENTION_LABELS: Readonly<Record<InterventionLevel, string>> = {
   REMOTE_MONITORING: "Remote Monitoring",
@@ -128,6 +144,14 @@ export type CaseView = {
       readonly at?: string;
       readonly reason?: string;
     };
+  };
+  /**
+   * What the workflow would accept right now, from persisted state alone (S7 read projection).
+   * Permissions are separate and still enforced by the API; a button is shown only when both hold.
+   */
+  readonly nextSteps: {
+    readonly canAcknowledge: boolean;
+    readonly canAssignOrReport: boolean;
   };
   readonly whatToDo: {
     readonly mode: "RECOMMEND_ONLY";
@@ -412,6 +436,10 @@ export function buildCaseView(input: {
         escalated: esc !== undefined,
         ...(esc !== undefined && { at: esc.at, reason: String(esc.details?.reason ?? "") }),
       },
+    },
+    nextSteps: {
+      canAcknowledge: event !== undefined && ACKNOWLEDGEABLE_EVENT_STATES.includes(event.state),
+      canAssignOrReport: event !== undefined && ACTIONABLE_EVENT_STATES.includes(event.state),
     },
     whatToDo: {
       mode: "RECOMMEND_ONLY",

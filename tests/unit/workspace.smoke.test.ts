@@ -58,7 +58,12 @@ describe("workspace structure (PROJECT_SPEC §44)", () => {
         };
         expect(pkg.private).toBe(true);
         expect(pkg.name.startsWith("@symbiosis/")).toBe(true);
-        expect(existsSync(join(dir, "src", "index.ts"))).toBe(true);
+        // apps/web is a Next.js app (S7): its entry is the App Router root layout.
+        const entry =
+          group === "apps" && name === "web"
+            ? join("src", "app", "layout.tsx")
+            : join("src", "index.ts");
+        expect(existsSync(join(dir, entry))).toBe(true);
       }
     });
   }

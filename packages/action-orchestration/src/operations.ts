@@ -31,7 +31,7 @@ import type { ActorContext, ActorDirectory } from "@symbiosis/tenancy";
 import { applyActionCommand, assignMitigationAction } from "./actions";
 import { actionsFor, findAction } from "./library";
 import type { ActionLibrary } from "./library";
-import { buildCaseView } from "./view";
+import { ACTIONABLE_EVENT_STATES, buildCaseView } from "./view";
 import type { CaseView, CaseViewSummary } from "./view";
 
 export type OperationsErrorCode = "NOT_FOUND" | "FORBIDDEN" | "INVALID_REQUEST" | "CONFLICT";
@@ -116,18 +116,6 @@ export interface Operations {
 const laterIso = (...isos: string[]) =>
   new Date(Math.max(...isos.map((i) => Date.parse(i)))).toISOString();
 
-/**
- * Risk-event states from which a human may assign or report an approved action: the first cycle
- * (ACKNOWLEDGED), further actions while waiting (ACTION_REPORTED) and a follow-up cycle after an
- * unsuccessful verification outcome. Outcome states are never silently closed (S5).
- */
-const ACTIONABLE_EVENT_STATES: readonly RiskEvent["state"][] = [
-  "ACKNOWLEDGED",
-  "ACTION_REPORTED",
-  "PARTIALLY_VERIFIED",
-  "NOT_IMPROVING",
-  "INCONCLUSIVE",
-];
 /** Case states that move to ACTION_REQUIRED when an action is assigned or reported. */
 const CASE_NEEDS_REQUIRE_ACTION: readonly CaseState[] = [
   "OPEN",

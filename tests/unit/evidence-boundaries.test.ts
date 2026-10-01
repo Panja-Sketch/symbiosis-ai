@@ -59,7 +59,7 @@ describe("S6 stays deterministic, local and free of cloud SDKs and AI", () => {
       }
     }
     const rootPkg = readFileSync(join(root, "package.json"), "utf8");
-    expect(rootPkg).not.toMatch(/@google-cloud|firebase|"next"|"react"|@google\/genai|vertexai/i);
+    expect(rootPkg).not.toMatch(/@google-cloud|firebase|"next"|@google\/genai|vertexai/i);
   });
 
   it("hashes only in the evidence hash module", () => {
@@ -202,12 +202,9 @@ describe("raw telemetry is not exposed by default", () => {
   });
 });
 
-describe("S6 does not start S7 or later", () => {
-  it("adds no Next.js workspace, Gemini, Firebase, Pub/Sub or Cloud Storage code", () => {
-    const web = join(root, "apps", "web");
-    const webPkg = readFileSync(join(web, "package.json"), "utf8");
-    expect(webPkg).not.toMatch(/"next"|"react"/);
-    for (const f of [...sources(join(root, "packages")), ...sources(join(root, "apps"))]) {
+describe("S6 backend packages stay free of UI, AI and cloud code (S7 added only apps/web)", () => {
+  it("adds no Gemini, Firebase, Pub/Sub or Cloud Storage code, and no React in packages or the API", () => {
+    for (const f of [...sources(join(root, "packages")), ...sources(join(root, "apps", "api"))]) {
       if (rel(f).includes("/ai-explanation/")) continue;
       const code = read(f);
       expect(code, rel(f)).not.toMatch(

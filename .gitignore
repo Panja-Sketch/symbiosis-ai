@@ -37,3 +37,11 @@ Thumbs.db
 
 # test runner output
 .vitest/
+
+# next.js / playwright local output
+apps/web/next-env.d.ts
+apps/web/tsconfig.tsbuildinfo
+test-results/
+playwright-report/
+apps/web/AGENTS.md
+apps/web/CLAUDE.md
