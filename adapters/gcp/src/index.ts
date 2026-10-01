@@ -12,3 +12,4 @@ export * from "./auth/firebase";
 export * from "./vertex";
 export { Firestore } from "@google-cloud/firestore";
 export * from "./seed";
+export * from "./provision";

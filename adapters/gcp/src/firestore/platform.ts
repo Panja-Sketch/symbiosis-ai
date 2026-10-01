@@ -216,6 +216,22 @@ export class FirestoreDeviceRegistry implements DeviceRegistry {
     });
   }
 
+  /**
+   * Operator provisioning only: atomic create that fails if the device id already exists, so a
+   * registered device can never be overwritten by accident. Holds no key material.
+   */
+  async create(device: DeviceRecord): Promise<void> {
+    await this.ctx
+      .col(C.devices)
+      .doc(device.deviceId)
+      .create({
+        organizationId: device.organizationId,
+        facilityId: device.facilityId,
+        json: encode(device),
+        ...storedFields(this.ctx),
+      });
+  }
+
   /** Operator/seed use only. Holds no key material. */
   async put(device: DeviceRecord): Promise<void> {
     await this.ctx
