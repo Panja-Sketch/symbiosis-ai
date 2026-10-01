@@ -10,7 +10,7 @@ export type Readiness = () => Promise<{
 
 /**
  * Liveness, readiness and version, answered before any application routing. None of them mutates
- * state or needs authentication, and none reveals configuration: `/healthz` says the process is
+ * state or needs authentication, and none reveals configuration: `/livez` says the process is
  * up, `/readyz` says whether the critical adapters answer (503 otherwise, so a broken revision is
  * never sent traffic), `/version` names the build.
  */
@@ -21,7 +21,7 @@ export function withHealth(
   return async (request) => {
     if (request.method.toUpperCase() === "GET" || request.method.toUpperCase() === "HEAD") {
       const path = request.target.split("?")[0];
-      if (path === "/healthz") {
+      if (path === "/livez") {
         return { status: 200, body: { status: "ok", role: options.role } };
       }
       if (path === "/readyz") {
@@ -59,7 +59,7 @@ export function withRequestLogging(inner: Handler, logger: Logger, component: st
     );
     try {
       const response = await inner(request);
-      if (path !== "/healthz" && path !== "/readyz") {
+      if (path !== "/livez" && path !== "/readyz") {
         logger.log(response.status >= 500 ? "ERROR" : "INFO", "request", {
           component,
           method: request.method,

@@ -23,7 +23,8 @@
     "test:e2e": "pnpm web:build && playwright test",
     "smoke:s7": "pnpm web:build && tsx scripts/smoke-s7.ts",
     "smoke:s8": "tsx scripts/smoke-s8.ts",
-    "seed:gcp": "tsx scripts/seed-gcp.ts"
+    "seed:gcp": "tsx scripts/seed-gcp.ts",
+    "smoke:s9": "tsx scripts/smoke-s9.ts"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.13.0",

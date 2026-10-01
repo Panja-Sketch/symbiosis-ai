@@ -1,0 +1,7 @@
+{
+  "note": "PUBLIC Firebase web app configuration (identifies the project; not a secret). Server credentials are never part of this file.",
+  "projectId": "symbiosis-ai-2026",
+  "appId": "1:554089078085:web:44d2a158fbb88eb3e9322c",
+  "apiKey": "AIzaSyCOwx2ZGRnD59d_Azr0y8IjfMIeVTw9vxc",
+  "authDomain": "symbiosis-ai-2026.firebaseapp.com"
+}

@@ -36,7 +36,14 @@ import {
   InMemoryExplanationLog,
   selectProvider,
 } from "@symbiosis/ai-explanation";
-import type { ExplanationGovernanceRecord, ExplanationLog } from "@symbiosis/ai-explanation";
+import { ProviderError } from "@symbiosis/ai-explanation";
+import type {
+  ExplanationGovernanceRecord,
+  ExplanationLog,
+  ExplanationProvider,
+  ProviderRequest,
+  ProviderResponse,
+} from "@symbiosis/ai-explanation";
 import type { Clock } from "@symbiosis/clock";
 import type { IdGenerator } from "@symbiosis/event-bus";
 import type { IdentityResolver } from "@symbiosis/tenancy";
@@ -152,6 +159,36 @@ export function createGcpPlatform(config: GcpConfig, logger: Logger): GcpPlatfor
   };
 }
 
+/**
+ * Logs why a provider call failed (error code and message only: the provider never puts a prompt,
+ * response body or credential in an error) so a template fallback is explainable from the logs.
+ */
+export class ErrorLoggingProvider implements ExplanationProvider {
+  readonly name: string;
+  readonly model?: string;
+  constructor(
+    private readonly inner: ExplanationProvider,
+    private readonly logger: Logger,
+  ) {
+    this.name = inner.name;
+    if (inner.model !== undefined) this.model = inner.model;
+  }
+  async generate(request: ProviderRequest): Promise<ProviderResponse> {
+    try {
+      return await this.inner.generate(request);
+    } catch (e) {
+      this.logger.log("WARNING", "explanation provider failed", {
+        component: "explanation",
+        provider: this.name,
+        model: this.model ?? "",
+        code: e instanceof ProviderError ? e.code : "UNEXPECTED",
+        detail: e instanceof Error ? e.message : String(e),
+      });
+      throw e;
+    }
+  }
+}
+
 /** Governance records go to structured logs (no prompt text, no secrets) and stay readable in-process. */
 export class LoggingExplanationLog implements ExplanationLog {
   private readonly local = new InMemoryExplanationLog();
@@ -193,7 +230,7 @@ export function createCloudExplanationService(options: {
   const cfg = loadExplanationConfig(env);
   const chosen = selectProvider(cfg, env, undefined, options.accessToken);
   return new ExplanationService({
-    primary: chosen.primary,
+    primary: new ErrorLoggingProvider(chosen.primary, options.logger),
     fallback: chosen.fallback,
     clock: options.clock,
     ids: options.ids,
