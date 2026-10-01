@@ -27,7 +27,7 @@ S7 — Persona UI (S0 to S6 completed earlier)
 
 ## Files changed
 
-Commit `feat(s7): implement Symbiosis persona web experience` (see Last known good commit). New: `apps/web` (config, `src/app/**` 10 routes + layout/error/loading/not-found/actions/globals.css, `src/components/**`, `src/lib/**`), `scripts/s7-backend.ts`, `scripts/smoke-s7.ts`, `playwright.config.ts`, `tests/e2e/*` (3 specs + helpers), `tests/integration/s7-web.test.tsx`, `s7-backend.test.ts`, `tests/unit/web-boundary.test.ts`, `web-contract.test.ts`, `apps/web/src/lib/lib.test.ts`. Modified: `apps/api/src/app-handler.ts` (dev identities), `packages/action-orchestration/src/{view,operations}.ts` (nextSteps, shared constants), `scripts/local-runtime.ts`, `scripts/dev.mjs`, `scripts/dev-runtime.ts` (hint), root `package.json`/lockfile, `tsconfig.json`, `vitest.config.ts`, `.gitignore`, two S6 boundary tests (D-063), README, DECISIONS (D-056 to D-063), IMPLEMENTATION_STATE.
+Commit `49aa94e` (`feat(s7): implement Symbiosis persona web experience`, 78 files). New: `apps/web` (config, `src/app/**` 10 routes + layout/error/loading/not-found/actions/globals.css, `src/components/**`, `src/lib/**`), `scripts/s7-backend.ts`, `scripts/smoke-s7.ts`, `playwright.config.ts`, `tests/e2e/*` (3 specs + helpers), `tests/integration/s7-web.test.tsx`, `s7-backend.test.ts`, `tests/unit/web-boundary.test.ts`, `web-contract.test.ts`, `apps/web/src/lib/lib.test.ts`. Modified: `apps/api/src/app-handler.ts` (dev identities), `packages/action-orchestration/src/{view,operations}.ts` (nextSteps, shared constants), `scripts/local-runtime.ts`, `scripts/dev.mjs`, `scripts/dev-runtime.ts` (hint), root `package.json`/lockfile, `tsconfig.json`, `vitest.config.ts`, `.gitignore`, two S6 boundary tests (D-063), README, DECISIONS (D-056 to D-063), IMPLEMENTATION_STATE.
 
 ## Commands executed
 
@@ -62,7 +62,7 @@ Clean after the S7 handoff commit; `main` pushed to `origin/main`.
 
 ## Last known good commit SHA
 
-(Filled in by the handoff commit below.) Check `git log` for `feat(s7): implement Symbiosis persona web experience`.
+`49aa94e638e106ec82b9d293c99a6afa25ee88d3` (S7 implementation, `feat(s7): implement Symbiosis persona web experience`). Check `git log` for the later handoff commit, which changes only documentation.
 
 ## Exact next task
 
