@@ -34,3 +34,6 @@ Thumbs.db
 
 # Claude local settings
 .claude/settings.local.json
+
+# test runner output
+.vitest/

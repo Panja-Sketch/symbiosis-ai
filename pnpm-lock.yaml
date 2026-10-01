@@ -211,7 +211,11 @@ importers:
 
   apps/worker: {}
 
-  packages/action-orchestration: {}
+  packages/action-orchestration:
+    dependencies:
+      '@symbiosis/contracts':
+        specifier: workspace:*
+        version: link:../contracts
 
   packages/ai-explanation: {}
 
@@ -249,21 +253,49 @@ importers:
 
   packages/portfolio: {}
 
-  packages/recommendations: {}
+  packages/recommendations:
+    dependencies:
+      '@symbiosis/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@symbiosis/verification':
+        specifier: workspace:*
+        version: link:../verification
 
   packages/recurrence: {}
 
   packages/repositories: {}
 
-  packages/risk-cases: {}
+  packages/risk-cases:
+    dependencies:
+      '@symbiosis/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@symbiosis/verification':
+        specifier: workspace:*
+        version: link:../verification
 
   packages/risk-detection: {}
 
-  packages/risk-lifecycle: {}
+  packages/risk-lifecycle:
+    dependencies:
+      '@symbiosis/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@symbiosis/risk-cases':
+        specifier: workspace:*
+        version: link:../risk-cases
+      '@symbiosis/verification':
+        specifier: workspace:*
+        version: link:../verification
 
   packages/tenancy: {}
 
-  packages/verification: {}
+  packages/verification:
+    dependencies:
+      '@symbiosis/contracts':
+        specifier: workspace:*
+        version: link:../contracts
 
 packages:
 
