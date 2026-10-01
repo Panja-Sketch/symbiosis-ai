@@ -2,7 +2,7 @@
 
 ## Current phase
 
-S0 — Repository foundation (finished; S1 not started)
+S1 — Domain core (finished; S2 not started)
 
 ## Current phase status
 
@@ -10,64 +10,74 @@ COMPLETE
 
 ## Last completed phase
 
-S0 — Repository foundation
+S1 — Domain core (S0 — Repository foundation completed earlier)
 
 ## Completed work
 
-- pnpm workspace (`apps/*`, `packages/*`, `adapters/*`): 36 workspace projects (4 apps, 27 packages, 4 adapters, plus root). Layout matches PROJECT_SPEC §44; a test asserts the exact membership.
-- Strict TypeScript (`tsconfig.base.json`, root `tsconfig.json`, per-package `tsconfig.json`), ESLint 9 flat config + typescript-eslint, Vitest, Prettier, `.editorconfig`, `.gitattributes`.
-- Every package/app/adapter is a source-only scaffold exporting `PACKAGE_NAME` and `SCAFFOLD_PHASE`. `packages/contracts` also exports only `Brand`, `IsoTimestamp` and four ID aliases. `apps/api` depends on `@symbiosis/contracts` (`workspace:*`) and uses it at runtime to prove resolution.
-- Directory skeleton for `config/`, `firmware/`, `firmware-contracts/`, `infrastructure/`, `tests/`, `docs/submission/` (`.gitkeep` placeholders).
-- `README.md`, `CLAUDE.md`, `.gitignore`, `.env.example` (placeholder names only), `docs/` memory files, phase-labelled doc stubs.
-- `pnpm dev` deliberately prints "NOT IMPLEMENTED" and exits 1 (D-006). `apps/web` is not Next.js yet (D-005, sequencing only; Next.js is required by the spec and lands in S7).
+- `packages/contracts`: spec domain types (`RiskRecommendation`, `RiskImprovementCase`, `RiskEvent`, `MitigationAction`, `VerificationAssessment`) with state/enum vocabularies as `as const` arrays, plus `TimeWindow`, `CriterionResult`, `Result`/`ok`/`err`, `DomainError`/`domainError`, `TransitionRecord`/`Transitioned`, and small validators (`isIsoTimestamp`, `isNonEmptyString`, `isEarlier`).
+- `packages/verification`: structural validator `validateVerificationAssessment` only (no evaluation, windows, or policy execution). Synthetic test fixture at `@symbiosis/verification/testing`.
+- `packages/recommendations`: `createRiskRecommendation`, `applyRecommendationCommand`, `RECOMMENDATION_TRANSITIONS`, `isRecommendationVerified` (CLOSED is never VERIFIED).
+- `packages/risk-cases`: `createRiskImprovementCase`, `applyCaseCommand` (REQUIRE_ACTION, REPORT_ACTION, START_VERIFICATION, RECORD_VERIFICATION, RECORD_RECURRENCE, CLOSE), `CASE_TRANSITIONS`, `checkCaseInvariants`.
+- `packages/risk-lifecycle`: `createRiskEvent`, `applyRiskEventCommand`, `RISK_EVENT_TRANSITIONS`, `grantsMitigationCredit` (only VERIFIED), and coordinators `completeVerification` and `reopenOnRecurrence`.
+- `packages/action-orchestration`: `assignMitigationAction`, `applyActionCommand` (ACKNOWLEDGE, REPORT_COMPLETE), `ACTION_TRANSITIONS`.
+- `tests/unit/domain-boundaries.test.ts`: asserts no workspace dependency cycles, contracts has no workspace deps, and S1 domain sources contain no cloud SDK imports, ambient clock/env/network access, or AI references.
+- Bug found by a test and fixed: `validateVerificationAssessment(undefined)` threw instead of returning a typed error.
+- README status updated. Decisions D-010 to D-014 recorded in `docs/DECISIONS.md`.
+- Not implemented (by design): HMAC, ingestion, simulator, normalization, data quality, baselines, detection, evidence, consent, repositories, any cloud/AI code, recurrence monitoring, verification evaluation.
 
 ## Files changed
 
-Commit `a9ab70f` (`chore(s0): bootstrap Symbiosis monorepo`): 153 files added. Root config, `apps/`, `packages/`, `adapters/`, `config/`, `firmware*/`, `infrastructure/`, `tests/unit/workspace.smoke.test.ts`, `scripts/dev-not-implemented.mjs`, `docs/*`, `README.md`, `CLAUDE.md`, `.env.example`, `.gitignore`, `pnpm-lock.yaml`.
-The follow-up commit updates only `docs/SESSION_HANDOFF.md` and `docs/IMPLEMENTATION_STATE.md`.
+Commit `731d28a` (`feat(s1): implement Symbiosis domain core`): 9 new contract files in `packages/contracts/src/`, implementations and `package.json` workspace deps in the five domain packages, 5 per-package test files, `tests/unit/domain-boundaries.test.ts`, `docs/DECISIONS.md` (D-010 to D-014), `.gitignore` (`.vitest/`), `pnpm-lock.yaml`.
+The follow-up docs commit updates `README.md`, `docs/IMPLEMENTATION_STATE.md` and this file.
 
 ## Commands executed
 
-`pnpm install`, `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm format:check`, `pnpm peers check`, `pnpm dev` (expected exit 1), `git check-ignore`, `git grep` secret-pattern scan, `git grep` S1-concept scan.
+`pnpm install`, `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm format:check`, `pnpm vitest run --reporter=json` (counts), grep scans for cloud SDKs / S2 concepts / secret patterns, `git status`, `git log`.
 
 ## Exact test results
 
-- `pnpm install`: Scope all 36 workspace projects; up to date; no peer dependency issues.
 - `pnpm lint` (`eslint .`): exit 0, no output.
 - `pnpm typecheck` (`tsc --noEmit -p tsconfig.json`): exit 0, no errors.
-- `pnpm test` (`vitest run`): 1 test file passed, 7 tests passed, 0 failed.
+- `pnpm test` (`vitest run`): **7 test files, 109 tests, 109 passed, 0 failed.**
+  - `packages/risk-lifecycle/src/risk-lifecycle.test.ts`: 31
+  - `packages/risk-cases/src/risk-cases.test.ts`: 35
+  - `packages/recommendations/src/recommendations.test.ts`: 12
+  - `tests/unit/domain-boundaries.test.ts`: 10
+  - `packages/action-orchestration/src/action-orchestration.test.ts`: 8
+  - `tests/unit/workspace.smoke.test.ts`: 7
+  - `packages/verification/src/verification.test.ts`: 6
 - `pnpm format:check`: all matched files use Prettier code style.
-- `pnpm dev`: prints NOT IMPLEMENTED, exit 1 (intended).
-- Secret-pattern scan: no matches (PROJECT_SPEC.md and lockfile excluded). S1-concept scan (RiskImprovementCase, RiskEvent, MitigationAction, VerificationAssessment, VERIFIED) over apps/packages/adapters/tests: none.
+- Cloud-SDK/AI scan of the six S1 packages: none. Secret-pattern scan: none. S2 scan: only a comment containing the word "normalized" (about readings) in `risk-lifecycle`; the `normalization` package and simulator/adapters remain S0 scaffolds.
 
 ## Known issues
 
-- TypeScript is pinned to `~6.0` because typescript-eslint 8.71 does not yet support TypeScript 7 (D-004).
-- Per-package `typecheck`/`test` scripts do not exist; typecheck and tests run from the repo root only (D-002).
-- The root smoke test cannot import workspace packages directly (pnpm strict resolution); it goes through `apps/api`.
-- Remote push status: see the final summary / `git status` (push done after the second commit).
+- TypeScript pinned to `~6.0` (D-004). `pnpm install` prints an informational note that `eslint@9.39.5` is deprecated (10.x exists); ESLint 9 was the approved choice and typescript-eslint 8.71 is validated against it. Revisit as a tooling task, not in a feature phase.
+- Spec gaps were resolved by S1 design choices recorded in D-013 (e.g. `MitigationAction.reportedBy/reportedAt` optional until REPORTED_COMPLETE, recurrence eligible from VERIFIED_IMPROVED or CLOSED). Confirm or adjust before S4/S5 depend on them.
+- Event-level dismissal authorization is not enforced in the domain (needs the `authz` package); the domain only requires an actor and reason.
+- Cross-aggregate coordination covers verification completion and recurrence only; action-report coordination between case and event is left to S4.
+- Per-package `typecheck`/`test` scripts do not exist; everything runs from the repo root.
 
 ## Architectural decisions made
 
-See `docs/DECISIONS.md` (D-001 to D-009).
+See `docs/DECISIONS.md` (D-001 to D-014).
 
 ## Current git status
 
-Clean after the S0 handoff commit; `main` pushed to `origin/main`.
+Clean after the S1 handoff commit; `main` pushed to `origin/main`.
 
 ## Last known good commit SHA
 
-`a9ab70f5f223fa96cd41a0421acc135d15507b79` (S0 bootstrap). Check `git log` for the later handoff commit.
+`731d28a151fbf8c111ee8919f38de5c44d04e005` (S1 implementation). Check `git log` for the later handoff commit.
 
 ## Exact next task
 
-S1 — Domain Core (recommendation, Risk Improvement Case, Risk Event, action, verification types, lifecycle tests per PROJECT_SPEC §45). Do not start until explicitly instructed.
+S2 — Local ingestion (edge HMAC verifier, simulator, normalization, data quality, in-memory repositories/event bus; PROJECT_SPEC section 45 and sections 9, 10, 14, 32, 33, 39). Do not start until explicitly instructed. Suggested first slice: `edge-security` HMAC verifier plus the canonical observation contract in `contracts`.
 
 ## Exact commands needed to resume
 
 ```
 git status && git log --oneline -5
-pnpm install && pnpm lint && pnpm typecheck && pnpm test
+pnpm install && pnpm lint && pnpm typecheck && pnpm test && pnpm format:check
 ```
 
 ## Cloud resources touched

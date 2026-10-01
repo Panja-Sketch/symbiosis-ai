@@ -6,8 +6,11 @@ architecture (single source of truth).
 
 ## Status
 
-Phase **S0 — Repository foundation** only. There is no product behavior and **no local runtime
-yet**: `pnpm dev` intentionally fails with a "not implemented" message. Progress is tracked in
+Phases **S0 (repository foundation)** and **S1 (domain core)** are complete: pure, deterministic
+domain models and lifecycle state machines (recommendation, Risk Improvement Case, Risk Event,
+mitigation action, verification assessment contract) with tests. There is still **no ingestion,
+detection, verification evaluation, or local runtime**: `pnpm dev` intentionally fails with a
+"not implemented" message. Progress is tracked in
 [docs/IMPLEMENTATION_STATE.md](docs/IMPLEMENTATION_STATE.md).
 
 ## Layout
