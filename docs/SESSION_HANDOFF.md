@@ -52,7 +52,7 @@ The follow-up docs commit updates `README.md`, `docs/IMPLEMENTATION_STATE.md` an
 ## Known issues
 
 - TypeScript pinned to `~6.0` (D-004). `pnpm install` prints an informational note that `eslint@9.39.5` is deprecated (10.x exists); ESLint 9 was the approved choice and typescript-eslint 8.71 is validated against it. Revisit as a tooling task, not in a feature phase.
-- Spec gaps were resolved by S1 design choices recorded in D-013 (e.g. `MitigationAction.reportedBy/reportedAt` optional until REPORTED_COMPLETE, recurrence eligible from VERIFIED_IMPROVED or CLOSED). Confirm or adjust before S4/S5 depend on them.
+- Spec gaps were resolved by S1 design choices recorded in D-013 (e.g. `MitigationAction.reportedBy/reportedAt` optional until REPORTED_COMPLETE, recurrence eligible only from VERIFIED_IMPROVED (corrected after S1)). Confirm or adjust before S4/S5 depend on them.
 - Event-level dismissal authorization is not enforced in the domain (needs the `authz` package); the domain only requires an actor and reason.
 - Cross-aggregate coordination covers verification completion and recurrence only; action-report coordination between case and event is left to S4.
 - Per-package `typecheck`/`test` scripts do not exist; everything runs from the repo root.

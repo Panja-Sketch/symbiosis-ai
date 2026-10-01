@@ -37,12 +37,15 @@ export const CASE_TRANSITIONS: Readonly<Record<CaseState, readonly CaseState[]>>
   PARTIALLY_VERIFIED: ["ACTION_REQUIRED", "CLOSED"],
   NOT_IMPROVING: ["ACTION_REQUIRED", "CLOSED"],
   INCONCLUSIVE: ["VERIFYING", "ACTION_REQUIRED", "CLOSED"],
-  CLOSED: ["REOPENED"],
+  CLOSED: [],
   REOPENED: ["ACTION_REQUIRED", "CLOSED"],
 };
 
-/** States from which a material recurrence may reopen the case. */
-const RECURRENCE_ELIGIBLE: readonly CaseState[] = ["VERIFIED_IMPROVED", "CLOSED"];
+/**
+ * Recurrence reopens only a VERIFIED_IMPROVED case (spec 4.1, 8.3). CLOSED is administrative
+ * and does not imply a verified improvement ever existed, so it is not eligible.
+ */
+const RECURRENCE_ELIGIBLE: readonly CaseState[] = ["VERIFIED_IMPROVED"];
 
 /** States that can only be held after a verification outcome was recorded. */
 const VERIFICATION_BACKED: readonly CaseState[] = [
@@ -238,7 +241,7 @@ export function applyCaseCommand(
           domainError(
             "INVALID_RECURRENCE",
             "CASE",
-            `Recurrence can only be recorded for a verified or closed case, not ${from}`,
+            `Recurrence can only be recorded for a VERIFIED_IMPROVED case, not ${from}`,
             { from },
           ),
         );

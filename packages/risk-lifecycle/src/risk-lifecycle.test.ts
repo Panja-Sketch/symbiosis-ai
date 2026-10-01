@@ -331,7 +331,7 @@ describe("reopenOnRecurrence", () => {
     if (!r.ok) expect(r.error.code).toBe("INVALID_RECURRENCE");
   });
 
-  it("rejects recurrence on a case that has not been verified or closed", () => {
+  it("rejects recurrence on a case that is not VERIFIED_IMPROVED", () => {
     const { c } = caseAtVerifying();
     const r = reopenOnRecurrence({ case: c, newEvent: newEvent("EVT-2"), at: T(10) });
     expect(r.ok).toBe(false);

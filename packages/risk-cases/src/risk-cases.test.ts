@@ -313,9 +313,18 @@ describe("recurrence", () => {
     expect(c.activeRiskEventId).toBe("EVT-3");
   });
 
-  it("an administratively closed case can be reopened on recurrence", () => {
+  it("an administratively closed case is not eligible for recurrence (CLOSED != VERIFIED)", () => {
     const closed = step(newCase(), { type: "CLOSE", at: T(1), actorId: "U", reason: "r" });
-    expect(step(closed, recur(closed, "EVT-2", 2)).state).toBe("REOPENED");
+    const r = applyCaseCommand(closed, recur(closed, "EVT-2", 2));
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error.code).toBe("INVALID_RECURRENCE");
+  });
+
+  it("a closed-after-verified case is also not reopened by recurrence", () => {
+    const closed = step(toVerified(), { type: "CLOSE", at: T(5), actorId: "U", reason: "r" });
+    const r = applyCaseCommand(closed, recur(closed, "EVT-2", 6));
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error.code).toBe("INVALID_RECURRENCE");
   });
 
   it.each(["OPEN", "ACTION_REQUIRED", "ACTION_REPORTED", "VERIFYING", "NOT_IMPROVING"] as const)(
@@ -371,8 +380,11 @@ describe("transition table and invariants", () => {
     }
   });
 
-  it("CLOSED is never a source of verified states", () => {
-    expect(CASE_TRANSITIONS.CLOSED).toEqual(["REOPENED"]);
+  it("CLOSED is terminal: it is never a source of verified or reopened states", () => {
+    expect(CASE_TRANSITIONS.CLOSED).toEqual([]);
+    expect(CASE_STATES.filter((s) => CASE_TRANSITIONS[s].includes("REOPENED"))).toEqual([
+      "VERIFIED_IMPROVED",
+    ]);
   });
 
   it("flags verification-backed states that lack a verification reference", () => {
