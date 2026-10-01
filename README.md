@@ -8,7 +8,7 @@ architecture (single source of truth).
 
 Phases **S0** (foundation), **S1** (domain core), **S2** (local ingestion), **S3** (detection +
 baselines), **S4** (operations workflow), **S5** (verification + recurrence + intervention
-prioritization) **S6** (evidence + consent), **S7** (persona UI) and **S8** (grounded Gemini explanations) are complete. A simulated device is authenticated, normalized and assessed; a
+prioritization) **S6** (evidence + consent), **S7** (persona UI) **S8** (grounded Gemini explanations) and **S9** (Google Cloud production adapters and deployment) are complete. A simulated device is authenticated, normalized and assessed; a
 deterministic rule detects persistent compound deterioration and opens a Risk Improvement Case; an
 alert goes out through a local notification port (ConsoleEmail); a person acknowledges, an approved
 action is assigned and reported, and the case waits as **VERIFICATION PENDING**. A reported action
@@ -22,7 +22,7 @@ evidence package** (canonical JSON, SHA-256 manifest, frozen device facts, expli
 synthetic-data label) that preserves its actual result; the insured controls what an insurer
 sees through scoped, revocable **sharing agreements**, raw telemetry is off by default, and
 every insurer read is authorization-checked and audited. The system deliberately stops there:
-S7 added the Next.js persona web app and S8 a strictly bounded explanation layer (AI explains, never decides); **no cloud integration (S9) yet.** Progress is tracked in
+S7 added the Next.js persona web app, S8 a strictly bounded explanation layer (AI explains, never decides), and S9 the cloud runtime: the same services on Firestore, Pub/Sub, Cloud Storage, Secret Manager and Firebase Auth, deployed to Cloud Run (see [docs/GCP_RUNTIME.md](docs/GCP_RUNTIME.md)). **No hardware integration (S10) yet.** Progress is tracked in
 [docs/IMPLEMENTATION_STATE.md](docs/IMPLEMENTATION_STATE.md).
 
 ## Layout
@@ -192,3 +192,23 @@ SYMBIOSIS_AI_PROVIDER=gemini GCP_PROJECT_ID=... VERTEX_ACCESS_TOKEN=... pnpm dev
 
 The model, region and limits are in `config/explanation/explanation.v1.json` (default model
 `gemini-2.5-flash`, override with `GEMINI_MODEL`). See [docs/AI_GOVERNANCE.md](docs/AI_GOVERNANCE.md).
+
+### Google Cloud runtime (S9)
+
+The same services run in two adapter families selected by `SYMBIOSIS_RUNTIME`: `local` (in-memory,
+demo identity header; unit tests, `pnpm dev`, the S2-S8 smokes) and `gcp` (Firestore, Pub/Sub,
+Cloud Storage, Secret Manager, Firebase Authentication, Vertex AI through the service identity).
+`gcp` refuses to start on missing configuration and never falls back to memory. Deployed as three
+Cloud Run services (public `web` and `api`, **private** `worker`) with dedicated least-privilege
+service accounts. Resource map, IAM matrix, Firestore structure, transaction boundaries, delivery
+and dead-letter behavior, deployment and rollback: [docs/GCP_RUNTIME.md](docs/GCP_RUNTIME.md).
+
+```
+pnpm test                      # includes Firestore contract tests on the emulator (needs Java; see runbook)
+pnpm seed:gcp --confirm-project <id>      # explicit, idempotent synthetic demo seeding (operator only)
+SMOKE_S9=1 GCP_PROJECT_ID=<id> pnpm smoke:s9 --confirm-project <id>   # OPT-IN: touches the real project
+```
+
+Cloud sign-in uses Firebase Email/Password; the API verifies each ID token and derives organization,
+facilities and roles from stored records, never from the request. Demo-user passwords are written only to
+the git-ignored `.secrets/demo-users.json`.
