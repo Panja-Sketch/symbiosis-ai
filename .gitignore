@@ -1,0 +1,36 @@
+# dependencies / build
+node_modules/
+dist/
+.next/
+out/
+coverage/
+*.tsbuildinfo
+.turbo/
+
+# environment and secrets (only .env.example is tracked)
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+service-account*.json
+*-credentials.json
+.secrets/
+secrets/
+
+# cloud / tooling local state
+.firebase/
+.gcloud/
+.pio/
+
+# editor / OS
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
+*.log
+
+# Claude local settings
+.claude/settings.local.json
