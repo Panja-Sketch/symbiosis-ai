@@ -2,7 +2,7 @@
 
 ## Current phase
 
-S8 — Gemini explanation layer (finished; S9 not started)
+S9 — Google Cloud production adapters and deployment foundation (finished; S10 not started)
 
 ## Current phase status
 
@@ -10,76 +10,93 @@ COMPLETE
 
 ## Last completed phase
 
-S8 — Gemini explanation layer (S0 to S7 completed earlier)
+S9 — Google Cloud production adapters and deployment foundation (S0 to S8 completed earlier)
 
 ## Completed work
 
-- **Explanation layer (`packages/ai-explanation`, D-064 to D-068, full detail in `docs/AI_GOVERNANCE.md`):** port `ExplanationProvider`; deterministic `TemplateExplanationProvider` (default, offline, fallback); `GeminiExplanationProvider` (Vertex AI `generateContent` over REST, no SDK, credential and network injected, the only file that knows the endpoint); `FakeGemini` scripted endpoint for tests, browser tests and smokes; `ExplanationService` (timeout, strict all-or-nothing validation, template fallback, cache keyed by a hash of the exact facts, governance log, never throws, never writes domain state).
-- **Facts and grounding:** `buildFacilityContext` (facility `CaseView` + evidence metadata) and `buildInsurerContext` (consent-filtered projection only). Stable fact ids, real provenance (case, event, action, verification + policy version, intervention + policy version, package ids). Absent scopes become "not shared" limitations. No telemetry, keys, credentials or other tenants can reach a prompt (no input field exists for them). Fixed system prompt; operator notes are length-limited, control-stripped, JSON-encoded in a separate untrusted block with neutralized delimiters. Validator rejects: bad schema/extra keys, unknown fact ids, invented numbers or identifiers, `ACT-` ids outside the approved library, restating the result or level as another, resolution/premium/coverage/dispatch/legal/authorship claims, AI claiming authority.
-- **Schema `explanation-output.v1`:** `summary`, `keyFacts`, `whyItMatters`, `actionContext`, `verificationExplanation`, `interventionExplanation`, `evidenceExplanation`, `limitations`, `sourceFactIds` (D-065 explains the deviation from the spec 18.1 example).
-- **API:** `GET /api/v1/cases/:id/explanation` (same auth/tenancy as the case) and `GET /insurance/v1/cases/:id/explanation` (consent gateway on every request, audited, built from `gateway.caseView` + `interventions` only). Prompts are never returned.
-- **UI:** `ExplanationPanel` streamed with Suspense after "Did it work?" (facility) and the verification section (insurer): "Authoritative system facts (deterministic)" box above a separate dashed explanation box; only a validated Gemini answer is labelled "AI-generated explanation based on verified system data"; the template says "No AI model was used"; a fallback names the reason; failure is a quiet notice. Deterministic sections never wait for it.
-- **Config (D-067):** `config/explanation/explanation.v1.json`: provider default `template`, model `gemini-2.5-flash` (the spec names none; assumption to confirm before enabling in S9), env overrides `SYMBIOSIS_AI_PROVIDER`, `GEMINI_MODEL`, `GCP_PROJECT_ID`, `GCP_REGION`, `VERTEX_ACCESS_TOKEN` (placeholders only in `.env.example`).
-- **Runtime/harness:** `createLocalRuntime` composes the service (`explanations`, `explanationLog`, option `explanationProvider`); `scripts/s7-backend.ts` gained `/control/ai` and `/control/ai-log`; `pnpm smoke:s8` added.
-- Not implemented (by design): any S9 cloud work (no Cloud Run, service account, Firestore, Pub/Sub, Firebase, Secret Manager), AI portfolio summaries, client-side refresh, streaming tokens.
+- **Runtime selection (D-069, D-070):** `adapters/gcp` (all cloud SDKs) and `packages/runtime` (config, shared composition, cloud platform, health, entrypoints). `SYMBIOSIS_RUNTIME=local|emulator|gcp`; `gcp` fails startup on any missing/invalid setting, refuses emulator hosts, demo identity and a static Vertex token, refuses to run on Cloud Run unless `gcp`, and verifies Firestore and the evidence bucket at boot. `scripts/local-runtime.ts` now uses the same `composeServices` as the cloud, so S2-S8 behavior is unchanged (all earlier smokes/E2E identical).
+- **Identity (D-071):** `IdentityResolver` seam; Firebase ID token verified server-side (signature, issuer, audience, expiry, revocation) -> UID link -> stored actor (org, facilities, roles). No demo header, `/ui` pages or dev identity listing in the cloud. Web sign-in (HttpOnly session cookie, token refresh, sign-out) in `apps/web`; no persona switcher in the cloud. Four synthetic demo users (`pnpm seed:gcp`; passwords only in git-ignored `.secrets/demo-users.json`).
+- **Firestore (D-072):** all repositories, audit log (per-organization gap-free sequence), actor/organization directories, device registry, replay guard, event inbox; tenant-prefixed ids; atomic uniqueness via `create()`/transactions; `storedAt` vs domain time. One shared contract suite runs on in-memory and the Firestore emulator (found and fixed a concurrency bug in the in-memory revoke).
+- **Pub/Sub (D-073):** `PubSubBus` (publish rejects on failure), push consumer in the private worker with OIDC verification, event inbox for duplicates, retry 10-300 s, dead letter after 5 attempts, DLQ pull subscription, Scheduler tick every minute.
+- **Cloud Storage (D-074):** `GcsEvidenceObjectStore` (never overwrites, read-back SHA check, key validation); bucket private. **Secret Manager (D-075):** device keys, fail closed. **Vertex (D-076):** ADC only; model corrected to `gemini-3.1-flash-lite` on the `global` endpoint after live testing; the cloud no longer lets the project region choose the Gemini location.
+- **Cloud Run (D-077):** `symbiosis-web` (public), `symbiosis-api` (public, application-level auth), `symbiosis-worker` (private). Distroless non-root images by digest; `/livez`, `/readyz`, `/version`; structured redacted logs. Reproducible scripts in `infrastructure/` (`gcloud/01-identities-and-iam.sh`, `gcloud/02-deploy.sh`, `cloudbuild/cloudbuild.yaml`, `firestore/firestore.rules`, `firebase-web-config.json` (public config)). Runbook, IAM matrix, resource map: `docs/GCP_RUNTIME.md`.
+- Not implemented (by design): any S10 hardware work, DLQ reprocessing, alert policies, mail delivery, cross-repository transactions.
 
 ## Files changed
 
-Commit `429451e` (`feat(s8): add grounded Gemini explanations`). New: `packages/ai-explanation/src/{types,phrases,facts,template,validate,prompt,gemini,fake-gemini,service,config,fixtures,explanation.test}.ts`, `config/explanation/explanation.v1.json`, `apps/web/src/components/{ExplanationPanel,ExplanationLoaders}.tsx`, `scripts/smoke-s8.ts`, `tests/integration/s8-{explanations,web}.test.ts(x)`, `tests/unit/ai-boundaries.test.ts`, `tests/e2e/explanations.spec.ts`, `docs/AI_GOVERNANCE.md` (written). Modified: `apps/api/src/{app-handler,insurance-handler}.ts`, `scripts/{local-runtime,s7-backend}.ts`, web `CaseDetail`, `InsurerCaseDetail`, the two case pages, `lib/{types,loaders}.ts`, `globals.css`, `tests/unit/web-boundary.test.ts`, `tests/e2e/helpers.ts`, package manifests/lockfile, `.env.example`, README, DECISIONS (D-064 to D-068), IMPLEMENTATION_STATE.
+Commits `4b4d55a` (adapters, runtime, web sign-in, builds, contract suite), `219efc1` (smoke, livez, provider error logging, scripts, docs), `3066a7e`/`43e248b` (docs state, smoke rerun handling), the Gemini-location fix commit, and the final handoff commit. New: `adapters/gcp/**`, `packages/runtime/**`, `tests/contract/**`, `tests/support/firestore-emulator.ts`, `scripts/{build-service.mjs,seed-gcp.ts,smoke-s9.ts,vertex-live.ts,mutation-s9.mjs}`, `Dockerfile.service`, `Dockerfile.web`, `.dockerignore`, `.gcloudignore`, `infrastructure/**`, web sign-in files, `docs/GCP_RUNTIME.md`. Modified: `apps/api` handlers (identity seam), `packages/tenancy` (resolver), `packages/repositories` (revoke atomicity), `packages/ai-explanation` (token supplier, global host, `GEMINI_LOCATION`), `config/explanation/explanation.v1.json` (model/location), `scripts/local-runtime.ts`, web lib/components, five boundary tests (D-069), README, `.env.example`, DECISIONS (D-069 to D-077).
 
 ## Commands executed
 
-`pnpm install`, `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm format:check`, `pnpm test:e2e`, `pnpm smoke:s2` to `smoke:s8`, a mutation script (below), secret and cloud audits, `git status/diff/log`.
+`pnpm install/lint/typecheck/test/format:check/test:e2e`, `pnpm smoke:s2` to `smoke:s8`, `pnpm seed:gcp`, `pnpm smoke:s9`, `node scripts/mutation-s9.mjs`, `scripts/vertex-live.ts`, `gcloud` (read-only reconnaissance; IAM, Pub/Sub, Scheduler, Secret Manager, Firestore index, Cloud Build, Cloud Run deploys), Firebase management REST (web app), Identity Toolkit sign-in REST for demo users.
 
 ## Exact test results
 
 - `pnpm lint`, `pnpm typecheck`, `pnpm format:check`: exit 0.
-- `pnpm test`: **61 test files, 895 tests, 895 passed, 0 failed** (S7 baseline 57 / 832). New: package unit tests 29, integration (real API) 18, web UI over real API 7, AI boundary tests 9.
-- **E2E (Playwright): 26 passed, 0 failed** (the 17 S7 tests unchanged plus 9 for S8: AI label and facts-first, template default, four fallback modes, prompt injection, insurer consent and revocation, persona wording, phone layout, governance log, axe on AI and fallback panels for both personas).
-- **Smoke: `smoke:s2` 9 PASS / 0 FAIL, `s3` 21 / 0, `s4` 31 / 0, `s5` 35 / 0, `s6` 32 / 0, `s7` 15 / 0, `s8` 17 / 0** (all exit 0).
-- **Mutation checks (all detected, all restored; baseline 63/63 targeted tests after):** M1 AI output may contradict the verification result: 3 failed; M2 insurer explanation served without consent: 4; M3 full case JSON (telemetry-derived fields) sent to the model: 6; M4 malformed Gemini output trusted: 5; M5 a Gemini error fails the whole request: 6; M6 action outside the approved library allowed: 3.
-- Audits: no cloud SDK, no credentials, no S9 resources (`infrastructure/` untouched); no domain package depends on `ai-explanation` or mentions Gemini (tests); the web app has no AI client; the explanation path is read-only (snapshot tests with the template, a good answer, a rejected answer and a quota failure).
+- `pnpm test` (with `SYMBIOSIS_REQUIRE_EMULATOR=1`): **64 test files, 965 tests, 965 passed, 0 failed** (S8 baseline 61 / 895). New: `tests/contract/repositories.contract.test.ts` 32 (16 in-memory + 16 Firestore emulator), `adapters/gcp/src/gcp.test.ts` 27, `packages/runtime/src/config.test.ts` 11. Five older boundary tests were updated, not skipped (D-069).
+- **E2E (Playwright): 26 passed, 0 failed** (unchanged from S8; run before the last runtime-only commit).
+- **Local smokes (all exit 0):** `smoke:s2` 9/0, `s3` 21/0, `s4` 31/0, `s5` 35/0, `s6` 32/0, `s7` 15/0, `s8` 17/0 (PASS/FAIL).
+- **`pnpm smoke:s9` against the real project: 60 passed, 0 failed** (final run, after the last deploy): Firebase real-token verification, forged/unsigned/wrong-project rejected; Firestore write/read + tenant isolation; Pub/Sub publish, worker consumption and duplicate dropped (processed=1, dropped=1, from Cloud Logging); Cloud Storage write, SHA-256, no overwrite, bucket private with no public principal; Secret Manager read (value never shown) and per-secret IAM; live Vertex with the S8 validator; worker private; anonymous/forged/demo-header requests denied; authenticated customer succeeds; hero case end to end in real time (signed device -> Pub/Sub -> worker -> case -> alert -> ack -> action -> VERIFICATION PENDING -> verified by a deterministic tick -> immutable package with valid integrity reloaded from Cloud Storage -> Gemini explanation from Cloud Run via workload identity); insurer denied, consented, then denied again right after revocation. The run happened inside the recurrence watch of an earlier smoke case, so it also proved recurrence reopening the SAME case.
+- **Mutation checks (all detected, all restored; script `scripts/mutation-s9.mjs`):** M1 GCP mode falls back to memory (1 failed), M2 token not verified (2), M3 organization from the request (1), M4 Firestore tenant filter removed (1, emulator), M5 evidence overwrite allowed (1), M6 duplicate processed twice (1), M7 secret value logged (survived at first: the test only used values the value-scrubber also catches; test strengthened, then 1 failed), M8 static AI token accepted (1), M9 storage failure treated as success (1), M10 insurer bypasses consent (3).
+- **Dead-letter proof (live, manual):** a malformed message published to `symbiosis-events` was rejected by the worker 5 times (logged `push delivery malformed`, about 15-20 s apart) and then appeared in `symbiosis-events-dlq-pull`; nothing else was affected.
+- **Incident found and fixed during the session:** the mutation script was run while a Cloud Build upload was starting, so one deployed revision (api/worker/web `-00002`) contained mutant M2. It was caught by the smoke (valid tokens suddenly unauthorized), replaced by a clean rebuild from a committed tree (`-00003`, then `-00004`), and never served a forged identity (the mutant mapped every token to a UID with no actor link). Rule: never run mutation checks while a build or deploy is being prepared.
+
+## Deployed state
+
+Region `us-central1`, project `symbiosis-ai-2026`. Final revisions and images (tag = commit SHA; deployed by digest):
+
+| Service            | Revision                    | Image digest                                                                    |
+| ------------------ | --------------------------- | ------------------------------------------------------------------------------- |
+| `symbiosis-api`    | `symbiosis-api-00004-gdw`   | `sha256:d94f0b4b663e058cd67313a1ffb5e9accd03d1ec80e650df786f6b7e360e49cd`       |
+| `symbiosis-web`    | `symbiosis-web-00004-mgk`   | `sha256:e59c2a28bbfe26b3032c59741479b675341dd50fcf80d751f7958ca237d734d7`       |
+| `symbiosis-worker` | `symbiosis-worker-00004-86k`| `sha256:bf690595360b0414b11c0564d0f135da5db88fe52f933d304b447c445258e760`       |
+
+URLs: API `https://symbiosis-api-554089078085.us-central1.run.app`, web `https://symbiosis-web-554089078085.us-central1.run.app`, worker (private, not invocable anonymously) `https://symbiosis-worker-554089078085.us-central1.run.app`. Identities, IAM matrix and the rest of the map: `docs/GCP_RUNTIME.md`. A synthetic hero case (`COOLING_ELECTRICAL_DETERIORATION on AST-SIM-FAN-A`), its verification, evidence package and audit entries exist in the demo tenant `ORG-SIM-001` as demo records.
 
 ## Known issues
 
-- **Model id is an assumption** (`gemini-2.5-flash`, D-067): the spec names none; confirm availability/region before enabling in S9. The real Vertex endpoint has not been called (no credential in this environment); the adapter is exercised against a scripted endpoint only, so request-shape drift against the live API is untested.
-- **Validation is conservative, not semantic:** it cannot prove a sentence true. Free-form Gemini prose that stays inside the facts, numbers and wording rules is accepted. A strict number rule may reject legitimate rephrasing (dates, spelled-out numbers) and fall back to the template; that is the safe direction.
-- **Access token comes from an environment variable** (`VERTEX_ACCESS_TOKEN`), local only; S9 replaces it with workload identity / Secret Manager.
-- **Cache and governance log are in-process** (lost on restart); S9 persistence. No client-side refresh button.
-- The explanation page makes extra API calls per view (case, evidence, explanation); the facility case list is still N+1 (S7).
-- S5/S6/S7 items still open (see earlier handoffs in git history): no package signature, `REVOKED` also means expired, consent per organization and facility, local identity, in-memory stores. TypeScript pinned `~6.0`; Windows `process.exit()` crash avoided via `process.exitCode`.
+- Services persist related records one after another (no cross-repository transaction); recovery is idempotent redelivery plus `tick()` repair (D-072).
+- One worker instance, concurrency 1; Pub/Sub is unordered; DLQ has no reprocessing tool and no alert policy (Cloud Monitoring metrics/logs only; none created).
+- Notifications are `ConsoleEmail` log lines. The cloud UI shows ids instead of names.
+- The retirement schedule of `gemini-3.1-flash-lite` could not be confirmed from the documentation (D-076); the model is configurable and the template is the fallback.
+- Broad pre-existing roles remain on the Compute default and `firebase-adminsdk` service accounts (not used by the services); the Firebase web API key has no referrer restriction. The Cloud Build upload tarball and logs live in the default buckets.
+- Firestore contract tests need Java plus a Firestore emulator jar (found in the firebase-tools cache here); without it they skip loudly, and `SYMBIOSIS_REQUIRE_EMULATOR=1` turns that into a failure. No Pub/Sub emulator was available, so the Pub/Sub adapter is unit-tested with fakes and proven live by the smoke.
+- Smoke part C writes a synthetic demo case and a revoked agreement document is deleted afterwards; audit entries remain (append-only).
+- S5/S6/S7/S8 open items stay open (no package signature, `REVOKED` also means expired, consent per organization and facility, TypeScript pinned `~6.0`).
 
 ## Architectural decisions made
 
-See `docs/DECISIONS.md` (D-001 to D-068; S8 is D-064 to D-068).
+`docs/DECISIONS.md` (D-001 to D-077; S9 is D-069 to D-077).
 
 ## Current git status
 
-Clean after the S8 handoff commit; `main` pushed to `origin/main`.
+Clean after the S9 handoff commit; `main` pushed to `origin/main`.
 
 ## Last known good commit SHA
 
-`429451ebc449387e442929d60c061e2f27f3bc29` (S8 implementation, `feat(s8): add grounded Gemini explanations`). Check `git log` for the later handoff commit, which changes only documentation.
+See `git log`: the final S9 handoff commit (documentation only) sits on top of the Gemini-location fix commit, the last code change, which is what the deployed `-00004` revisions were built from.
 
 ## Exact next task
 
-S9 — GCP adapters (PROJECT_SPEC sections 11.2, 12.1, 39 and Phase S9): Firestore repositories, Pub/Sub event bus, Cloud Storage evidence store, Secret Manager, Firebase Authentication, Cloud Run, each behind the existing ports (`EventBus`, repositories, `EvidenceObjectStore`, `ActorDirectory`, `ExplanationProvider`), with core tests still cloud-free. Do not start until explicitly instructed. Suggested first slice: the Firebase identity adapter (replacing the development identity cookie and `X-Demo-Actor-Id`), then Firestore repositories with a contract-test suite shared with the in-memory ones, then Secret Manager for the Vertex credential and a live Gemini smoke behind an explicit opt-in.
+S10 — hardware integration (ESP32 firmware and provisioning against the unchanged signed `/edge/v1` protocol; PROJECT_SPEC section on hardware and Phase S10). Do not start until explicitly instructed. Suggested first slice: provision the real device record and a fresh device key in Secret Manager through an operator script (never the browser), point one real ESP32 at `https://symbiosis-api-554089078085.us-central1.run.app/edge/v1/telemetry`, and reuse `firmware-contracts/` known-answer vectors and the cloud smoke's device steps as the acceptance test. Remember the firmware must persist its sequence number across reboots (D-017).
 
 ## Exact commands needed to resume
 
 ```
 git status && git log --oneline -10
 pnpm install && pnpm exec playwright install chromium
-pnpm lint && pnpm typecheck && pnpm test && pnpm format:check
+pnpm lint && pnpm typecheck && SYMBIOSIS_REQUIRE_EMULATOR=1 pnpm test && pnpm format:check
 pnpm smoke:s2 && pnpm smoke:s3 && pnpm smoke:s4 && pnpm smoke:s5 && pnpm smoke:s6 && pnpm smoke:s7 && pnpm smoke:s8
 pnpm test:e2e
-pnpm dev     # web http://127.0.0.1:3000, api http://127.0.0.1:8787 (template explanations by default)
+pnpm dev     # local mode: web http://127.0.0.1:3000, api http://127.0.0.1:8787
+# cloud (opt-in, real project): see docs/GCP_RUNTIME.md
+SMOKE_S9=1 GCP_PROJECT_ID=symbiosis-ai-2026 pnpm smoke:s9 --confirm-project symbiosis-ai-2026
 ```
 
 ## Cloud resources touched
 
-None
+Project `symbiosis-ai-2026`: created 5 service accounts (`symbiosis-web|api|worker|pubsub-push|scheduler`), project/topic/bucket/secret/service IAM bindings (see `docs/GCP_RUNTIME.md`), Pub/Sub subscriptions `symbiosis-events-worker` (push, DLQ policy) and `symbiosis-events-dlq-pull`, Cloud Scheduler job `symbiosis-tick`, one Firestore composite index, Secret Manager secret `symbiosis-device-key-DEV-SIM-001-KEY-SIM-001`, Firebase web app `Symbiosis web` (a duplicate created by mistake was removed), four Firebase Auth demo users, Firestore documents (seed + smoke data), three Cloud Run services, images in Artifact Registry `symbiosis`, Cloud Build jobs. Reused unchanged: Firestore database and its deny-all rules, evidence bucket, topics, Artifact Registry repository, Firebase project and Email/Password sign-in.
 
 ## Secrets referenced (NAME ONLY)
 
-None referenced in code. Placeholder names in `.env.example`: GCP_PROJECT_ID, GCP_REGION, FIREBASE_PROJECT_ID, DEVICE_KEY_SECRET_NAME, SMTP_SECRET_NAME, EVIDENCE_SIGNING_SECRET_NAME, EDGE_PORT, EDGE_BASE_URL, SIMULATOR_INTERVAL_MS, SIMULATOR_DEVICE_ID, SIMULATOR_KEY_ID, SIMULATOR_DEVICE_KEY_HEX, SIMULATOR_SCENARIO, OPS_TICK_INTERVAL_MS, and for S8 SYMBIOSIS_AI_PROVIDER, GEMINI_MODEL, VERTEX_ACCESS_TOKEN (all empty placeholders). The web app reads `SYMBIOSIS_API_URL` and `WEB_PORT`. No real credential exists in the repository.
+Secret Manager: `symbiosis-device-key-DEV-SIM-001-KEY-SIM-001`. Local git-ignored file `.secrets/demo-users.json` (demo-user passwords). Environment variable names: see `.env.example` (all empty placeholders). No credential, token or password is in the repository; the Firebase web config in `infrastructure/firebase-web-config.json` is public project configuration.
