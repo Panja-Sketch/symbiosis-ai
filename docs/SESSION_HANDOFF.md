@@ -27,7 +27,7 @@ S5 — Verification + recurrence + intervention prioritization (S0 to S4 complet
 
 ## Files changed
 
-Implementation commit `feat(s5): implement physical verification and recurrence`. New: `packages/verification/src/{engine,policy,labels}.ts` (+ tests/fixture), `packages/recurrence/src/index.ts`, `packages/intervention-prioritization/src/{policy,engine,service}.ts`, `packages/contracts/src/intervention.ts`, `apps/worker/src/verification-runner.ts`, `config/verification-policy/cooling-electrical.v1.json`, `config/intervention-policy/risk-engineer-prioritization.v1.json`, `scripts/smoke-s5.ts`, `tests/integration/verification.test.ts`, `tests/unit/verification-boundaries.test.ts`. Modified: contracts (verification types, events, audit actions), repositories, risk-cases (`RECORD_DETECTION` states), risk-lifecycle (`startVerification`), operations service and case view, notifications alerting (`case.reopened`), authz, device-registry (`listForFacility`), api handler and page, worker pipeline, local runtime, dev runtime, simulator scenarios, root package.json, README, DECISIONS (D-037 to D-046), IMPLEMENTATION_STATE, earlier tests/smoke adjusted per D-046.
+Commit `61c5296` (`feat(s5): implement physical verification and recurrence`): 61 files, +6877/-249. New: `packages/verification/src/{engine,policy,labels}.ts` (+ tests/fixture), `packages/recurrence/src/index.ts`, `packages/intervention-prioritization/src/{policy,engine,service}.ts`, `packages/contracts/src/intervention.ts`, `apps/worker/src/verification-runner.ts`, `config/verification-policy/cooling-electrical.v1.json`, `config/intervention-policy/risk-engineer-prioritization.v1.json`, `scripts/smoke-s5.ts`, `tests/integration/verification.test.ts`, `tests/unit/verification-boundaries.test.ts`. Modified: contracts (verification types, events, audit actions), repositories, risk-cases (`RECORD_DETECTION` states), risk-lifecycle (`startVerification`), operations service and case view, notifications alerting (`case.reopened`), authz, device-registry (`listForFacility`), api handler and page, worker pipeline, local runtime, dev runtime, simulator scenarios, root package.json, README, DECISIONS (D-037 to D-046), IMPLEMENTATION_STATE, earlier tests/smoke adjusted per D-046.
 
 ## Commands executed
 
@@ -64,11 +64,11 @@ See `docs/DECISIONS.md` (D-001 to D-046; S5 is D-037 to D-046).
 
 ## Current git status
 
-Clean after the S5 handoff commit; `main` pushed to `origin/main`.
+Clean after the S5 handoff commit; `main` pushed to `origin/main`. The follow-up docs commit updates only this file.
 
 ## Last known good commit SHA
 
-S5 implementation: filled in by the follow-up handoff commit (see `git log`).
+`61c5296b635cedf755ab1af9801e226ab176c85b` (S5 implementation, `feat(s5): implement physical verification and recurrence`). Check `git log` for the later handoff commit.
 
 ## Exact next task
 
