@@ -12,6 +12,7 @@ import {
   reportAction,
   revokeSharing,
 } from "../lib/commands";
+import { SESSION_COOKIE, authMode } from "../lib/auth-mode";
 import { IDENTITY_COOKIE, landingFor, personaOf, safeLocalPath } from "../lib/identity";
 import { loadDirectory } from "../lib/loaders";
 
@@ -27,9 +28,11 @@ const text = (f: FormData, k: string): string => {
 };
 
 async function actor(): Promise<string> {
-  const id = (await cookies()).get(IDENTITY_COOKIE)?.value;
-  if (id === undefined || id === "") redirect("/");
-  return id;
+  const token = authMode() === "token";
+  const id = (await cookies()).get(token ? SESSION_COOKIE : IDENTITY_COOKIE)?.value;
+  if (id === undefined || id === "") redirect(token ? "/login" : "/");
+  // Token mode: the value is only a presence check; the API reads the token cookie itself.
+  return token ? "session" : id;
 }
 
 function finish(path: string, r: ApiResult<unknown>, notice: string): never {
@@ -44,6 +47,7 @@ function finish(path: string, r: ApiResult<unknown>, notice: string): never {
 const casePath = (f: FormData) => `/operations/cases/${encodeURIComponent(text(f, "caseId"))}`;
 
 export async function switchIdentity(form: FormData): Promise<void> {
+  if (authMode() === "token") redirect("/login"); // no identity switching in the cloud
   const actorId = text(form, "actorId");
   const dir = await loadDirectory();
   const identity = dir.ok ? dir.value.actors.find((a) => a.actorId === actorId) : undefined;

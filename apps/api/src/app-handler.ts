@@ -10,7 +10,13 @@ import { permissionsFor } from "@symbiosis/authz";
 import { EVIDENCE_CONSENT_SCOPES } from "@symbiosis/contracts";
 import type { ConsentError, InsuranceGateway, SharingService } from "@symbiosis/consent";
 import type { EvidenceError, EvidenceService } from "@symbiosis/evidence";
-import type { ActorContext, ActorDirectory, OrganizationRecord } from "@symbiosis/tenancy";
+import { DemoHeaderIdentityResolver } from "@symbiosis/tenancy";
+import type {
+  ActorContext,
+  ActorDirectory,
+  IdentityResolver,
+  OrganizationRecord,
+} from "@symbiosis/tenancy";
 import { RESULT_LABELS } from "@symbiosis/verification";
 import type { EdgeRequest, EdgeResponse } from "./edge-handler";
 import type { CaseEvidenceExtras } from "./html";
@@ -30,6 +36,12 @@ export type AppApiDeps = {
   /** Used only by the minimal insurer demo pages; the JSON API is `createInsuranceHandler`. */
   readonly insurance: InsuranceGateway;
   readonly directory: ActorDirectory;
+  /**
+   * How the caller is identified. Absent means the local development resolver over `directory`
+   * (`X-Demo-Actor-Id`). Production passes a verified-token resolver; the `/ui` proof pages then do
+   * not exist because they identify the caller from the URL.
+   */
+  readonly identity?: IdentityResolver;
   /**
    * Local-only maintenance hook: runs the escalation evaluator and alert retries once. Absent
    * means the route does not exist. Cloud mode will use Cloud Scheduler instead (S9).
@@ -133,12 +145,18 @@ function parseBody(raw: Uint8Array): { ok: true; value: Record<string, unknown> 
 export function createAppHandler(
   deps: AppApiDeps,
 ): (request: EdgeRequest) => Promise<EdgeResponse> {
+  const identity: IdentityResolver =
+    deps.identity ?? new DemoHeaderIdentityResolver(deps.directory);
+
   async function actorFor(
     request: EdgeRequest,
     query: URLSearchParams,
   ): Promise<ActorContext | undefined> {
-    const id = request.headers["x-demo-actor-id"] ?? query.get("actor") ?? undefined;
-    return id === undefined || !ID.test(id) ? undefined : deps.directory.get(id);
+    return identity.resolve({
+      headers: request.headers,
+      // `?actor=` exists only for the local HTML proof pages; no other resolver sees it.
+      ...(identity.kind === "demo" && { query }),
+    });
   }
 
   /** Evidence and sharing facts for the case page; absent when the role may not read evidence. */
@@ -250,8 +268,15 @@ export function createAppHandler(
     const query = new URLSearchParams(queryString);
     const method = request.method.toUpperCase();
     const isUi = path.startsWith("/ui/");
+    // The proof pages identify the caller from the URL; only the local demo resolver allows that.
+    if (isUi && identity.kind !== "demo") return problem(404, "NOT_FOUND", "Unknown route");
 
-    if (method === "GET" && path === "/api/v1/dev/identities" && deps.devIdentities !== undefined) {
+    if (
+      method === "GET" &&
+      path === "/api/v1/dev/identities" &&
+      deps.devIdentities !== undefined &&
+      identity.kind === "demo"
+    ) {
       const { actors, organizations } = deps.devIdentities;
       return json(200, {
         identity: "DEVELOPMENT_ONLY",
@@ -268,7 +293,10 @@ export function createAppHandler(
 
     const actor = await actorFor(request, query);
     if (actor === undefined) {
-      const message = "A known development actor is required (X-Demo-Actor-Id header or ?actor=)";
+      const message =
+        identity.kind === "demo"
+          ? "A known development actor is required (X-Demo-Actor-Id header or ?actor=)"
+          : "A valid identity token is required (Authorization: Bearer)";
       return isUi
         ? {
             status: 401,
@@ -349,7 +377,7 @@ export function createAppHandler(
         facilityIds: actor.facilityIds,
         roles: actor.roles,
         permissions: permissionsFor(actor.roles),
-        identity: "DEVELOPMENT_ONLY",
+        identity: identity.kind === "demo" ? "DEVELOPMENT_ONLY" : "VERIFIED_TOKEN",
       });
     }
     if (method === "GET" && route.length === 1 && route[0] === "cases") {

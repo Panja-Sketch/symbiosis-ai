@@ -1,5 +1,5 @@
 import { GeminiExplanationProvider } from "./gemini";
-import type { FetchLike, GeminiConfig } from "./gemini";
+import type { AccessTokenProvider, FetchLike, GeminiConfig } from "./gemini";
 import { TemplateExplanationProvider } from "./template";
 import type { ExplanationProvider, FallbackReason } from "./types";
 
@@ -7,7 +7,7 @@ import type { ExplanationProvider, FallbackReason } from "./types";
  * Explanation configuration (S8). The model name, region, timeouts and cache lifetimes live in the
  * versioned file `config/explanation/explanation.v1.json`; a few values can be overridden from the
  * environment. No secret is stored in config: the access token is read from the environment at call
- * time (S9 replaces that with Secret Manager / workload identity). The default provider is the
+ * time in local mode; in the cloud (S9) the caller passes a workload-identity token supplier instead. The default provider is the
  * deterministic template, so nothing depends on Gemini unless it is switched on.
  */
 
@@ -70,10 +70,14 @@ export function resolveExplanationConfig(file: unknown, env: Env = {}): Explanat
         env.GEMINI_MODEL !== undefined && env.GEMINI_MODEL !== ""
           ? env.GEMINI_MODEL
           : str(g.model, "gemini.model"),
+      // GEMINI_LOCATION (S9) wins: a model may be served only from a different location than the
+      // project region. GCP_REGION is the S8 override and is kept.
       location:
-        env.GCP_REGION !== undefined && env.GCP_REGION !== ""
-          ? env.GCP_REGION
-          : str(g.location, "gemini.location"),
+        env.GEMINI_LOCATION !== undefined && env.GEMINI_LOCATION !== ""
+          ? env.GEMINI_LOCATION
+          : env.GCP_REGION !== undefined && env.GCP_REGION !== ""
+            ? env.GCP_REGION
+            : str(g.location, "gemini.location"),
       temperature: num(g.temperature, "gemini.temperature", 0, 1),
       maxOutputTokens: num(g.maxOutputTokens, "gemini.maxOutputTokens", 64, 8192),
       timeoutMs: num(g.timeoutMs, "gemini.timeoutMs", 100, 60000),
@@ -100,11 +104,13 @@ export function selectProvider(
   config: ExplanationConfig,
   env: Env = {},
   fetchImpl?: FetchLike,
+  /** Production: a workload-identity token supplier (ADC). Replaces the local VERTEX_ACCESS_TOKEN. */
+  tokenProvider?: AccessTokenProvider,
 ): ProviderSelection {
   const fallback = new TemplateExplanationProvider();
   if (config.provider === "template") return { primary: fallback, fallback };
   const projectId = env.GCP_PROJECT_ID ?? "";
-  if (projectId === "" || (env.VERTEX_ACCESS_TOKEN ?? "") === "") {
+  if (projectId === "" || (tokenProvider === undefined && (env.VERTEX_ACCESS_TOKEN ?? "") === "")) {
     return { primary: fallback, fallback, note: "NOT_CONFIGURED" };
   }
   const gemini: GeminiConfig = {
@@ -118,7 +124,7 @@ export function selectProvider(
   return {
     primary: new GeminiExplanationProvider(
       gemini,
-      async () => env.VERTEX_ACCESS_TOKEN ?? "",
+      tokenProvider ?? (async () => env.VERTEX_ACCESS_TOKEN ?? ""),
       fetchImpl,
     ),
     fallback,

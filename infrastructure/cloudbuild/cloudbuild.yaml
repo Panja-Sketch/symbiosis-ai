@@ -1,0 +1,63 @@
+# Builds the three images and tags each with the commit SHA. Run from the repo root:
+#   gcloud builds submit --config infrastructure/cloudbuild/cloudbuild.yaml \
+#     --substitutions=_SHA=$(git rev-parse --short=12 HEAD),_WEB_API_KEY=...,_WEB_APP_ID=...
+substitutions:
+  _REPO: us-central1-docker.pkg.dev/symbiosis-ai-2026/symbiosis
+  _SHA: dev
+  _WEB_API_KEY: ""
+  _WEB_APP_ID: ""
+steps:
+  - id: api
+    name: gcr.io/cloud-builders/docker
+    waitFor: ["-"]
+    args:
+      - build
+      - -f
+      - Dockerfile.service
+      - --build-arg
+      - SERVICE=api
+      - --build-arg
+      - GIT_SHA=${_SHA}
+      - -t
+      - "${_REPO}/api:${_SHA}"
+      - .
+  - id: worker
+    name: gcr.io/cloud-builders/docker
+    waitFor: ["-"]
+    args:
+      - build
+      - -f
+      - Dockerfile.service
+      - --build-arg
+      - SERVICE=worker
+      - --build-arg
+      - GIT_SHA=${_SHA}
+      - -t
+      - "${_REPO}/worker:${_SHA}"
+      - .
+  - id: web
+    name: gcr.io/cloud-builders/docker
+    waitFor: ["-"]
+    args:
+      - build
+      - -f
+      - Dockerfile.web
+      - --build-arg
+      - GIT_SHA=${_SHA}
+      - --build-arg
+      - NEXT_PUBLIC_FIREBASE_API_KEY=${_WEB_API_KEY}
+      - --build-arg
+      - NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=symbiosis-ai-2026.firebaseapp.com
+      - --build-arg
+      - NEXT_PUBLIC_FIREBASE_PROJECT_ID=symbiosis-ai-2026
+      - --build-arg
+      - NEXT_PUBLIC_FIREBASE_APP_ID=${_WEB_APP_ID}
+      - -t
+      - "${_REPO}/web:${_SHA}"
+      - .
+images:
+  - "${_REPO}/api:${_SHA}"
+  - "${_REPO}/worker:${_SHA}"
+  - "${_REPO}/web:${_SHA}"
+options:
+  logging: CLOUD_LOGGING_ONLY

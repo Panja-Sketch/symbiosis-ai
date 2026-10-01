@@ -1,5 +1,7 @@
 import type { ReactNode } from "react";
 import { signOut, switchIdentity } from "../app/actions";
+import { SignOutButton } from "./firebase-session-sync";
+import type { AuthMode } from "../lib/auth-mode";
 import { PERSONA_LABELS, roleLabel } from "../lib/identity";
 import type { Persona, Session } from "../lib/identity";
 import type { DirectoryDto } from "../lib/types";
@@ -71,10 +73,12 @@ export function IdentitySwitcher({
 export function AppShell({
   session,
   directory,
+  mode = "demo",
   children,
 }: {
   readonly session: Session | undefined;
   readonly directory: DirectoryDto | undefined;
+  readonly mode?: AuthMode;
   readonly children: ReactNode;
 }) {
   return (
@@ -83,8 +87,16 @@ export function AppShell({
         Skip to content
       </a>
       <div className="demo-banner" role="note">
-        <strong>Local demo.</strong> Synthetic data and a development identity, not production
-        authentication.
+        {mode === "token" ? (
+          <>
+            <strong>Cloud prototype.</strong> Synthetic data; signed in with a verified identity.
+          </>
+        ) : (
+          <>
+            <strong>Local demo.</strong> Synthetic data and a development identity, not production
+            authentication.
+          </>
+        )}
       </div>
       <header className="topbar">
         <a className="brand" href="/">
@@ -116,7 +128,8 @@ export function AppShell({
             </p>
           )}
           {directory !== undefined && <IdentitySwitcher directory={directory} session={session} />}
-          {session !== undefined && (
+          {session !== undefined && mode === "token" && <SignOutButton />}
+          {session !== undefined && mode === "demo" && (
             <form action={signOut}>
               <button type="submit" className="btn btn-small btn-quiet">
                 Clear identity

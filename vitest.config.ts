@@ -4,5 +4,6 @@ export default defineConfig({
   test: {
     include: ["tests/**/*.test.{ts,tsx}", "{apps,packages,adapters}/*/src/**/*.test.{ts,tsx}"],
     passWithNoTests: false,
+    globalSetup: ["tests/support/firestore-emulator.ts"],
   },
 });

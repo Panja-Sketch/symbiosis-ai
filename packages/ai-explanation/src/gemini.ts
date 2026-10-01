@@ -51,7 +51,7 @@ export const RESPONSE_SCHEMA = {
 } as const;
 
 export const geminiUrl = (c: Pick<GeminiConfig, "projectId" | "location" | "model">): string =>
-  `https://${c.location}-aiplatform.googleapis.com/v1/projects/${encodeURIComponent(c.projectId)}/locations/${encodeURIComponent(c.location)}/publishers/google/models/${encodeURIComponent(c.model)}:generateContent`;
+  `https://${c.location === "global" ? "" : `${c.location}-`}aiplatform.googleapis.com/v1/projects/${encodeURIComponent(c.projectId)}/locations/${encodeURIComponent(c.location)}/publishers/google/models/${encodeURIComponent(c.model)}:generateContent`;
 
 export class GeminiExplanationProvider implements ExplanationProvider {
   readonly name = "gemini";

@@ -42,6 +42,42 @@ export interface ActorDirectory {
   ): Promise<ActorContext | undefined>;
 }
 
+/** What an identity resolver may look at: request headers (lower-case names) and the query. */
+export type IdentityRequest = {
+  readonly headers: Readonly<Record<string, string | undefined>>;
+  readonly query?: URLSearchParams;
+};
+
+/**
+ * Turns a request into the canonical actor, or `undefined` (unauthenticated). The result must be
+ * derived only from verified credentials plus trusted server-side records: organization, facility
+ * scope and roles are never taken from the request. Local mode uses `DemoHeaderIdentityResolver`;
+ * production uses a verified-token resolver (S9). `kind` lets callers tell them apart (the HTML proof
+ * pages and the dev identity listing exist only for the demo resolver).
+ */
+export interface IdentityResolver {
+  readonly kind: "demo" | "token";
+  resolve(request: IdentityRequest): Promise<ActorContext | undefined>;
+}
+
+const DEMO_ACTOR_ID = /^[A-Za-z0-9_.:-]{1,128}$/;
+
+/**
+ * LOCAL DEVELOPMENT ONLY: trusts the `X-Demo-Actor-Id` header (or `?actor=`) as an actor id and
+ * looks it up in the server-side directory. This is not authentication. Production runtimes must
+ * never construct it (the gcp runtime refuses to start with it).
+ */
+export class DemoHeaderIdentityResolver implements IdentityResolver {
+  readonly kind = "demo" as const;
+
+  constructor(private readonly directory: ActorDirectory) {}
+
+  async resolve(request: IdentityRequest): Promise<ActorContext | undefined> {
+    const id = request.headers["x-demo-actor-id"] ?? request.query?.get("actor") ?? undefined;
+    return id === undefined || !DEMO_ACTOR_ID.test(id) ? undefined : this.directory.get(id);
+  }
+}
+
 export class InMemoryActorDirectory implements ActorDirectory {
   private readonly actors = new Map<string, ActorContext>();
 

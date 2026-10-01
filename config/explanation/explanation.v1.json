@@ -4,8 +4,8 @@
   "outputSchemaVersion": "explanation-output.v1",
   "provider": "template",
   "gemini": {
-    "model": "gemini-2.5-flash",
-    "location": "us-central1",
+    "model": "gemini-3.1-flash-lite",
+    "location": "global",
     "temperature": 0.1,
     "maxOutputTokens": 1500,
     "timeoutMs": 8000

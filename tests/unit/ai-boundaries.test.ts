@@ -23,6 +23,7 @@ describe("S8: Gemini stays behind the ExplanationProvider port", () => {
   it("only the ai-explanation package, the API composition, scripts and tests mention Gemini or Vertex", () => {
     const allowed = [
       "/packages/ai-explanation/",
+      "/packages/runtime/src/gcp.ts", // cloud composition: selects the provider and wires ADC (S9)
       "/tests/",
       "/scripts/",
       "/docs/",
@@ -48,7 +49,8 @@ describe("S8: Gemini stays behind the ExplanationProvider port", () => {
           dependencies?: Record<string, string>;
         };
         const uses = Object.keys(json.dependencies ?? {}).includes("@symbiosis/ai-explanation");
-        if (d.name === "api") expect(uses).toBe(true);
+        // api and runtime (the cloud composition roots, S9) compose the explanation layer.
+        if (d.name === "api" || d.name === "runtime") expect(uses).toBe(true);
         else expect(uses, `${g}/${d.name}`).toBe(false);
       }
     }

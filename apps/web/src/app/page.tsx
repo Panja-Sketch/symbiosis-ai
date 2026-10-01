@@ -1,3 +1,6 @@
+import { redirect } from "next/navigation";
+import { authMode } from "../lib/auth-mode";
+import { homeFor } from "../lib/identity";
 import { ErrorState } from "../components/ui";
 import { Landing } from "../components/Landing";
 import { getDirectory, getSession } from "../lib/session";
@@ -10,6 +13,7 @@ export default async function Home({
   readonly searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const [directory, session, q] = await Promise.all([getDirectory(), getSession(), searchParams]);
+  if (authMode() === "token") redirect(session === undefined ? "/login" : homeFor(session.persona));
   if (directory === undefined) {
     return (
       <ErrorState

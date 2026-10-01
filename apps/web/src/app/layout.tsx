@@ -1,5 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
+import { SessionSync } from "../components/firebase-session-sync";
+import { authMode } from "../lib/auth-mode";
 import { AppShell } from "../components/AppShell";
 import { getDirectory, getSession } from "../lib/session";
 import "./globals.css";
@@ -17,7 +19,8 @@ export default async function RootLayout({ children }: { readonly children: Reac
   return (
     <html lang="en">
       <body>
-        <AppShell session={session} directory={directory}>
+        {authMode() === "token" && <SessionSync />}
+        <AppShell session={session} directory={directory} mode={authMode()}>
           {children}
         </AppShell>
       </body>

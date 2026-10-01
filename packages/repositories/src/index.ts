@@ -533,7 +533,11 @@ export class InMemorySharingAgreementRepository implements SharingAgreementRepos
       readonly reason?: string;
     },
   ): Promise<RevokeAgreementResult> {
-    const current = await this.getForOwner(organizationId, agreementId);
+    // No await between the read and the write: revocation must be atomic (found by the shared
+    // contract suite, which revokes concurrently).
+    const found = this.items.get(agreementId);
+    const current =
+      found !== undefined && found.organizationId === organizationId ? found : undefined;
     if (current === undefined) return { status: "NOT_FOUND" };
     if (current.revokedAt !== undefined) return { status: "ALREADY_REVOKED", agreement: current };
     const next: SharingAgreement = Object.freeze({

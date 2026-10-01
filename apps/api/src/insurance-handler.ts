@@ -1,12 +1,15 @@
 import { buildInsurerContext } from "@symbiosis/ai-explanation";
 import type { ExplanationService } from "@symbiosis/ai-explanation";
 import type { InsuranceError, InsuranceGateway } from "@symbiosis/consent";
-import type { ActorContext, ActorDirectory } from "@symbiosis/tenancy";
+import { DemoHeaderIdentityResolver } from "@symbiosis/tenancy";
+import type { ActorContext, ActorDirectory, IdentityResolver } from "@symbiosis/tenancy";
 import type { EdgeRequest, EdgeResponse } from "./edge-handler";
 
 export type InsuranceApiDeps = {
   readonly gateway: InsuranceGateway;
   readonly directory: ActorDirectory;
+  /** Absent means the local development resolver over `directory`. */
+  readonly identity?: IdentityResolver;
   /** Optional explanation layer (S8): inputs are the consent-filtered projection only. */
   readonly explanations?: ExplanationService;
 };
@@ -38,9 +41,11 @@ const fromError = (e: InsuranceError): EdgeResponse =>
 export function createInsuranceHandler(
   deps: InsuranceApiDeps,
 ): (request: EdgeRequest) => Promise<EdgeResponse> {
+  const identity: IdentityResolver =
+    deps.identity ?? new DemoHeaderIdentityResolver(deps.directory);
+
   async function actorFor(request: EdgeRequest): Promise<ActorContext | undefined> {
-    const id = request.headers["x-demo-actor-id"];
-    return id === undefined || !ID.test(id) ? undefined : deps.directory.get(id);
+    return identity.resolve({ headers: request.headers });
   }
 
   return async (request) => {
@@ -51,7 +56,9 @@ export function createInsuranceHandler(
       return problem(
         401,
         "UNAUTHENTICATED",
-        "A known development actor is required (X-Demo-Actor-Id)",
+        identity.kind === "demo"
+          ? "A known development actor is required (X-Demo-Actor-Id)"
+          : "A valid identity token is required (Authorization: Bearer)",
       );
     }
     if (request.method.toUpperCase() !== "GET") {

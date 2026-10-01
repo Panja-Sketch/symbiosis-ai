@@ -30,7 +30,11 @@ describe("hardware independence (spec principle 7)", () => {
   const HARDWARE_MODELS = /esp32|sht41|mpu6050|ina219/i;
 
   it("canonical, domain, ingestion and app sources never name hardware models", () => {
-    const files = [...sources("packages"), ...sources("apps")];
+    // packages/runtime/src/compose.ts is a composition root (like scripts/): it must register the
+    // hardware source adapter by name. No other package or app may.
+    const files = [...sources("packages"), ...sources("apps")].filter(
+      (f) => rel(f) !== "packages/runtime/src/compose.ts",
+    );
     expect(files.length).toBeGreaterThan(10);
     for (const f of files) {
       expect(readFileSync(f, "utf8"), rel(f)).not.toMatch(HARDWARE_MODELS);
@@ -94,7 +98,12 @@ describe("S4 stays within scope", () => {
     for (const m of manifests) {
       const json = JSON.parse(readFileSync(m, "utf8")) as Record<string, Record<string, string>>;
       const names = Object.keys({ ...json.dependencies, ...json.devDependencies });
-      for (const n of names) {
+      // Workspace links (including @symbiosis/adapter-gcp) are not SDKs; the cloud SDKs themselves
+      // may be declared only by adapters/gcp (S9, D-069).
+      if (rel(m) === "adapters/gcp/package.json") continue;
+      // The browser sign-in client (S9) is the one third-party identity dependency of the web app.
+      if (rel(m) === "apps/web/package.json") names.splice(names.indexOf("firebase") >>> 0, 1);
+      for (const n of names.filter((x) => !x.startsWith("@symbiosis/"))) {
         expect(n, rel(m)).not.toMatch(
           /google|firebase|gcp|@aws|azure|pubsub|firestore|gemini|vertex/i,
         );
@@ -104,6 +113,9 @@ describe("S4 stays within scope", () => {
 
   it("source files do not import cloud SDKs", () => {
     for (const f of all) {
+      // Cloud SDK imports are confined to adapters/gcp (S9) and the web login client (S9).
+      if (rel(f).startsWith("adapters/gcp/") || rel(f).startsWith("apps/web/src/lib/firebase"))
+        continue;
       expect(readFileSync(f, "utf8"), rel(f)).not.toMatch(
         /from\s+["'](?:@google|@google-cloud|firebase|googleapis)/,
       );

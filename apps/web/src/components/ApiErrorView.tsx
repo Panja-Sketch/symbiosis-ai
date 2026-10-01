@@ -43,8 +43,8 @@ export function ApiErrorView({
   }
   if (error.status === 401) {
     return (
-      <AccessDenied title="Choose a demo identity" homeHref="/" homeLabel="Choose a demo identity">
-        <p>This area needs a development identity. Pick one from the switcher at the top.</p>
+      <AccessDenied title="Sign in required" homeHref="/" homeLabel="Go to sign-in">
+        <p>This area needs a signed-in identity. Sign in, or choose a demo identity locally.</p>
       </AccessDenied>
     );
   }

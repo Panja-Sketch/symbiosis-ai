@@ -6,6 +6,9 @@
  * Every call carries the development identity as `X-Demo-Actor-Id`. The server maps that id to an
  * organization, facilities and roles itself, so nothing the web app sends can widen a scope.
  */
+import { cookies } from "next/headers";
+import { SESSION_COOKIE, authMode } from "./auth-mode";
+
 /** Read per call so tests and deployments can point the web server at any API. */
 export const apiBaseUrl = (): string =>
   (process.env.SYMBIOSIS_API_URL ?? "http://127.0.0.1:8787").replace(/\/+$/, "");
@@ -22,17 +25,38 @@ export type ApiError = {
 };
 export type ApiResult<T> = { readonly ok: true; readonly value: T } | ApiError;
 
-type Init = { readonly actorId?: string; readonly body?: unknown; readonly method?: string };
+type Init = {
+  readonly actorId?: string;
+  readonly body?: unknown;
+  readonly method?: string;
+  /** An explicit ID token (used once, to check a fresh sign-in before a session is stored). */
+  readonly bearer?: string;
+};
+
+/**
+ * Who the call is made as. Demo mode: the development actor id header. Token mode (cloud): the
+ * person's ID token from the HttpOnly session cookie, as a bearer token; the API verifies it and
+ * derives organization, facilities and roles itself, so no id supplied here can widen access.
+ */
+async function identityHeaders(init: Init): Promise<Record<string, string>> {
+  if (init.bearer !== undefined) return { Authorization: `Bearer ${init.bearer}` };
+  if (authMode() === "token") {
+    const token = (await cookies()).get(SESSION_COOKIE)?.value;
+    return token === undefined || token === "" ? {} : { Authorization: `Bearer ${token}` };
+  }
+  return init.actorId !== undefined ? { "X-Demo-Actor-Id": init.actorId } : {};
+}
 
 /** One fetch; a GET is retried once on a network error (a pooled connection to a restarted API). */
 async function send(path: string, init: Init): Promise<Response> {
   const method = init.method ?? (init.body === undefined ? "GET" : "POST");
+  const identity = await identityHeaders(init);
   const attempt = () =>
     fetch(`${apiBaseUrl()}${path}`, {
       method,
       cache: "no-store",
       headers: {
-        ...(init.actorId !== undefined && { "X-Demo-Actor-Id": init.actorId }),
+        ...identity,
         ...(init.body !== undefined && { "Content-Type": "application/json" }),
       },
       ...(init.body !== undefined && { body: JSON.stringify(init.body) }),
@@ -80,3 +104,6 @@ export const apiGet = <T>(actorId: string | undefined, path: string) =>
 
 export const apiPost = <T>(actorId: string, path: string, body: unknown = {}) =>
   apiCall<T>(path, { actorId, body });
+
+/** The API's view of a freshly signed-in person (also proves the token is valid). */
+export const apiMe = (bearer: string) => apiCall<{ actorId: string }>("/api/v1/me", { bearer });

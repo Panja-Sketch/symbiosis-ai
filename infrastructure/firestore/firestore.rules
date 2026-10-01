@@ -1,0 +1,10 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Clients never read or write Firestore. Only the API and worker (Admin SDK, service accounts)
+    // do, and they bypass rules. Keep this deny-all.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

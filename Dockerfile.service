@@ -1,0 +1,26 @@
+# Production image for the api or worker (S9). Build: docker build --build-arg SERVICE=api .
+# Stage 1 compiles the workspace TypeScript into one bundle and installs only the cloud SDKs
+# (lockfile-exact). Stage 2 is a distroless, non-root Node runtime: no shell, no package manager,
+# no credentials. Configuration comes from the environment; secrets from Secret Manager at runtime.
+FROM node:22-slim AS build
+WORKDIR /repo
+RUN npm install -g pnpm@12.8.1
+COPY . .
+RUN pnpm install --frozen-lockfile
+ARG SERVICE
+RUN node scripts/build-service.mjs ${SERVICE}
+RUN pnpm --filter @symbiosis/adapter-gcp deploy --prod /out
+
+FROM gcr.io/distroless/nodejs22-debian12:nonroot
+WORKDIR /app
+ARG SERVICE
+ARG GIT_SHA=unknown
+COPY --from=build /out/node_modules ./node_modules
+COPY --from=build /repo/dist/${SERVICE}/main.mjs ./main.mjs
+COPY --from=build /repo/config ./config
+ENV NODE_ENV=production \
+    SYMBIOSIS_RUNTIME=gcp \
+    SYMBIOSIS_CONFIG_DIR=/app/config \
+    SYMBIOSIS_VERSION=${GIT_SHA}
+EXPOSE 8080
+CMD ["main.mjs"]
