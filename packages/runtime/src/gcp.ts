@@ -226,7 +226,12 @@ export function createCloudExplanationService(options: {
   readonly ids: IdGenerator;
   readonly logger: Logger;
 }): ExplanationService {
-  const env = { ...options.env, GCP_PROJECT_ID: options.config.projectId };
+  // GCP_REGION is the project's region (Cloud Run, Pub/Sub). It must NOT choose the Gemini location:
+  // the model is served from the location in config/explanation (or GEMINI_LOCATION), which is
+  // "global" for the current model. (Found by the first Cloud Run smoke: a 404 for the model.)
+  const { GCP_REGION: _projectRegion, ...rest } = options.env;
+  void _projectRegion;
+  const env = { ...rest, GCP_PROJECT_ID: options.config.projectId };
   const cfg = loadExplanationConfig(env);
   const chosen = selectProvider(cfg, env, undefined, options.accessToken);
   return new ExplanationService({
