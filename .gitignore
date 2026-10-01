@@ -45,3 +45,7 @@ test-results/
 playwright-report/
 apps/web/AGENTS.md
 apps/web/CLAUDE.md
+
+# firmware host-test build output
+firmware/esp32-lab/.host-build/
+firmware/esp32-lab/include/secrets.h

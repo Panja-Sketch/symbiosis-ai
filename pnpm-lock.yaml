@@ -306,6 +306,9 @@ importers:
 
   adapters/esp32:
     dependencies:
+      '@symbiosis/device-registry':
+        specifier: workspace:*
+        version: link:../../packages/device-registry
       '@symbiosis/normalization':
         specifier: workspace:*
         version: link:../../packages/normalization
