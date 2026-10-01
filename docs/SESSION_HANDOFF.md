@@ -25,7 +25,7 @@ S8 — Gemini explanation layer (S0 to S7 completed earlier)
 
 ## Files changed
 
-Commit `feat(s8): add grounded Gemini explanations`. New: `packages/ai-explanation/src/{types,phrases,facts,template,validate,prompt,gemini,fake-gemini,service,config,fixtures,explanation.test}.ts`, `config/explanation/explanation.v1.json`, `apps/web/src/components/{ExplanationPanel,ExplanationLoaders}.tsx`, `scripts/smoke-s8.ts`, `tests/integration/s8-{explanations,web}.test.ts(x)`, `tests/unit/ai-boundaries.test.ts`, `tests/e2e/explanations.spec.ts`, `docs/AI_GOVERNANCE.md` (written). Modified: `apps/api/src/{app-handler,insurance-handler}.ts`, `scripts/{local-runtime,s7-backend}.ts`, web `CaseDetail`, `InsurerCaseDetail`, the two case pages, `lib/{types,loaders}.ts`, `globals.css`, `tests/unit/web-boundary.test.ts`, `tests/e2e/helpers.ts`, package manifests/lockfile, `.env.example`, README, DECISIONS (D-064 to D-068), IMPLEMENTATION_STATE.
+Commit `429451e` (`feat(s8): add grounded Gemini explanations`). New: `packages/ai-explanation/src/{types,phrases,facts,template,validate,prompt,gemini,fake-gemini,service,config,fixtures,explanation.test}.ts`, `config/explanation/explanation.v1.json`, `apps/web/src/components/{ExplanationPanel,ExplanationLoaders}.tsx`, `scripts/smoke-s8.ts`, `tests/integration/s8-{explanations,web}.test.ts(x)`, `tests/unit/ai-boundaries.test.ts`, `tests/e2e/explanations.spec.ts`, `docs/AI_GOVERNANCE.md` (written). Modified: `apps/api/src/{app-handler,insurance-handler}.ts`, `scripts/{local-runtime,s7-backend}.ts`, web `CaseDetail`, `InsurerCaseDetail`, the two case pages, `lib/{types,loaders}.ts`, `globals.css`, `tests/unit/web-boundary.test.ts`, `tests/e2e/helpers.ts`, package manifests/lockfile, `.env.example`, README, DECISIONS (D-064 to D-068), IMPLEMENTATION_STATE.
 
 ## Commands executed
 
@@ -59,7 +59,7 @@ Clean after the S8 handoff commit; `main` pushed to `origin/main`.
 
 ## Last known good commit SHA
 
-(Filled in by the handoff commit.) Check `git log` for `feat(s8): add grounded Gemini explanations`.
+`429451ebc449387e442929d60c061e2f27f3bc29` (S8 implementation, `feat(s8): add grounded Gemini explanations`). Check `git log` for the later handoff commit, which changes only documentation.
 
 ## Exact next task
 
