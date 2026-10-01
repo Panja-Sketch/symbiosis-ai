@@ -548,16 +548,31 @@ check(
     priorCases.length,
 );
 check("compound deterioration accepted", await send("compound-outdoor-heat", 3));
+const priorById = new Map(priorCases.map((c) => [c.caseId as string, c]));
 const found = await until(
   "the case",
   async () => {
     const list = ((await call("GET", "/api/v1/cases", mgrToken)).body.cases ?? []) as Json[];
-    return list.find((c) => !priorCases.some((p) => p.caseId === c.caseId));
+    // A new case, or (a rerun inside the one-hour recurrence watch of an earlier verified smoke
+    // case) the SAME case reopened: both are correct behavior, the second proves recurrence.
+    return (
+      list.find((c) => !priorById.has(c.caseId)) ??
+      list.find(
+        (c) => priorById.get(c.caseId)?.state === "VERIFIED_IMPROVED" && c.state === "REOPENED",
+      )
+    );
   },
   120000,
 );
 const caseId: string = found?.caseId ?? "";
-check("the worker created exactly one Risk Improvement Case from Pub/Sub events", caseId !== "");
+const reopened = priorById.has(caseId);
+check(
+  reopened
+    ? "recurrence inside the watch window reopened the SAME case (no duplicate case)"
+    : "the worker created exactly one Risk Improvement Case from Pub/Sub events",
+  caseId !== "",
+  reopened ? "rerun inside the recurrence watch" : "",
+);
 let view = (await call("GET", `/api/v1/cases/${caseId}`, mgrToken)).body;
 const alerted = await until(
   "alert",
@@ -644,7 +659,7 @@ check(
   "an immutable evidence package was created (Cloud Storage + Firestore index)",
   pkgList.length >= 1,
 );
-const pkgId: string = pkgList[0]?.packageId ?? "";
+const pkgId: string = pkgList.at(-1)?.packageId ?? "";
 const pkg = pkgId === "" ? undefined : await call("GET", `/api/v1/evidence/${pkgId}`, mgrToken);
 check(
   "package integrity (SHA-256 manifest) is valid when reloaded from Cloud Storage",
