@@ -5,13 +5,28 @@ import type {
 } from "@symbiosis/intervention-prioritization";
 import { can } from "@symbiosis/authz";
 import { permissionsFor } from "@symbiosis/authz";
+import { EVIDENCE_CONSENT_SCOPES } from "@symbiosis/contracts";
+import type { ConsentError, InsuranceGateway, SharingService } from "@symbiosis/consent";
+import type { EvidenceError, EvidenceService } from "@symbiosis/evidence";
 import type { ActorContext, ActorDirectory } from "@symbiosis/tenancy";
+import { RESULT_LABELS } from "@symbiosis/verification";
 import type { EdgeRequest, EdgeResponse } from "./edge-handler";
-import { renderCaseHtml, renderCaseListHtml, renderErrorHtml } from "./html";
+import type { CaseEvidenceExtras } from "./html";
+import {
+  renderCaseHtml,
+  renderCaseListHtml,
+  renderErrorHtml,
+  renderInsurerCaseHtml,
+  renderInsurerHomeHtml,
+} from "./html";
 
 export type AppApiDeps = {
   readonly operations: Operations;
   readonly interventions: InterventionService;
+  readonly evidence: EvidenceService;
+  readonly sharing: SharingService;
+  /** Used only by the minimal insurer demo pages; the JSON API is `createInsuranceHandler`. */
+  readonly insurance: InsuranceGateway;
   readonly directory: ActorDirectory;
   /**
    * Local-only maintenance hook: runs the escalation evaluator and alert retries once. Absent
@@ -30,6 +45,34 @@ const STATUS: Record<OperationsError["code"], number> = {
 const fromInterventionError = (e: InterventionError): EdgeResponse =>
   json(STATUS[e.code], { error: { code: e.code, message: e.message } });
 
+const EVIDENCE_STATUS: Record<EvidenceError["code"], number> = {
+  NOT_FOUND: 404,
+  FORBIDDEN: 403,
+  INVALID_REQUEST: 400,
+  VERIFICATION_NOT_COMPLETED: 409,
+  UNRESOLVED_EVIDENCE: 409,
+  INCONSISTENT_SOURCE: 409,
+  SERIALIZATION_FAILURE: 500,
+  STORAGE_FAILURE: 500,
+  INTEGRITY_FAILURE: 500,
+};
+const fromEvidenceError = (e: EvidenceError): EdgeResponse =>
+  json(EVIDENCE_STATUS[e.code], {
+    error: {
+      code: e.code,
+      message: e.message,
+      ...(e.details !== undefined && { details: e.details }),
+    },
+  });
+const fromConsentError = (e: ConsentError): EdgeResponse =>
+  json(STATUS[e.code], {
+    error: {
+      code: e.code,
+      message: e.message,
+      ...(e.details !== undefined && { details: e.details }),
+    },
+  });
+
 const json = (status: number, body: unknown): EdgeResponse => ({ status, body });
 const problem = (status: number, code: string, message: string): EdgeResponse =>
   json(status, { error: { code, message } });
@@ -41,6 +84,14 @@ const fromError = (e: OperationsError): EdgeResponse =>
       ...(e.domain !== undefined && { domainCode: e.domain.code }),
     },
   });
+
+const STATUS_FOR_INSURANCE = {
+  FORBIDDEN: 403,
+  ACCESS_DENIED: 403,
+  NOT_FOUND: 404,
+  INTEGRITY_FAILURE: 500,
+  AUDIT_FAILURE: 500,
+} as const;
 
 const ID = /^[A-Za-z0-9_.:-]{1,128}$/;
 
@@ -77,6 +128,110 @@ export function createAppHandler(
     return id === undefined || !ID.test(id) ? undefined : deps.directory.get(id);
   }
 
+  /** Evidence and sharing facts for the case page; absent when the role may not read evidence. */
+  async function caseExtras(
+    actor: ActorContext,
+    caseId: string,
+    latestId: string | undefined,
+  ): Promise<CaseEvidenceExtras | undefined> {
+    if (!can(actor, "EVIDENCE_READ")) return undefined;
+    const list = await deps.evidence.listForCase(actor, caseId);
+    const agreements = await deps.sharing.listForCase(actor, caseId);
+    if (!list.ok) return undefined;
+    const latest =
+      latestId === undefined ? undefined : await deps.evidence.getForActor(actor, latestId);
+    const p = latest?.ok ? latest.value : undefined;
+    return {
+      packages: list.value.map((r) => ({
+        packageId: r.packageId,
+        createdAt: r.createdAt,
+        resultLabel: RESULT_LABELS[r.result],
+      })),
+      ...(p !== undefined && {
+        latest: {
+          packageId: p.record.packageId,
+          resultLabel: RESULT_LABELS[p.record.result],
+          policyId: p.package.payload.verification.policyId,
+          policyVersion: p.package.payload.verification.policyVersion,
+          createdAt: p.record.createdAt,
+          payloadSha256: p.record.payloadSha256,
+          manifestSha256: p.record.manifestSha256,
+          integrityValid: p.integrity.valid,
+          integrityIssues: p.integrity.issues,
+          sourceLabel: p.package.payload.source.label,
+          synthetic: p.package.payload.source.synthetic,
+        },
+      }),
+      agreements: agreements.ok
+        ? agreements.value.map((g) => ({
+            agreementId: g.agreement.agreementId,
+            recipientOrganizationId: g.agreement.recipientOrganizationId,
+            scopes: g.agreement.scopes,
+            status: g.status,
+            effectiveFrom: g.agreement.effectiveFrom,
+            ...(g.agreement.expiresAt !== undefined && { expiresAt: g.agreement.expiresAt }),
+            ...(g.agreement.revokedAt !== undefined && { revokedAt: g.agreement.revokedAt }),
+          }))
+        : [],
+      canManageSharing: can(actor, "SHARING_MANAGE"),
+      canGrantRaw: can(actor, "SHARING_GRANT_RAW_TELEMETRY"),
+      standardScopes: EVIDENCE_CONSENT_SCOPES,
+    };
+  }
+
+  /** Minimal UI form posts (grant / revoke). Same local identity; redirects back to the case. */
+  async function uiPost(
+    actor: ActorContext,
+    parts: string[],
+    query: URLSearchParams,
+    request: EdgeRequest,
+  ): Promise<EdgeResponse> {
+    const html = (status: number, body: string): EdgeResponse => ({
+      status,
+      contentType: "text/html; charset=utf-8",
+      body,
+    });
+    const caseId = query.get("case") ?? "";
+    if (!ID.test(caseId)) return html(400, renderErrorHtml(400, "A case is required"));
+    const back: EdgeResponse = {
+      status: 303,
+      contentType: "text/html; charset=utf-8",
+      body: "",
+      headers: { Location: `/ui/cases/${caseId}?actor=${encodeURIComponent(actor.actorId)}` },
+    };
+    const form = new URLSearchParams(new TextDecoder().decode(request.rawBody));
+    if (parts[1] === "sharing" && parts[2] === "grant" && parts.length === 3) {
+      const expires = form.get("expiresAt")?.trim() ?? "";
+      const r = await deps.sharing.createAgreement(actor, {
+        recipientOrganizationId: form.get("recipientOrganizationId") ?? "",
+        scopes: form.getAll("scope"),
+        facilityIds: [form.get("facilityId") ?? ""],
+        ...(expires !== "" && { expiresAt: expires }),
+      });
+      return r.ok
+        ? back
+        : html(
+            STATUS[r.error.code],
+            renderErrorHtml(
+              STATUS[r.error.code],
+              `${r.error.message} ${(r.error.details ?? []).join(", ")}`,
+            ),
+          );
+    }
+    if (
+      parts[1] === "sharing" &&
+      parts[3] === "revoke" &&
+      parts.length === 4 &&
+      ID.test(parts[2] ?? "")
+    ) {
+      const r = await deps.sharing.revokeAgreement(actor, parts[2] as string);
+      return r.ok
+        ? back
+        : html(STATUS[r.error.code], renderErrorHtml(STATUS[r.error.code], r.error.message));
+    }
+    return html(404, renderErrorHtml(404, "Not found"));
+  }
+
   return async (request) => {
     const [path = "", queryString = ""] = request.target.split("?");
     const query = new URLSearchParams(queryString);
@@ -98,6 +253,8 @@ export function createAppHandler(
     const parts = path.split("/").filter(Boolean); // e.g. ["api","v1","cases",":id","acknowledge"]
 
     if (isUi) {
+      // The pages are read-only except the two sharing forms (grant / revoke).
+      if (method === "POST" && parts[1] === "sharing") return uiPost(actor, parts, query, request);
       if (method !== "GET") return problem(405, "METHOD_NOT_ALLOWED", "UI pages are read-only");
       const html = (status: number, body: string): EdgeResponse => ({
         status,
@@ -112,9 +269,44 @@ export function createAppHandler(
       }
       if (parts[1] === "cases" && parts.length === 3 && ID.test(parts[2] ?? "")) {
         const r = await deps.operations.getCaseView(actor, parts[2] as string);
-        return r.ok
-          ? html(200, renderCaseHtml(r.value, actor.actorId))
-          : html(STATUS[r.error.code], renderErrorHtml(STATUS[r.error.code], r.error.message));
+        if (!r.ok) {
+          return html(STATUS[r.error.code], renderErrorHtml(STATUS[r.error.code], r.error.message));
+        }
+        const extras = await caseExtras(
+          actor,
+          r.value.caseId,
+          r.value.evidence.latestEvidencePackageId,
+        );
+        return html(200, renderCaseHtml(r.value, actor.actorId, extras));
+      }
+      if (parts[1] === "insurer" && parts[2] === "cases") {
+        if (parts.length === 3) {
+          const sites = await deps.insurance.sites(actor);
+          if (!sites.ok) {
+            return html(
+              STATUS_FOR_INSURANCE[sites.error.code],
+              renderErrorHtml(STATUS_FOR_INSURANCE[sites.error.code], sites.error.message),
+            );
+          }
+          const cases = [];
+          for (const s of sites.value) {
+            const c = await deps.insurance.casesForSite(actor, s.siteId);
+            if (c.ok) cases.push(...c.value);
+          }
+          return html(200, renderInsurerHomeHtml(actor.actorId, sites.value, cases));
+        }
+        if (parts.length === 4 && ID.test(parts[3] ?? "")) {
+          const r = await deps.insurance.evidence(actor, parts[3] as string);
+          return r.ok
+            ? html(200, renderInsurerCaseHtml(actor.actorId, r.value))
+            : html(
+                STATUS_FOR_INSURANCE[r.error.code],
+                renderErrorHtml(
+                  STATUS_FOR_INSURANCE[r.error.code],
+                  `${r.error.message}${r.error.reason !== undefined ? ` (${r.error.reason})` : ""}`,
+                ),
+              );
+        }
       }
       return html(404, renderErrorHtml(404, "Not found"));
     }
@@ -172,6 +364,55 @@ export function createAppHandler(
       return problem(404, "NOT_FOUND", "Unknown route");
     }
 
+    // ---- evidence and sharing (S6) -------------------------------------------------------------
+    if (route[0] === "evidence" && route.length === 2 && ID.test(route[1] ?? "")) {
+      if (method !== "GET") return problem(405, "METHOD_NOT_ALLOWED", "GET only");
+      const r = await deps.evidence.getForActor(actor, route[1] as string);
+      return r.ok
+        ? json(200, {
+            record: r.value.record,
+            integrity: r.value.integrity,
+            package: r.value.package,
+          })
+        : fromEvidenceError(r.error);
+    }
+    if (route[0] === "sharing-agreements") {
+      if (route.length === 1) {
+        if (method === "GET") {
+          const r = await deps.sharing.listAgreements(actor);
+          return r.ok ? json(200, { agreements: r.value }) : fromConsentError(r.error);
+        }
+        if (method !== "POST") return problem(405, "METHOD_NOT_ALLOWED", "GET or POST only");
+        const body = parseBody(request.rawBody);
+        if (!body.ok) return problem(400, "MALFORMED_BODY", "Body must be a JSON object");
+        // The granting organization is the actor's own and is never read from the body.
+        const r = await deps.sharing.createAgreement(actor, {
+          recipientOrganizationId: body.value.recipientOrganizationId,
+          scopes: body.value.scopes,
+          facilityIds: body.value.facilityIds,
+          effectiveFrom: body.value.effectiveFrom,
+          expiresAt: body.value.expiresAt,
+        });
+        return r.ok ? json(201, r.value) : fromConsentError(r.error);
+      }
+      if (ID.test(route[1] ?? "")) {
+        const id = route[1] as string;
+        if (route.length === 2) {
+          if (method !== "GET") return problem(405, "METHOD_NOT_ALLOWED", "GET only");
+          const r = await deps.sharing.getAgreement(actor, id);
+          return r.ok ? json(200, r.value) : fromConsentError(r.error);
+        }
+        if (route.length === 3 && route[2] === "revoke") {
+          if (method !== "POST") return problem(405, "METHOD_NOT_ALLOWED", "POST only");
+          const body = parseBody(request.rawBody);
+          if (!body.ok) return problem(400, "MALFORMED_BODY", "Body must be a JSON object");
+          const r = await deps.sharing.revokeAgreement(actor, id, body.value.reason);
+          return r.ok ? json(200, r.value) : fromConsentError(r.error);
+        }
+      }
+      return problem(404, "NOT_FOUND", "Unknown route");
+    }
+
     if (route[0] !== "cases" || route.length < 2 || !ID.test(route[1] ?? "")) {
       return problem(404, "NOT_FOUND", "Unknown route");
     }
@@ -179,7 +420,14 @@ export function createAppHandler(
 
     if (method === "GET" && route.length === 2) {
       const r = await deps.operations.getCaseView(actor, caseId);
-      return r.ok ? json(200, r.value) : fromError(r.error);
+      if (!r.ok) return fromError(r.error);
+      const packages = await deps.evidence.listForCase(actor, caseId);
+      const agreements = await deps.sharing.listForCase(actor, caseId);
+      return json(200, {
+        ...r.value,
+        ...(packages.ok && { evidencePackages: packages.value }),
+        ...(agreements.ok && { sharingAgreements: agreements.value }),
+      });
     }
     if (method !== "POST") return problem(405, "METHOD_NOT_ALLOWED", "Unsupported method");
 
@@ -230,9 +478,12 @@ export function createAppHandler(
 export function createApiHandler(handlers: {
   readonly edge: (request: EdgeRequest) => Promise<EdgeResponse>;
   readonly app: (request: EdgeRequest) => Promise<EdgeResponse>;
+  readonly insurance: (request: EdgeRequest) => Promise<EdgeResponse>;
 }): (request: EdgeRequest) => Promise<EdgeResponse> {
   return (request) =>
-    request.target.startsWith("/api/") || request.target.startsWith("/ui/")
-      ? handlers.app(request)
-      : handlers.edge(request);
+    request.target.startsWith("/insurance/")
+      ? handlers.insurance(request)
+      : request.target.startsWith("/api/") || request.target.startsWith("/ui/")
+        ? handlers.app(request)
+        : handlers.edge(request);
 }

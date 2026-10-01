@@ -22,6 +22,8 @@ export type EdgeResponse = {
   /** A string body is sent as-is with `contentType`; anything else is JSON. */
   readonly body: unknown;
   readonly contentType?: string;
+  /** Extra response headers (e.g. `Location` for the minimal UI form redirects). */
+  readonly headers?: Readonly<Record<string, string>>;
 };
 
 export type EdgeLogEntry = {

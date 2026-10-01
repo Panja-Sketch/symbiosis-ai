@@ -98,7 +98,89 @@ export const SYNTHETIC_ACTORS: readonly ActorContext[] = [
     facilityIds: ["FAC-OTHER-001"],
     roles: ["FACILITY_MANAGER"],
   },
+  // Insurer-side actors (S6). Their own organization owns no facilities: what they may read is
+  // decided by sharing agreements, never by facility membership.
+  {
+    actorId: "USR-RISK-ENGINEER-001",
+    organizationId: "ORG-INS-001",
+    facilityIds: "ALL",
+    roles: ["RISK_ENGINEER"],
+  },
+  {
+    actorId: "USR-UNDERWRITER-001",
+    organizationId: "ORG-INS-001",
+    facilityIds: "ALL",
+    roles: ["UNDERWRITER"],
+  },
+  {
+    actorId: "USR-OTHER-INSURER-RE-001",
+    organizationId: "ORG-INS-002",
+    facilityIds: "ALL",
+    roles: ["RISK_ENGINEER"],
+  },
 ];
+
+export const ORGANIZATION_TYPES = ["INSURED", "INSURER", "BROKER"] as const;
+export type OrganizationType = (typeof ORGANIZATION_TYPES)[number];
+
+/**
+ * An organization and the facilities that belong to it. Membership is server-side data: a
+ * request can never claim a facility or organization it does not own (spec 36).
+ */
+export type OrganizationRecord = {
+  readonly organizationId: string;
+  readonly name: string;
+  readonly type: OrganizationType;
+  readonly facilityIds: readonly string[];
+};
+
+export interface OrganizationDirectory {
+  get(organizationId: string): Promise<OrganizationRecord | undefined>;
+}
+
+export class InMemoryOrganizationDirectory implements OrganizationDirectory {
+  private readonly orgs = new Map<string, OrganizationRecord>();
+
+  constructor(orgs: readonly OrganizationRecord[] = []) {
+    for (const o of orgs) this.orgs.set(o.organizationId, o);
+  }
+
+  async get(organizationId: string): Promise<OrganizationRecord | undefined> {
+    return this.orgs.get(organizationId);
+  }
+}
+
+/** SYNTHETIC LOCAL ORGANIZATIONS ONLY (S6). Real membership is Firebase-backed in S9. */
+export const SYNTHETIC_ORGANIZATIONS: readonly OrganizationRecord[] = [
+  {
+    organizationId: "ORG-SIM-001",
+    name: "Synthetic Cold Storage Co (insured)",
+    type: "INSURED",
+    facilityIds: ["FAC-SIM-001"],
+  },
+  {
+    organizationId: "ORG-SIM-002",
+    name: "Synthetic Other Insured Co",
+    type: "INSURED",
+    facilityIds: ["FAC-OTHER-001"],
+  },
+  {
+    organizationId: "ORG-INS-001",
+    name: "Synthetic Insurer One",
+    type: "INSURER",
+    facilityIds: [],
+  },
+  {
+    organizationId: "ORG-INS-002",
+    name: "Synthetic Insurer Two",
+    type: "INSURER",
+    facilityIds: [],
+  },
+];
+
+export function createSyntheticOrganizationDirectory(): InMemoryOrganizationDirectory {
+  return new InMemoryOrganizationDirectory(SYNTHETIC_ORGANIZATIONS);
+}
 
 export function createSyntheticActorDirectory(): InMemoryActorDirectory {
   return new InMemoryActorDirectory(SYNTHETIC_ACTORS);

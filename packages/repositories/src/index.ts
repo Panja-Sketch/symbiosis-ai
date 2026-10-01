@@ -7,10 +7,13 @@ import type {
   BaselineSnapshot,
   CanonicalObservation,
   DetectionState,
+  EvidencePackageRecord,
   MitigationAction,
   RiskEngineerInterventionRecommendation,
   RiskEvent,
   RiskImprovementCase,
+  SharedEvidenceRecord,
+  SharingAgreement,
   VerificationAttempt,
 } from "@symbiosis/contracts";
 
@@ -410,5 +413,173 @@ export class InMemoryInterventionRepository implements InterventionRepository {
 
   async listByCase(organizationId: string, caseId: string) {
     return (await this.list(organizationId)).filter((r) => r.caseId === caseId);
+  }
+}
+
+/**
+ * Index of immutable evidence packages (the package bytes live in the evidence object store).
+ * A package is never updated or deleted, and a verification has at most one package, so a
+ * redelivered `verification.completed` cannot create a second one. Organization-scoped.
+ */
+export interface EvidencePackageRepository {
+  /** False (and nothing stored) when the package id or the verification already has a package. */
+  insertIfAbsent(record: EvidencePackageRecord): Promise<boolean>;
+  get(organizationId: string, packageId: string): Promise<EvidencePackageRecord | undefined>;
+  getByVerification(
+    organizationId: string,
+    verificationId: string,
+  ): Promise<EvidencePackageRecord | undefined>;
+  /** Oldest first; the whole history stays available. */
+  listByCase(organizationId: string, caseId: string): Promise<readonly EvidencePackageRecord[]>;
+}
+
+export class InMemoryEvidencePackageRepository implements EvidencePackageRepository {
+  private readonly records = new Map<string, EvidencePackageRecord>();
+
+  async insertIfAbsent(record: EvidencePackageRecord): Promise<boolean> {
+    const key = `${record.organizationId}|${record.packageId}`;
+    if (this.records.has(key)) return false;
+    for (const r of this.records.values()) {
+      if (
+        r.organizationId === record.organizationId &&
+        r.verificationId === record.verificationId
+      ) {
+        return false;
+      }
+    }
+    this.records.set(key, Object.freeze({ ...record }));
+    return true;
+  }
+
+  async get(organizationId: string, packageId: string) {
+    return this.records.get(`${organizationId}|${packageId}`);
+  }
+
+  async getByVerification(organizationId: string, verificationId: string) {
+    return [...this.records.values()].find(
+      (r) => r.organizationId === organizationId && r.verificationId === verificationId,
+    );
+  }
+
+  async listByCase(organizationId: string, caseId: string) {
+    return [...this.records.values()]
+      .filter((r) => r.organizationId === organizationId && r.caseId === caseId)
+      .sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt));
+  }
+}
+
+export type RevokeAgreementResult =
+  | { readonly status: "REVOKED"; readonly agreement: SharingAgreement }
+  | { readonly status: "NOT_FOUND" }
+  | { readonly status: "ALREADY_REVOKED"; readonly agreement: SharingAgreement };
+
+/**
+ * Sharing agreements. History is preserved: an agreement is never deleted, and revocation only
+ * sets its revocation metadata once (it can never be un-revoked or have its terms rewritten).
+ * Owner reads are scoped by the granting organization; recipient reads by the recipient.
+ */
+export interface SharingAgreementRepository {
+  /** Throws if the agreement id already exists. */
+  insert(agreement: SharingAgreement): Promise<void>;
+  getForOwner(organizationId: string, agreementId: string): Promise<SharingAgreement | undefined>;
+  listForOwner(organizationId: string): Promise<readonly SharingAgreement[]>;
+  listForRecipient(recipientOrganizationId: string): Promise<readonly SharingAgreement[]>;
+  revoke(
+    organizationId: string,
+    agreementId: string,
+    revocation: {
+      readonly revokedAt: string;
+      readonly revokedBy: string;
+      readonly reason?: string;
+    },
+  ): Promise<RevokeAgreementResult>;
+  /** Every agreement across tenants, for the system-level expiry reconciliation only. */
+  listAllForSystemTick(): Promise<readonly SharingAgreement[]>;
+}
+
+export class InMemorySharingAgreementRepository implements SharingAgreementRepository {
+  private readonly items = new Map<string, SharingAgreement>();
+
+  async insert(agreement: SharingAgreement): Promise<void> {
+    if (this.items.has(agreement.agreementId)) {
+      throw new Error(`sharing agreement ${agreement.agreementId} already exists`);
+    }
+    this.items.set(agreement.agreementId, Object.freeze({ ...agreement }));
+  }
+
+  async getForOwner(organizationId: string, agreementId: string) {
+    const a = this.items.get(agreementId);
+    return a !== undefined && a.organizationId === organizationId ? a : undefined;
+  }
+
+  async listForOwner(organizationId: string) {
+    return [...this.items.values()]
+      .filter((a) => a.organizationId === organizationId)
+      .sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt));
+  }
+
+  async listForRecipient(recipientOrganizationId: string) {
+    return [...this.items.values()]
+      .filter((a) => a.recipientOrganizationId === recipientOrganizationId)
+      .sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt));
+  }
+
+  async revoke(
+    organizationId: string,
+    agreementId: string,
+    revocation: {
+      readonly revokedAt: string;
+      readonly revokedBy: string;
+      readonly reason?: string;
+    },
+  ): Promise<RevokeAgreementResult> {
+    const current = await this.getForOwner(organizationId, agreementId);
+    if (current === undefined) return { status: "NOT_FOUND" };
+    if (current.revokedAt !== undefined) return { status: "ALREADY_REVOKED", agreement: current };
+    const next: SharingAgreement = Object.freeze({
+      ...current,
+      revokedAt: revocation.revokedAt,
+      revokedBy: revocation.revokedBy,
+      ...(revocation.reason !== undefined && { revocationReason: revocation.reason }),
+    });
+    this.items.set(agreementId, next);
+    return { status: "REVOKED", agreement: next };
+  }
+
+  async listAllForSystemTick() {
+    return [...this.items.values()];
+  }
+}
+
+/** Ledger of evidence made available to a recipient: unique per agreement + package. */
+export interface SharedEvidenceRepository {
+  insertIfAbsent(record: SharedEvidenceRecord): Promise<boolean>;
+  listByCase(organizationId: string, caseId: string): Promise<readonly SharedEvidenceRecord[]>;
+  listByAgreement(
+    organizationId: string,
+    agreementId: string,
+  ): Promise<readonly SharedEvidenceRecord[]>;
+}
+
+export class InMemorySharedEvidenceRepository implements SharedEvidenceRepository {
+  private readonly items = new Map<string, SharedEvidenceRecord>();
+
+  async insertIfAbsent(record: SharedEvidenceRecord): Promise<boolean> {
+    const key = `${record.agreementId}|${record.evidencePackageId}`;
+    if (this.items.has(key)) return false;
+    this.items.set(key, Object.freeze({ ...record }));
+    return true;
+  }
+
+  async listByCase(organizationId: string, caseId: string) {
+    return [...this.items.values()].filter(
+      (r) => r.organizationId === organizationId && r.caseId === caseId,
+    );
+  }
+
+  async listByAgreement(organizationId: string, agreementId: string) {
+    return [...this.items.values()].filter(
+      (r) => r.organizationId === organizationId && r.agreementId === agreementId,
+    );
   }
 }

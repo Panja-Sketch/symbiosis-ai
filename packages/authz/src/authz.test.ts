@@ -23,9 +23,27 @@ describe("local role permissions (not production authorization)", () => {
   });
 
   it("auditors read only; insurer-side roles have no operations permissions", () => {
-    expect(permissionsFor(["READ_ONLY_AUDITOR"])).toEqual(["CASE_READ", "INTERVENTION_READ"]);
+    expect(permissionsFor(["READ_ONLY_AUDITOR"])).toEqual([
+      "CASE_READ",
+      "INTERVENTION_READ",
+      "EVIDENCE_READ",
+    ]);
+    // S6: insurer-side roles can only read the consent-filtered evidence API, nothing else.
     for (const r of ["RISK_ENGINEER", "UNDERWRITER", "BROKER_RISK_MANAGER"] as const) {
-      expect(permissionsFor([r])).toEqual([]);
+      expect(permissionsFor([r])).toEqual(["INSURANCE_EVIDENCE_READ"]);
+    }
+  });
+
+  it("sharing: managers grant and revoke, only an admin may grant raw telemetry, insurers cannot share", () => {
+    expect(can(actor(["FACILITY_MANAGER"]), "SHARING_MANAGE")).toBe(true);
+    expect(can(actor(["FACILITY_MANAGER"]), "SHARING_GRANT_RAW_TELEMETRY")).toBe(false);
+    expect(can(actor(["ORG_ADMIN"]), "SHARING_GRANT_RAW_TELEMETRY")).toBe(true);
+    expect(can(actor(["ORG_ADMIN"]), "INSURANCE_EVIDENCE_READ")).toBe(false);
+    expect(can(actor(["OPERATOR"]), "EVIDENCE_READ")).toBe(false);
+    expect(can(actor(["READ_ONLY_AUDITOR"]), "SHARING_MANAGE")).toBe(false);
+    for (const r of ["RISK_ENGINEER", "UNDERWRITER", "BROKER_RISK_MANAGER"] as const) {
+      expect(can(actor([r]), "SHARING_MANAGE")).toBe(false);
+      expect(can(actor([r]), "CASE_READ")).toBe(false);
     }
   });
 

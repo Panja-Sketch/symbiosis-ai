@@ -16,4 +16,6 @@ export * from "./edge";
 export * from "./baseline";
 export * from "./risk";
 export * from "./operations";
+export * from "./evidence";
+export * from "./consent";
 export * from "./events";

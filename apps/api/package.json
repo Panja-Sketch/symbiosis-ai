@@ -9,11 +9,14 @@
     "@symbiosis/action-orchestration": "workspace:*",
     "@symbiosis/authz": "workspace:*",
     "@symbiosis/clock": "workspace:*",
+    "@symbiosis/consent": "workspace:*",
     "@symbiosis/contracts": "workspace:*",
     "@symbiosis/device-registry": "workspace:*",
     "@symbiosis/edge-security": "workspace:*",
     "@symbiosis/event-bus": "workspace:*",
+    "@symbiosis/evidence": "workspace:*",
     "@symbiosis/intervention-prioritization": "workspace:*",
-    "@symbiosis/tenancy": "workspace:*"
+    "@symbiosis/tenancy": "workspace:*",
+    "@symbiosis/verification": "workspace:*"
   }
 }

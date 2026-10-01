@@ -12,6 +12,7 @@ import type {
   RiskEvent,
   RiskEventState,
   RiskImprovementCase,
+  SharingState,
   VerificationAttempt,
 } from "@symbiosis/contracts";
 import { describeReasonCodes } from "@symbiosis/notifications";
@@ -179,13 +180,22 @@ export type CaseView = {
   };
   readonly intervention?: InterventionView;
   readonly evidence: {
+    readonly latestEvidencePackageId?: string;
     readonly auditReferences: readonly {
       readonly auditId: string;
       readonly action: string;
       readonly at: string;
     }[];
   };
-  readonly sharing: { readonly label: string };
+  readonly sharing: { readonly state: SharingState; readonly label: string };
+};
+
+/** Presentation wording for the case sharing state (S6). A package alone never reads "shared". */
+export const SHARING_LABELS: Readonly<Record<SharingState, string>> = {
+  NOT_SHARED: "NOT SHARED. No evidence package exists yet.",
+  SHAREABLE: "SHAREABLE. An evidence package exists; nothing has been shared with anyone.",
+  SHARED: "SHARED under an active sharing agreement.",
+  REVOKED: "REVOKED. Evidence was shared and has since been revoked; no active agreement remains.",
 };
 
 const latest = (entries: readonly AuditEntry[], action: AuditEntry["action"]) =>
@@ -465,8 +475,11 @@ export function buildCaseView(input: {
       },
     }),
     evidence: {
+      ...(c.latestEvidencePackageId !== undefined && {
+        latestEvidencePackageId: c.latestEvidencePackageId,
+      }),
       auditReferences: audit.map((e) => ({ auditId: e.auditId, action: e.action, at: e.at })),
     },
-    sharing: { label: "Not available until S6" },
+    sharing: { state: c.sharingState, label: SHARING_LABELS[c.sharingState] },
   };
 }

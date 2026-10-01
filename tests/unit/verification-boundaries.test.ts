@@ -160,10 +160,10 @@ describe("thresholds live in versioned config, not in code", () => {
 });
 
 describe("the S5 product surface", () => {
-  it("offers only the specified verification and intervention routes (no insurer evidence API)", () => {
+  it("keeps the specified verification and intervention routes (S6 adds evidence and sharing)", () => {
     const text = readFileSync(join(root, "apps/api/src/app-handler.ts"), "utf8");
     expect(text).toMatch(/"verifications"/);
     expect(text).toMatch(/"interventions"/);
-    expect(text).not.toMatch(/insurer|evidence-packages|\/evidence\/|consent/i);
+    expect(text).not.toMatch(/evidence-packages/i);
   });
 });

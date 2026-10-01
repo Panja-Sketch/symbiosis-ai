@@ -4,21 +4,30 @@ import {
   createApiHandler,
   createAppHandler,
   createEdgeHandler,
+  createInsuranceHandler,
   createEdgeServer,
   listen,
 } from "@symbiosis/api";
 import type { RunningServer } from "@symbiosis/api";
 import type { EdgeLogEntry } from "@symbiosis/api";
-import { createOperations, parseActionLibrary } from "@symbiosis/action-orchestration";
+import { actionsFor, createOperations, parseActionLibrary } from "@symbiosis/action-orchestration";
 import type { ActionLibrary, Operations } from "@symbiosis/action-orchestration";
 import { esp32SourceAdapter } from "@symbiosis/adapter-esp32";
 import { simulatorSourceAdapter } from "@symbiosis/adapter-simulator";
 import { InMemoryAuditLog } from "@symbiosis/audit";
+import { createInsuranceGateway, createSharingService, startSharing } from "@symbiosis/consent";
+import type { InsuranceGateway, SharingService } from "@symbiosis/consent";
 import { SystemClock } from "@symbiosis/clock";
 import type { Clock } from "@symbiosis/clock";
 import { parseBaselineConfig } from "@symbiosis/baselines";
 import type { BaselineConfig } from "@symbiosis/baselines";
 import { parseDataQualityConfig } from "@symbiosis/data-quality";
+import {
+  InMemoryEvidenceObjectStore,
+  createEvidenceService,
+  startEvidenceBuilder,
+} from "@symbiosis/evidence";
+import type { EvidenceObjectStore, EvidenceService } from "@symbiosis/evidence";
 import {
   createInterventionService,
   parseInterventionPolicy,
@@ -39,16 +48,22 @@ import { InMemoryBus, RandomIdGenerator } from "@symbiosis/event-bus";
 import type { IdGenerator } from "@symbiosis/event-bus";
 import { ConsoleEmail, createAlerting, startAlerting } from "@symbiosis/notifications";
 import type { NotificationSender } from "@symbiosis/notifications";
-import { createSyntheticActorDirectory } from "@symbiosis/tenancy";
+import {
+  createSyntheticActorDirectory,
+  createSyntheticOrganizationDirectory,
+} from "@symbiosis/tenancy";
 import {
   InMemoryActionRepository,
   InMemoryAlertRepository,
   InMemoryBaselineRepository,
   InMemoryCaseRepository,
   InMemoryDetectionStateRepository,
+  InMemoryEvidencePackageRepository,
   InMemoryInterventionRepository,
   InMemoryObservationRepository,
   InMemoryRiskEventRepository,
+  InMemorySharedEvidenceRepository,
+  InMemorySharingAgreementRepository,
   InMemoryVerificationRepository,
 } from "@symbiosis/repositories";
 import { parseRuleConfig } from "@symbiosis/risk-detection";
@@ -82,6 +97,8 @@ export type LocalRuntimeOptions = {
   readonly notificationSender?: NotificationSender;
   /** Where ConsoleEmail writes; defaults to console.log. */
   readonly consoleSink?: (line: string) => void;
+  /** Replaces the in-memory evidence object store (tests inject a failing or tamperable one). */
+  readonly evidenceStore?: EvidenceObjectStore;
 };
 
 export type LocalRuntime = {
@@ -96,6 +113,13 @@ export type LocalRuntime = {
   readonly actions: InMemoryActionRepository;
   readonly verifications: InMemoryVerificationRepository;
   readonly interventions: InMemoryInterventionRepository;
+  readonly evidencePackages: InMemoryEvidencePackageRepository;
+  readonly evidenceStore: EvidenceObjectStore;
+  readonly agreements: InMemorySharingAgreementRepository;
+  readonly shares: InMemorySharedEvidenceRepository;
+  readonly evidenceService: EvidenceService;
+  readonly sharingService: SharingService;
+  readonly insuranceGateway: InsuranceGateway;
   readonly verificationRunner: VerificationRunner;
   readonly interventionService: InterventionService;
   readonly verificationPolicy: VerificationPolicy;
@@ -112,6 +136,8 @@ export type LocalRuntime = {
     escalated: readonly { riskEventId: string; caseId: string }[];
     retried: number;
     verification: Awaited<ReturnType<VerificationRunner["tick"]>>;
+    evidence: Awaited<ReturnType<EvidenceService["createMissing"]>>;
+    sharing: Awaited<ReturnType<SharingService["reconcileAll"]>>;
   }>;
   readonly registry: DeviceRegistry;
   readonly keys: DeviceKeyStore;
@@ -174,8 +200,13 @@ export async function createLocalRuntime(options: LocalRuntimeOptions = {}): Pro
   const actions = new InMemoryActionRepository();
   const verifications = new InMemoryVerificationRepository();
   const interventions = new InMemoryInterventionRepository();
+  const evidencePackages = new InMemoryEvidencePackageRepository();
+  const evidenceStore = options.evidenceStore ?? new InMemoryEvidenceObjectStore();
+  const agreements = new InMemorySharingAgreementRepository();
+  const shares = new InMemorySharedEvidenceRepository();
   const audit = new InMemoryAuditLog();
   const directory = createSyntheticActorDirectory();
+  const organizations = createSyntheticOrganizationDirectory();
   const policy = options.escalationPolicy ?? loadEscalationPolicy();
   const library = options.actionLibrary ?? loadActionLibrary();
   const verificationPolicy = options.verificationPolicy ?? loadVerificationPolicy();
@@ -235,6 +266,59 @@ export async function createLocalRuntime(options: LocalRuntimeOptions = {}): Pro
     baselineConfig,
   });
 
+  // Evidence (S6): a package is built from every completed verification, then the consent
+  // service reacts to the package. Neither can change a verification result or a risk state.
+  const evidenceService = createEvidenceService({
+    bus,
+    ids,
+    clock,
+    audit,
+    cases,
+    riskEvents,
+    actions,
+    observations,
+    baselines,
+    verifications,
+    packages: evidencePackages,
+    store: evidenceStore,
+    policies: [
+      {
+        policyId: verificationPolicy.policyId,
+        policyVersion: verificationPolicy.policyVersion,
+        document: verificationPolicy,
+      },
+    ],
+    approvedActionsFor: (hazardType) =>
+      actionsFor(library, hazardType).map((a) => ({
+        actionLibraryId: a.actionLibraryId,
+        title: a.title,
+        libraryVersion: library.version,
+      })),
+  });
+  startEvidenceBuilder({ bus }, evidenceService);
+  const sharingService = createSharingService({
+    bus,
+    ids,
+    clock,
+    audit,
+    cases,
+    agreements,
+    shares,
+    packages: evidencePackages,
+    organizations,
+  });
+  startSharing({ bus }, sharingService);
+  const insuranceGateway = createInsuranceGateway({
+    ids,
+    clock,
+    audit,
+    cases,
+    agreements,
+    packages: evidencePackages,
+    interventions,
+    evidence: evidenceService,
+  });
+
   const alertingDeps = {
     bus,
     ids,
@@ -289,7 +373,10 @@ export async function createLocalRuntime(options: LocalRuntimeOptions = {}): Pro
     // Verification starts for reported actions and completes once a window has ended. It is the
     // only code that can produce a verification result.
     const verification = await verificationRunner.tick();
-    return { escalated: escalation.escalated, retried, verification };
+    // Packages for any completed verification that has none yet, then expiry-aware sharing state.
+    const evidence = await evidenceService.createMissing();
+    const sharing = await sharingService.reconcileAll();
+    return { escalated: escalation.escalated, retried, verification, evidence, sharing };
   };
 
   const edgeHandler = createEdgeHandler({
@@ -306,9 +393,13 @@ export async function createLocalRuntime(options: LocalRuntimeOptions = {}): Pro
     app: createAppHandler({
       operations,
       interventions: interventionService,
+      evidence: evidenceService,
+      sharing: sharingService,
+      insurance: insuranceGateway,
       directory,
       runTick: tick,
     }),
+    insurance: createInsuranceHandler({ gateway: insuranceGateway, directory }),
   });
   const server = await listen(createEdgeServer(handler), options.port ?? 0);
   return {
@@ -323,6 +414,13 @@ export async function createLocalRuntime(options: LocalRuntimeOptions = {}): Pro
     actions,
     verifications,
     interventions,
+    evidencePackages,
+    evidenceStore,
+    agreements,
+    shares,
+    evidenceService,
+    sharingService,
+    insuranceGateway,
     verificationRunner,
     interventionService,
     verificationPolicy,

@@ -187,7 +187,11 @@ describe("V1 successful improvement (end to end)", () => {
       caseId,
       completeness: 1,
     });
-    expect(w.types().some((t) => t.startsWith("evidence."))).toBe(false);
+    // S6: the completed verification now gets an evidence package, which is documentation only:
+    // nothing is shared, and the result and case state above are untouched.
+    expect(w.types()).toContain("evidence.package_created.v1");
+    expect(w.types()).not.toContain("evidence.shared.v1");
+    expect(c?.sharingState).toBe("SHAREABLE");
 
     await expectEvidenceReal(w, attempt?.verificationId ?? "");
 

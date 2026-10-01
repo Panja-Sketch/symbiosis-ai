@@ -1,4 +1,6 @@
-import type { CaseSeverity, CaseState } from "./case";
+import type { CaseSeverity, CaseState, SharingState } from "./case";
+import type { ConsentScope } from "./consent";
+import type { EvidenceDataOrigin } from "./evidence";
 import type { Alert, AlertKind, NotificationChannel, NotificationResult } from "./operations";
 import type { ObservationEvaluation, RiskDetection } from "./risk";
 import type { UnassessedObservation, CanonicalObservation, CanonicalSignal } from "./canonical";
@@ -283,6 +285,65 @@ export type InterventionRecommendationUpdatedPayload = {
   readonly generatedAt: IsoTimestamp;
 };
 
+/** An immutable evidence package now exists for a completed verification (S6). */
+export type EvidencePackageCreatedPayload = {
+  readonly evidencePackageId: string;
+  readonly caseId: string;
+  readonly riskEventId: string;
+  readonly verificationId: string;
+  /** The verification result exactly as recorded; a package never implies improvement. */
+  readonly result: VerificationResult;
+  readonly policyId: string;
+  readonly policyVersion: string;
+  readonly schemaVersion: string;
+  readonly payloadSha256: string;
+  readonly manifestSha256: string;
+  readonly artifactCount: number;
+  readonly dataOrigin: EvidenceDataOrigin;
+  readonly createdAt: IsoTimestamp;
+};
+
+/** The package can now be shared; nothing has been shared by this event. */
+export type EvidenceShareablePayload = {
+  readonly evidencePackageId: string;
+  readonly caseId: string;
+  readonly result: VerificationResult;
+  readonly previousSharingState: SharingState;
+  readonly sharingState: SharingState;
+};
+
+export type ConsentGrantedPayload = {
+  readonly agreementId: string;
+  readonly recipientOrganizationId: string;
+  readonly scopes: readonly ConsentScope[];
+  /** The envelope facility_id is the first of these. */
+  readonly facilityIds: readonly string[];
+  readonly effectiveFrom: IsoTimestamp;
+  readonly expiresAt?: IsoTimestamp;
+  readonly createdBy: string;
+  readonly includesRawTelemetry: boolean;
+};
+
+export type ConsentRevokedPayload = {
+  readonly agreementId: string;
+  readonly recipientOrganizationId: string;
+  readonly facilityIds: readonly string[];
+  readonly revokedAt: IsoTimestamp;
+  readonly revokedBy: string;
+  readonly reason?: string;
+};
+
+/** A package became available to a recipient under a valid agreement (not an insurer read). */
+export type EvidenceSharedPayload = {
+  readonly shareId: string;
+  readonly agreementId: string;
+  readonly caseId: string;
+  readonly evidencePackageId: string;
+  readonly recipientOrganizationId: string;
+  readonly scopes: readonly ConsentScope[];
+  readonly sharedAt: IsoTimestamp;
+};
+
 export type RiskObservationEvaluatedEvent = EventEnvelope<
   "risk.observation_evaluated.v1",
   RiskObservationEvaluatedPayload
@@ -335,6 +396,18 @@ export type InterventionRecommendationUpdatedEvent = EventEnvelope<
   InterventionRecommendationUpdatedPayload
 >;
 
+export type EvidencePackageCreatedEvent = EventEnvelope<
+  "evidence.package_created.v1",
+  EvidencePackageCreatedPayload
+>;
+export type EvidenceShareableEvent = EventEnvelope<
+  "evidence.shareable.v1",
+  EvidenceShareablePayload
+>;
+export type ConsentGrantedEvent = EventEnvelope<"consent.granted.v1", ConsentGrantedPayload>;
+export type ConsentRevokedEvent = EventEnvelope<"consent.revoked.v1", ConsentRevokedPayload>;
+export type EvidenceSharedEvent = EventEnvelope<"evidence.shared.v1", EvidenceSharedPayload>;
+
 /** All platform events defined so far. Later phases extend this union. */
 export type PlatformEvent =
   | TelemetryReceivedEvent
@@ -360,7 +433,12 @@ export type PlatformEvent =
   | VerificationCompletedEvent
   | RecurrenceDetectedEvent
   | CaseReopenedEvent
-  | InterventionRecommendationUpdatedEvent;
+  | InterventionRecommendationUpdatedEvent
+  | EvidencePackageCreatedEvent
+  | EvidenceShareableEvent
+  | ConsentGrantedEvent
+  | ConsentRevokedEvent
+  | EvidenceSharedEvent;
 
 export type PlatformEventType = PlatformEvent["event_type"];
 export type EventOfType<T extends PlatformEventType> = Extract<PlatformEvent, { event_type: T }>;

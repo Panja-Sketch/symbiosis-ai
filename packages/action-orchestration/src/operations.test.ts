@@ -511,7 +511,7 @@ describe("tenancy and permissions", () => {
 });
 
 describe("case view", () => {
-  it("lists the approved actions as RECOMMEND_ONLY and shows sharing as not yet available", async () => {
+  it("lists the approved actions as RECOMMEND_ONLY and shows nothing shared before any evidence exists", async () => {
     const w = await acknowledged();
     const v = await w.operations.getCaseView(await actor(w, MGR), "CASE-1");
     expect(v.ok).toBe(true);
@@ -523,7 +523,8 @@ describe("case view", () => {
       "ACT-COOLING-REDUCE-LOAD",
       "ACT-COOLING-START-BACKUP",
     ]);
-    expect(v.value.sharing.label).toBe("Not available until S6");
+    expect(v.value.sharing).toMatchObject({ state: "NOT_SHARED" });
+    expect(v.value.sharing.label).toMatch(/^NOT SHARED/);
     expect(v.value.didItWork.status).toBe("NOT_APPLICABLE_YET");
   });
 

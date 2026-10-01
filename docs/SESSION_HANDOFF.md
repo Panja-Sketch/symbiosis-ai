@@ -2,7 +2,7 @@
 
 ## Current phase
 
-S5 — Verification + recurrence + intervention prioritization (finished; S6 not started)
+S6 — Evidence + consent (finished; S7 not started)
 
 ## Current phase status
 
@@ -10,76 +10,81 @@ COMPLETE
 
 ## Last completed phase
 
-S5 — Verification + recurrence + intervention prioritization (S0 to S4 completed earlier)
+S6 — Evidence + consent (S0 to S5 completed earlier)
 
 ## Completed work
 
-- **Verification policy and engine (`packages/verification`, `config/verification-policy/cooling-electrical.v1.json`):** versioned hero policy (D-037) parsed fail-closed; `evaluateVerification` is a pure deterministic engine over scoped canonical observations, learned baselines (same operating mode only), device facts and the reported actions. Criteria: VIBRATION and CURRENT (required, sustained interval + hysteresis band), BACKUP_CAPACITY (required only when a reported action is on the policy list; must be observed running), ZONE_TEMPERATURE_SLOPE (role configurable, SUPPORTING by default), DATA_QUALITY and DEVICE_INTEGRITY (required). Results, precedence, completeness and confidence: D-039 to D-041.
-- **Verification runner (`apps/worker/src/verification-runner.ts`):** the only code that starts or completes a verification (enforced by a test). `tick()` starts verification for `ACTION_REPORTED` cases (`verification.started`, case/event `VERIFYING`) and completes attempts whose window ended (`verification.completed`, case/event outcome) through the `risk-lifecycle` coordinators `startVerification`/`completeVerification` so state cannot partially persist. Processing failure becomes INCONCLUSIVE; a coordinator/repository failure leaves the attempt IN_PROGRESS and is reported. `resolveEvidence` proves evidence ids exist.
-- **Verification attempts (`VerificationRepository`):** one immutable record per case/event/action cycle (policy id/version, actions, window, required signals, assessment, typed evidence references, `recurrenceWatchEndsAt`); history is never overwritten.
-- **Recurrence (`packages/recurrence`, `apps/worker/src/risk-pipeline.ts`):** a qualifying detection against a `VERIFIED_IMPROVED` case of the same organization, facility, hazard and primary asset inside the watch window reopens the same case (REOPENED, `recurrenceCount + 1`, new RiskEvent, `recurrence.detected` then `case.reopened`, INITIAL alert for the new event); outside the window a new case opens (D-043). `RECORD_DETECTION` is now legal in `VERIFYING` and the unsuccessful outcome states.
-- **Human follow-up (D-044):** assign/report accepted from PARTIALLY_VERIFIED, NOT_IMPROVING and INCONCLUSIVE; not silently closed.
-- **Intervention prioritization (`packages/intervention-prioritization`, `config/intervention-policy/risk-engineer-prioritization.v1.json`):** rule policy over trusted facts, highest matching level wins, four allowed levels, supersede/resolve/acknowledge, event-driven recalculation (D-045). Decision support only.
-- **API/UI:** `GET /api/v1/verifications/:id`, `GET /api/v1/interventions`, `GET /api/v1/interventions/:id`, `POST /api/v1/interventions/:id/acknowledge`; case view and minimal page gained "Did it work?" (pending or result, criteria, before/after, completeness, confidence, evidence-reference count), "Is it staying fixed?" and "Intervention recommendation".
-- **Events (all `.v1`):** `verification.started`, `verification.completed`, `recurrence.detected`, `case.reopened`, `intervention.recommendation_updated`. Not emitted: any `evidence.*` (S6).
-- **Runtime:** `runtime.tick()` = alert retries, escalation, then verification start/evaluation; `pnpm smoke:s5` added; simulator scenarios `partial-improvement` and `backup-running`.
-- Not implemented (by design): evidence package/manifest/hash/PDF, consent, sharing, insurer evidence API, final UI, Gemini, Firebase/Firestore/Pub/Sub/Storage/Scheduler/Secret Manager/Cloud Run, firmware.
+- **Evidence package (`packages/evidence`, D-047 to D-049):** every completed verification (all four results, faithfully) produces an immutable `evidence-package.v1` built by a pure builder from existing trusted records only: payload (spec-19 facts, no id or timestamp so the hash is a pure function of the records), hashed artifacts (the referenced observations, baselines, actions, audit entries, policy and device snapshot), a SHA-256 `evidence-manifest.v1` and `manifestSha256`. Canonical form `symbiosis-canonical-json.v1` (sorted keys, no whitespace, plain JSON only). `verifyEvidencePackage` recomputes everything from the package alone; `EvidenceService.load` also checks canonical bytes and the index record. A missing referenced record, device snapshot or completion audit entry fails explicitly (no package, no event). Stored through `EvidenceObjectStore` (in-memory; Cloud Storage is S9) and an `EvidencePackageRepository` index; neither can overwrite. Creation is idempotent per verification, retried by `tick()` (`createMissing`).
+- **Snapshot fix:** the verification runner freezes the device facts it used onto the completed attempt (`deviceSnapshots`); `DEVICE:<id>` evidence now resolves to that copy (also in S5 `resolveEvidence`). Other mutable records are embedded as hashed snapshots, so later registry, case or event changes never rewrite a package.
+- **Case linkage:** new documentation commands in `risk-cases` (`RECORD_EVIDENCE_PACKAGE`, `SET_SHARING_STATE`) that preserve state, severity, verification references and `updatedAt`; invariant: a sharing state other than `NOT_SHARED` requires `latestEvidencePackageId`.
+- **Consent (`packages/consent`, D-050 to D-053):** `SharingAgreement` (spec shape plus `createdAt`/`revokedBy`/`revocationReason`), ten scopes (`INTERVENTION_RECOMMENDATION` added; `RAW_TELEMETRY` separate, off by default, granting needs `SHARING_GRANT_RAW_TELEMETRY`), pure deny-by-default `evaluateAccess`, `SharingService` (create, revoke, list, reconcile, package reaction), `InsuranceGateway` (six read paths), scope-filtered projections. Sharing state is derived (`NOT_SHARED`, `SHAREABLE`, `SHARED`, `REVOKED`; a package alone is never `SHARED`; `REVOKED` also covers expiry).
+- **Events (`.v1`):** `evidence.package_created` (caused by `verification.completed`), `evidence.shareable`, `consent.granted`, `consent.revoked`, `evidence.shared`. Audit actions: `EVIDENCE_PACKAGE_CREATED/READ`, `SHARING_AGREEMENT_CREATED/REVOKED`, `EVIDENCE_SHARED`, `SHARING_STATE_CHANGED`, `INSURER_EVIDENCE_READ`, `INSURER_ACCESS_DENIED`.
+- **API/UI (D-054):** `GET /api/v1/evidence/:id`, `POST /api/v1/sharing-agreements`, `POST /api/v1/sharing-agreements/:id/revoke` (+ `GET /api/v1/sharing-agreements[/:id]`); insurer `GET /insurance/v1/sites`, `/sites/:id/cases`, `/cases/:id`, `/cases/:id/evidence` (`?include=raw_telemetry`, `?package=`), `/recommendations`, `/interventions`. New synthetic organizations and insurer actors (`USR-RISK-ENGINEER-001`, `USR-UNDERWRITER-001`, `USR-OTHER-INSURER-RE-001`); permissions `EVIDENCE_READ`, `SHARING_MANAGE`, `SHARING_GRANT_RAW_TELEMETRY`, `INSURANCE_EVIDENCE_READ`. The case page shows the evidence package, live hash verification, source label, sharing state, grant and revoke forms; `/ui/insurer/cases[/:id]` shows only consented evidence.
+- **Runtime:** `tick()` = alert retries, escalation, verification, `evidence.createMissing()`, `sharing.reconcileAll()`; `pnpm smoke:s6` added.
+- Not implemented (by design): S7 persona workspaces, Trust Center, Gemini, Firebase/Firestore/Pub/Sub/Cloud Storage/Secret Manager/Cloud Run, firmware, PDF export, package signing.
 
 ## Files changed
 
-Commit `61c5296` (`feat(s5): implement physical verification and recurrence`): 61 files, +6877/-249. New: `packages/verification/src/{engine,policy,labels}.ts` (+ tests/fixture), `packages/recurrence/src/index.ts`, `packages/intervention-prioritization/src/{policy,engine,service}.ts`, `packages/contracts/src/intervention.ts`, `apps/worker/src/verification-runner.ts`, `config/verification-policy/cooling-electrical.v1.json`, `config/intervention-policy/risk-engineer-prioritization.v1.json`, `scripts/smoke-s5.ts`, `tests/integration/verification.test.ts`, `tests/unit/verification-boundaries.test.ts`. Modified: contracts (verification types, events, audit actions), repositories, risk-cases (`RECORD_DETECTION` states), risk-lifecycle (`startVerification`), operations service and case view, notifications alerting (`case.reopened`), authz, device-registry (`listForFacility`), api handler and page, worker pipeline, local runtime, dev runtime, simulator scenarios, root package.json, README, DECISIONS (D-037 to D-046), IMPLEMENTATION_STATE, earlier tests/smoke adjusted per D-046.
+Commit `feat(s6): implement evidence and consent sharing` (see "Last known good commit SHA"). New: `packages/contracts/src/{evidence,consent}.ts`, `packages/evidence/src/{canonical,hash,store,builder,verify,service}.ts`, `packages/consent/src/{access,sharing,projection,gateway}.ts`, `apps/api/src/insurance-handler.ts`, `scripts/smoke-s6.ts`, `tests/integration/{evidence,consent,s6-world}`, `tests/unit/evidence-boundaries.test.ts`, package tests (evidence canonical, consent access and projection, repositories S6, risk-cases documentation, tenancy organizations), `docs/EVIDENCE_STANDARD.md` (written). Modified: contracts (events, audit actions, verification attempt snapshot), repositories (evidence index, agreements, share ledger), risk-cases, tenancy (organizations, insurer actors), authz, action-orchestration case view, verification runner (device snapshots), api handler/html/server/edge types, local and dev runtime, root package.json, README, DECISIONS (D-047 to D-055), IMPLEMENTATION_STATE, and the six earlier test assertions listed in D-055.
 
 ## Commands executed
 
-`pnpm install`, `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm format:check`, `pnpm exec vitest run --reporter=json` (counts), `pnpm smoke:s2` to `smoke:s5`, a mutation script (below), grep audits (cloud SDK, AI, secrets, S6 vocabulary, co-author trailers), `git status/log/diff`.
+`pnpm install --offline`, `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm format:check` (prettier --write once), `pnpm exec vitest run --reporter=json` (counts), `pnpm smoke:s2` to `smoke:s6`, a mutation script (below), grep audits (cloud SDK, Gemini, secrets, co-author trailers), `git status/log/diff`.
 
 ## Exact test results
 
 - `pnpm lint`: exit 0. `pnpm typecheck`: exit 0. `pnpm format:check`: clean.
-- `pnpm test`: **43 test files, 666 tests, 666 passed, 0 failed** (S4 baseline was 37 files / 527 tests). New or notable: verification engine 63 (+6 validator), recurrence 10, intervention-prioritization 25, risk-lifecycle verification-flow 8, S5 integration 20 (V1 to V5, negatives, history, backup, API/tenancy), `verification-boundaries` 11, authz +1.
-- **Smoke: `smoke:s2` 9 PASS / 0 FAIL, `smoke:s3` 21 / 0, `smoke:s4` 31 / 0, `smoke:s5` 35 / 0** (all exit 0). `smoke:s5` covers steps 1 to 23 of the brief plus the negative paths (no telemetry, unhealthy device, abnormal evidence). Event order in the verified-then-recurrence run: `action.reported > verification.started > verification.completed > intervention.recommendation_updated > recurrence.detected > case.reopened > intervention.recommendation_updated`.
-- **Mutation checks (all detected, all restored):** (1) precedence bug letting insufficient required criteria through: 8 tests failed, but note it was initially NOT detected because the engine's validator backstop masked it, so a test now asserts the primary logic independently; with both layers broken (M1b) 27 failed; (2) action report may verify directly (ACTION_REPORTED to VERIFIED_IMPROVED in the case table): 4 failed; (3) authentication quality ignored: 3 failed; (4) missing required evidence turned into a pass: 2 failed; (5) recurrence creating a duplicate case instead of reopening: 2 failed.
-- Audits: no cloud SDK, Gemini or secrets in new code (only guard tests and older comments name them); no S6 vocabulary outside the guard test; dependency graph acyclic (asserted by test); no co-author trailers.
+- `pnpm test`: **52 test files, 796 tests, 796 passed, 0 failed** (S5 baseline 43 files / 666 tests). New: integration evidence 29, integration consent/insurer API/UI 25, evidence boundaries 16, consent access 20, consent projection 10, evidence canonical 11, repositories S6 8, risk-cases documentation 6, tenancy organizations 4, plus 1 added authz test.
+- **Smoke: `smoke:s2` 9 PASS / 0 FAIL, `smoke:s3` 21 / 0, `smoke:s4` 31 / 0, `smoke:s5` 35 / 0, `smoke:s6` 32 / 0** (all exit 0). `smoke:s6` covers steps 1 to 18 of the brief. Event order: `verification.completed > evidence.package_created > evidence.shareable > consent.granted > evidence.shared > consent.revoked`.
+- **Mutation checks (all detected, all restored; baseline 796/796 after):** M1 unresolved evidence ids allowed: 3 tests failed; M2 insurer read without consent: 22; M3 revoked consent keeps working: 9; M4 raw telemetry through an ordinary evidence scope: 2; M5 hashing ignores changed content: 21; M6 verify ignores a changed artifact hash: 1; M7 package upgrades the result: 5; M8 package alone marks SHARED: 2; M9 device snapshot not frozen: 41; M10 wrong recipient accepted: 2; M11 expired agreement stays active: 4; M12 unauditable read released (fail open): 1; M13 facility scope ignored: 1.
+- Audits: no cloud SDK, Gemini, Firebase, secrets or S7 code (only an interface comment names Cloud Storage); only workspace dependencies added; dependency graph acyclic (asserted by test); insurer HTTP handler reaches data only through the consent gateway (asserted); no co-author trailers.
 
-## Recurrence proof
+## Package hash behavior
 
-`smoke:s5` and `tests/integration/verification.test.ts`: after VERIFIED_IMPROVED, 12 normal samples keep the case verified; one isolated abnormal signal does not reopen; three persistent compound instants inside the 1 h watch window produce `recurrence.detected`, the same case id in REOPENED with `recurrenceCount` 1, a second RiskEvent (the first stays VERIFIED), one case total, an INITIAL alert for the new event, the prior verification untouched, and the intervention rising to RISK_ENGINEER_REVIEW. After 2 h the same hazard opens a second case instead.
+Same trusted records plus the same injected clock and ids produce byte-identical packages and hashes (tested across two runs). Changing one value in the payload, an artifact snapshot, an artifact hash, the manifest, the package id or dropping an artifact fails `verifyEvidencePackage`; a fully recomputed forgery is caught by the stored index. A historical package still verifies after the device registry, the case and the risk events change.
+
+## Consent and revocation proof
+
+`smoke:s6` and `tests/integration/consent.test.ts`: before consent the insurer is denied; after a scoped grant exactly the granted sections appear (each scope releases only its own section); raw telemetry, another facility, another insurer organization, an expired or not-yet-effective agreement and a missing scope are denied; revocation denies the next read at the same instant on every endpoint (`AGREEMENT_REVOKED`), keeps the agreement, the package, the hashes and the audit history, and moves the case to `REVOKED`; a second revoke is a 409 and cannot change `revokedAt`; one revoked agreement does not affect another.
+
+## Insurer-access proof
+
+Every gateway method requires `INSURANCE_EVIDENCE_READ` and re-evaluates the stored agreements at the current time with the actor's own organization as recipient (asserted statically and by tests); responses for unknown, uncovered and other-tenant cases are identical; every allowed and denied read is audited with actor, agreements and scopes; if the audit write fails nothing is released; a package failing integrity verification is withheld (500).
 
 ## Known issues
 
-- **Verification starts on the scheduler tick**, not immediately on `action.reported` (D-038). Without a tick nothing starts; `pnpm dev` ticks every `OPS_TICK_INTERVAL_MS` (10 s).
-- **No retry-without-action:** an INCONCLUSIVE case needs another reported action to verify again; the domain table allows `INCONCLUSIVE -> VERIFYING` but no command exists. Re-alerting a failed cycle (demo stage 5) is not implemented.
-- **Second action during `VERIFYING` is rejected** (409), and the window is not restarted.
-- **Asset bindings in policy:** backup and zone-temperature asset ids are in the verification policy (no asset-topology model yet).
-- **Evidence `DEVICE:<id>` is a live registry reference**, not a frozen health snapshot (S6 snapshots). Observation evidence includes excluded observations that explain an exclusion.
-- **Intervention triggers not wired:** `recommendation.overdue`, `telemetry.quality_changed`, `device.health_changed` do not exist as events yet. Insurer-side roles cannot read recommendations until S6 sharing.
-- **A VERIFIED_IMPROVED case with no verified record** (corrupt data only) would not match recurrence and a detection would open a new case.
-- **Dismissal then flapping** (S4) is unchanged.
-- **Atomicity** across repositories is by ordering (compute first, persist after), not a transaction; the in-memory stores cannot fail partway. A real store needs transactions (S9).
+- **No package signature:** hashes show change, not authorship; signing (`EVIDENCE_SIGNING_SECRET_NAME`) is later hardening. No PDF.
+- **`REVOKED` also means "expired"**: the four-value vocabulary cannot distinguish; the stored state catches up on the next tick (reads are enforced immediately).
+- **Packages are created on the bus cascade after verification:** a failure dead-letters and relies on the `tick()` retry (`createMissing`); an event-publish failure after the package is stored would not be redelivered (the in-memory bus cannot fail here; S9 needs an outbox or transaction).
+- **Consent grants are per organization and facility** (no per-case or per-package consent, no insurer-side organization hierarchy, no invitation flow).
+- **Insurer case facts are partly live:** `recommendation` and the current recurrence count come from the live case; everything else comes from the frozen package.
+- **Pre-agreement packages are releasable** once an agreement is active (the window governs access time).
+- Device snapshots exist only for attempts completed since S6; an older attempt without one cannot yield a package that cites a device (explicit failure).
+- S5 items still open: verification starts on the scheduler tick, no retry-without-action, intervention triggers `recommendation.overdue`/`telemetry.quality_changed`/`device.health_changed` not wired, atomicity by ordering rather than a transaction.
 - Local only: development identity, in-memory stores, `POST /ops/tick`, ConsoleEmail. Carried over: TypeScript pinned `~6.0`; Windows `process.exit()` crash avoided via `process.exitCode`.
 
 ## Architectural decisions made
 
-See `docs/DECISIONS.md` (D-001 to D-046; S5 is D-037 to D-046).
+See `docs/DECISIONS.md` (D-001 to D-055; S6 is D-047 to D-055).
 
 ## Current git status
 
-Clean after the S5 handoff commit; `main` pushed to `origin/main`. The follow-up docs commit updates only this file.
+Clean after the S6 handoff commit; `main` pushed to `origin/main`.
 
 ## Last known good commit SHA
 
-`61c5296b635cedf755ab1af9801e226ab176c85b` (S5 implementation, `feat(s5): implement physical verification and recurrence`). Check `git log` for the later handoff commit.
+Recorded in the follow-up docs commit (`docs(s6): record validated evidence handoff`); the implementation commit is `feat(s6): implement evidence and consent sharing` (check `git log`).
 
 ## Exact next task
 
-S6 — Evidence + consent (PROJECT_SPEC sections 19, 20, 35 stages 8 to 9, 45): immutable evidence package and manifest built from the existing evidence references (`VerificationAttempt.evidenceReferences`, `resolveEvidence`), consent gateway, sharing agreements, insurer evidence API (spec 43) and the `evidence.*` / `consent.*` events. Do not start until explicitly instructed. Suggested first slice: an evidence-package builder that consumes a completed `VERIFIED` attempt, snapshots each referenced record (including device health at verification time) with a SHA-256 manifest, stored through a repository interface, emitting `evidence.package_created` and setting `latestEvidencePackageId`, before any consent or sharing.
+S7 — Persona UI (PROJECT_SPEC sections 24, 25, 45): Operations Workspace, Risk Evidence Workspace, portfolio view and Trust Center, as the real Next.js `apps/web` (D-005), consuming the existing application and insurance APIs and the case-detail evidence and sharing sections; no new domain logic. Do not start until explicitly instructed. Suggested first slice: the Next.js shell with the development-identity switcher and the Operations case-detail page (all spec-25 sections including Evidence and Sharing) over `/api/v1`, then the insurer evidence workspace over `/insurance/v1`.
 
 ## Exact commands needed to resume
 
 ```
 git status && git log --oneline -10
 pnpm install && pnpm lint && pnpm typecheck && pnpm test && pnpm format:check
-pnpm smoke:s2 && pnpm smoke:s3 && pnpm smoke:s4 && pnpm smoke:s5
+pnpm smoke:s2 && pnpm smoke:s3 && pnpm smoke:s4 && pnpm smoke:s5 && pnpm smoke:s6
 ```
 
 ## Cloud resources touched
@@ -88,4 +93,4 @@ None
 
 ## Secrets referenced (NAME ONLY)
 
-None referenced in code. Placeholder names in `.env.example`: GCP_PROJECT_ID, GCP_REGION, FIREBASE_PROJECT_ID, DEVICE_KEY_SECRET_NAME, SMTP_SECRET_NAME, EVIDENCE_SIGNING_SECRET_NAME, EDGE_PORT, EDGE_BASE_URL, SIMULATOR_INTERVAL_MS, SIMULATOR_DEVICE_ID, SIMULATOR_KEY_ID, SIMULATOR_DEVICE_KEY_HEX, SIMULATOR_SCENARIO, OPS_TICK_INTERVAL_MS. The simulator default key is the public synthetic dev key from `@symbiosis/device-registry`; local actor ids are synthetic; no real device key, credential or email address exists in the repository.
+None referenced in code. Placeholder names in `.env.example`: GCP_PROJECT_ID, GCP_REGION, FIREBASE_PROJECT_ID, DEVICE_KEY_SECRET_NAME, SMTP_SECRET_NAME, EVIDENCE_SIGNING_SECRET_NAME, EDGE_PORT, EDGE_BASE_URL, SIMULATOR_INTERVAL_MS, SIMULATOR_DEVICE_ID, SIMULATOR_KEY_ID, SIMULATOR_DEVICE_KEY_HEX, SIMULATOR_SCENARIO, OPS_TICK_INTERVAL_MS. The simulator default key is the public synthetic dev key from `@symbiosis/device-registry`; local actor and organization ids are synthetic; no real device key, credential or email address exists in the repository.

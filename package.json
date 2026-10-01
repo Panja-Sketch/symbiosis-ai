@@ -17,7 +17,8 @@
     "smoke:s2": "tsx scripts/smoke-s2.ts",
     "smoke:s3": "tsx scripts/smoke-s3.ts",
     "smoke:s4": "tsx scripts/smoke-s4.ts",
-    "smoke:s5": "tsx scripts/smoke-s5.ts"
+    "smoke:s5": "tsx scripts/smoke-s5.ts",
+    "smoke:s6": "tsx scripts/smoke-s6.ts"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",
@@ -29,12 +30,14 @@
     "@symbiosis/authz": "workspace:*",
     "@symbiosis/baselines": "workspace:*",
     "@symbiosis/clock": "workspace:*",
+    "@symbiosis/consent": "workspace:*",
     "@symbiosis/contracts": "workspace:*",
     "@symbiosis/data-quality": "workspace:*",
     "@symbiosis/device-registry": "workspace:*",
     "@symbiosis/edge-security": "workspace:*",
     "@symbiosis/escalation": "workspace:*",
     "@symbiosis/event-bus": "workspace:*",
+    "@symbiosis/evidence": "workspace:*",
     "@symbiosis/intervention-prioritization": "workspace:*",
     "@symbiosis/normalization": "workspace:*",
     "@symbiosis/notifications": "workspace:*",

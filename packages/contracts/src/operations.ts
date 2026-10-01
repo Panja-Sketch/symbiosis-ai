@@ -90,6 +90,14 @@ export const AUDIT_ACTIONS = [
   "INTERVENTION_RECOMMENDED",
   "INTERVENTION_ACKNOWLEDGED",
   "INTERVENTION_RESOLVED",
+  "EVIDENCE_PACKAGE_CREATED",
+  "EVIDENCE_PACKAGE_READ",
+  "SHARING_AGREEMENT_CREATED",
+  "SHARING_AGREEMENT_REVOKED",
+  "EVIDENCE_SHARED",
+  "SHARING_STATE_CHANGED",
+  "INSURER_EVIDENCE_READ",
+  "INSURER_ACCESS_DENIED",
 ] as const;
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
 
@@ -105,7 +113,15 @@ export type AuditEntry = {
   readonly actorId: string;
   readonly actorType: "USER" | "SYSTEM";
   readonly action: AuditAction;
-  readonly targetType: "CASE" | "RISK_EVENT" | "ACTION" | "ALERT" | "VERIFICATION" | "INTERVENTION";
+  readonly targetType:
+    | "CASE"
+    | "RISK_EVENT"
+    | "ACTION"
+    | "ALERT"
+    | "VERIFICATION"
+    | "INTERVENTION"
+    | "EVIDENCE_PACKAGE"
+    | "SHARING_AGREEMENT";
   readonly targetId: string;
   readonly beforeState?: string;
   readonly afterState?: string;

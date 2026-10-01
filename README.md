@@ -7,8 +7,8 @@ architecture (single source of truth).
 ## Status
 
 Phases **S0** (foundation), **S1** (domain core), **S2** (local ingestion), **S3** (detection +
-baselines), **S4** (operations workflow) and **S5** (verification + recurrence + intervention
-prioritization) are complete. A simulated device is authenticated, normalized and assessed; a
+baselines), **S4** (operations workflow), **S5** (verification + recurrence + intervention
+prioritization) and **S6** (evidence + consent) are complete. A simulated device is authenticated, normalized and assessed; a
 deterministic rule detects persistent compound deterioration and opens a Risk Improvement Case; an
 alert goes out through a local notification port (ConsoleEmail); a person acknowledges, an approved
 action is assigned and reported, and the case waits as **VERIFICATION PENDING**. A reported action
@@ -17,8 +17,12 @@ post-action sensor readings (versioned policy in `config/verification-policy/`) 
 `VERIFIED`, `PARTIALLY_VERIFIED`, `NOT_IMPROVING` or `INCONCLUSIVE`, history is kept, and if the
 same hazard returns inside the recurrence-watch window the **same** case is `REOPENED`. A
 deterministic, versioned risk-engineer intervention recommendation (decision support only) is
-recalculated on material events. The system deliberately stops there: **no evidence package,
-consent, final UI, AI or cloud integration yet.** Progress is tracked in
+recalculated on material events. Every completed verification now produces an **immutable
+evidence package** (canonical JSON, SHA-256 manifest, frozen device facts, explicit
+synthetic-data label) that preserves its actual result; the insured controls what an insurer
+sees through scoped, revocable **sharing agreements**, raw telemetry is off by default, and
+every insurer read is authorization-checked and audited. The system deliberately stops there:
+**no final UI (S7), AI (S8) or cloud integration (S9) yet.** Progress is tracked in
 [docs/IMPLEMENTATION_STATE.md](docs/IMPLEMENTATION_STATE.md).
 
 ## Layout
@@ -39,7 +43,7 @@ pnpm test
 pnpm format:check
 ```
 
-## Running locally (S2-S4)
+## Running locally (S2-S6)
 
 ```
 pnpm dev          # api + worker (one process, in-memory bus) and the simulator
@@ -47,6 +51,7 @@ pnpm smoke:s2     # self-checking ingestion run over real HTTP, exits non-zero o
 pnpm smoke:s3     # baseline -> isolated anomalies -> compound deterioration -> one case
 pnpm smoke:s4     # detected -> alert -> acknowledge -> assign -> report -> VERIFICATION PENDING
 pnpm smoke:s5     # ... -> trusted post-action data -> VERIFIED -> hazard returns -> same case REOPENED
+pnpm smoke:s6     # ... VERIFIED -> evidence package + hashes -> SHAREABLE -> consent -> insurer read -> revoke
 ```
 
 `pnpm dev` listens on `http://127.0.0.1:8787` (override with `EDGE_PORT`) and prints each
@@ -110,3 +115,31 @@ result with criteria, before/after values, completeness, confidence and evidence
 recommendation (Remote Monitoring, Remote Review, Risk Engineer Review, Site Visit Recommended). A
 recommendation is decision support only: it schedules nobody and changes no underwriting, premium
 or coverage.
+
+### Evidence and consent (S6)
+
+A completed verification (any result) is turned into an immutable evidence package by the
+worker (`evidence.package_created`, case `latestEvidencePackageId`, then `evidence.shareable`);
+the case is then `SHAREABLE`, **never** `SHARED` merely because a package exists. The format,
+canonical serialization, hashes and snapshot rules are in
+[docs/EVIDENCE_STANDARD.md](docs/EVIDENCE_STANDARD.md). Try it with `pnpm dev`:
+
+- Insured side (development identity `USR-FACILITY-MGR-001`; `USR-ORG-ADMIN-001` may also grant raw
+  telemetry): `GET /api/v1/evidence/:id`, `POST /api/v1/sharing-agreements`
+  (`{recipientOrganizationId, facilityIds, scopes, effectiveFrom?, expiresAt?}`),
+  `POST /api/v1/sharing-agreements/:id/revoke`, plus `GET /api/v1/sharing-agreements[/:id]`. The
+  case page `/ui/cases/:id?actor=USR-FACILITY-MGR-001` shows the latest package (id, result,
+  policy, time, hashes with a live hash check, synthetic label), the sharing state, and grant and
+  revoke forms.
+- Insurer side (`USR-RISK-ENGINEER-001`, `USR-UNDERWRITER-001`; recipient organization
+  `ORG-INS-001`): `GET /insurance/v1/sites`, `/sites/:id/cases`, `/cases/:id`,
+  `/cases/:id/evidence` (add `?include=raw_telemetry` only with an explicit `RAW_TELEMETRY` scope),
+  `/recommendations`, `/interventions`; page `/ui/insurer/cases?actor=USR-RISK-ENGINEER-001`.
+  Every result is consent-filtered and audited; there is no sensor dashboard.
+
+Scopes: `RECOMMENDATION`, `EVENT_SUMMARY`, `ACTION_SUMMARY`, `BEFORE_AFTER_METRICS`,
+`VERIFICATION_RESULT`, `VERIFICATION_CONFIDENCE`, `RECURRENCE_STATUS`, `EVIDENCE_ARTIFACTS`,
+`INTERVENTION_RECOMMENDATION`, and the separate, off-by-default `RAW_TELEMETRY`. A revoked,
+expired or not-yet-effective agreement, another recipient, another facility or a missing scope
+is denied on the very next read. Everything is synthetic and local (in-memory stores and object
+store); no cloud service is used.

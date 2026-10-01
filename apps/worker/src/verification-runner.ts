@@ -2,6 +2,7 @@ import type {
   AuditEntry,
   Baseline,
   CriterionResult,
+  DeviceFactSnapshot,
   DomainError,
   EvidenceReference,
   MitigationAction,
@@ -96,16 +97,37 @@ const laterIso = (...isos: string[]) =>
 export function createVerificationRunner(deps: VerificationRunnerDeps): VerificationRunner {
   const { policy } = deps;
 
-  async function deviceFacts(c: RiskImprovementCase): Promise<DeviceFact[]> {
+  /**
+   * The device facts the engine is given, plus a frozen copy of them. The copy is stored on the
+   * completed attempt so evidence built later describes the devices as they were at verification
+   * time, not as the live registry happens to look then (S6 snapshot semantics).
+   */
+  async function deviceFacts(
+    c: RiskImprovementCase,
+    capturedAt: string,
+  ): Promise<{ facts: DeviceFact[]; snapshots: DeviceFactSnapshot[] }> {
     const devices = await deps.registry.listForFacility(c.organizationId, c.facilityId);
-    return devices.map((d) => ({
-      deviceId: d.deviceId,
-      organizationId: d.organizationId,
-      facilityId: d.facilityId,
-      status: d.status,
-      health: d.health,
-      assetIds: deviceAssetIds(d),
-    }));
+    return {
+      facts: devices.map((d) => ({
+        deviceId: d.deviceId,
+        organizationId: d.organizationId,
+        facilityId: d.facilityId,
+        status: d.status,
+        health: d.health,
+        assetIds: deviceAssetIds(d),
+      })),
+      snapshots: devices.map((d) => ({
+        deviceId: d.deviceId,
+        organizationId: d.organizationId,
+        facilityId: d.facilityId,
+        status: d.status,
+        health: d.health,
+        assetIds: [...deviceAssetIds(d)],
+        ...(d.firmwareVersion !== undefined && { firmwareVersion: d.firmwareVersion }),
+        ...(d.lastSeenAt !== undefined && { lastSeenAt: d.lastSeenAt }),
+        capturedAt,
+      })),
+    };
   }
 
   const startedBase = (
@@ -375,6 +397,7 @@ export function createVerificationRunner(deps: VerificationRunnerDeps): Verifica
 
         let evaluated: ReturnType<typeof evaluateVerification> | undefined;
         let processingError: string | undefined;
+        let deviceSnapshots: DeviceFactSnapshot[] = [];
         try {
           const lookbackMs = policy.reference.preActionLookbackSeconds * 1000;
           const observations = await deps.observations.listForWindow({
@@ -384,6 +407,8 @@ export function createVerificationRunner(deps: VerificationRunnerDeps): Verifica
             fromIso: new Date(Date.parse(reportedAt) - lookbackMs).toISOString(),
             toIso: attempt.postActionWindow.end,
           });
+          const devices = await deviceFacts(c, now);
+          deviceSnapshots = devices.snapshots;
           evaluated = evaluateVerification({
             verificationId: attempt.verificationId,
             policy,
@@ -397,7 +422,7 @@ export function createVerificationRunner(deps: VerificationRunnerDeps): Verifica
             observations,
             snapshotBaselines: await snapshotBaselines(c),
             activeBaselines: [...(await deps.baselines.listActive(c.organizationId, c.facilityId))],
-            devices: await deviceFacts(c),
+            devices: devices.facts,
             auditEvidenceIds,
           });
         } catch (error) {
@@ -446,6 +471,7 @@ export function createVerificationRunner(deps: VerificationRunnerDeps): Verifica
           evaluatedAt: assessment.evaluatedAt,
           assessment,
           evidenceReferences,
+          deviceSnapshots,
           ...(recurrenceWatchEndsAt !== undefined &&
             assessment.result === "VERIFIED" && { recurrenceWatchEndsAt }),
         };
@@ -580,8 +606,17 @@ export async function resolveEvidence(
         );
         break;
       case "DEVICE": {
-        const device = await deps.registry.get(ref.id.replace(/^DEVICE:/, ""));
-        exists = device !== undefined && device.organizationId === org;
+        // The frozen copy taken at verification time wins; the live registry is only a fallback
+        // for attempts completed before snapshots existed.
+        const deviceId = ref.id.replace(/^DEVICE:/, "");
+        if (attempt.deviceSnapshots !== undefined) {
+          exists = attempt.deviceSnapshots.some(
+            (d) => d.deviceId === deviceId && d.organizationId === org,
+          );
+        } else {
+          const device = await deps.registry.get(deviceId);
+          exists = device !== undefined && device.organizationId === org;
+        }
         break;
       }
     }

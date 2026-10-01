@@ -4,5 +4,17 @@
   "private": true,
   "type": "module",
   "main": "src/index.ts",
-  "types": "src/index.ts"
+  "types": "src/index.ts",
+  "dependencies": {
+    "@symbiosis/audit": "workspace:*",
+    "@symbiosis/authz": "workspace:*",
+    "@symbiosis/clock": "workspace:*",
+    "@symbiosis/contracts": "workspace:*",
+    "@symbiosis/event-bus": "workspace:*",
+    "@symbiosis/evidence": "workspace:*",
+    "@symbiosis/repositories": "workspace:*",
+    "@symbiosis/risk-cases": "workspace:*",
+    "@symbiosis/tenancy": "workspace:*",
+    "@symbiosis/verification": "workspace:*"
+  }
 }

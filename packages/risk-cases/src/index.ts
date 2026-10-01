@@ -13,6 +13,7 @@ import type {
   CaseSeverity,
   CaseState,
   DomainError,
+  SharingState,
   IsoTimestamp,
   Result,
   RiskImprovementCase,
@@ -111,6 +112,9 @@ export function checkCaseInvariants(c: RiskImprovementCase): string[] {
   }
   if (VERIFICATION_BACKED.includes(c.state) && !isNonEmptyString(c.latestVerificationId)) {
     issues.push(`${c.state} requires latestVerificationId`);
+  }
+  if (c.sharingState !== "NOT_SHARED" && !isNonEmptyString(c.latestEvidencePackageId)) {
+    issues.push(`${c.sharingState} requires latestEvidencePackageId`);
   }
   if (c.state === "REOPENED" && c.recurrenceCount < 1) {
     issues.push("REOPENED requires recurrenceCount >= 1");
@@ -418,4 +422,37 @@ function recordDetection(
       at: command.at,
     },
   });
+}
+
+/**
+ * Documentation commands (S6). They record that an evidence package exists or how it is shared.
+ * They are deliberately NOT lifecycle transitions: the physical-risk state, severity, event,
+ * verification reference and `updatedAt` are all preserved, because creating or sharing evidence
+ * is not a change in the physical risk (and `updatedAt` feeds the recurrence-watch display).
+ */
+export type CaseDocumentationCommand =
+  | { readonly type: "RECORD_EVIDENCE_PACKAGE"; readonly evidencePackageId: string }
+  | { readonly type: "SET_SHARING_STATE"; readonly sharingState: SharingState };
+
+export function applyCaseDocumentation(
+  c: RiskImprovementCase,
+  command: CaseDocumentationCommand,
+): Result<RiskImprovementCase, DomainError> {
+  let next: RiskImprovementCase;
+  switch (command.type) {
+    case "RECORD_EVIDENCE_PACKAGE":
+      if (!isNonEmptyString(command.evidencePackageId)) {
+        return err(invalid("evidencePackageId is required"));
+      }
+      next = { ...c, latestEvidencePackageId: command.evidencePackageId };
+      break;
+    case "SET_SHARING_STATE":
+      if (!SHARING_STATES.includes(command.sharingState)) {
+        return err(invalid("sharingState is not allowed"));
+      }
+      next = { ...c, sharingState: command.sharingState };
+      break;
+  }
+  const valid = validateRiskImprovementCase(next);
+  return valid.ok ? ok(Object.freeze(next)) : valid;
 }

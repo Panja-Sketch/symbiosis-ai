@@ -276,7 +276,7 @@ describe("full operations workflow over HTTP", () => {
     }
     expect(page.text).toContain("VERIFICATION PENDING");
     expect(page.text).toContain("ACTION_REPORTED");
-    expect(page.text).toContain("Not available until S6");
+    expect(page.text).toContain("NOT SHARED");
     expect(page.text).not.toMatch(/VERIFIED/i);
     expect(page.text).not.toContain("<script>alert(1)</script>");
     expect(page.text).toContain("&lt;script&gt;");

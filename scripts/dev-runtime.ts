@@ -29,6 +29,11 @@ for (const type of [
   "recurrence.detected.v1",
   "case.reopened.v1",
   "intervention.recommendation_updated.v1",
+  "evidence.package_created.v1",
+  "evidence.shareable.v1",
+  "consent.granted.v1",
+  "consent.revoked.v1",
+  "evidence.shared.v1",
 ] as const) {
   runtime.bus.subscribe(type, (event) => {
     console.log(`[bus] ${event.event_type} ${event.event_id} corr=${event.correlation_id}`);

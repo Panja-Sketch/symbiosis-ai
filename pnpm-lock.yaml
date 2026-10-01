@@ -193,6 +193,9 @@ importers:
       '@symbiosis/clock':
         specifier: workspace:*
         version: link:packages/clock
+      '@symbiosis/consent':
+        specifier: workspace:*
+        version: link:packages/consent
       '@symbiosis/contracts':
         specifier: workspace:*
         version: link:packages/contracts
@@ -211,6 +214,9 @@ importers:
       '@symbiosis/event-bus':
         specifier: workspace:*
         version: link:packages/event-bus
+      '@symbiosis/evidence':
+        specifier: workspace:*
+        version: link:packages/evidence
       '@symbiosis/intervention-prioritization':
         specifier: workspace:*
         version: link:packages/intervention-prioritization
@@ -302,6 +308,9 @@ importers:
       '@symbiosis/clock':
         specifier: workspace:*
         version: link:../../packages/clock
+      '@symbiosis/consent':
+        specifier: workspace:*
+        version: link:../../packages/consent
       '@symbiosis/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
@@ -314,12 +323,18 @@ importers:
       '@symbiosis/event-bus':
         specifier: workspace:*
         version: link:../../packages/event-bus
+      '@symbiosis/evidence':
+        specifier: workspace:*
+        version: link:../../packages/evidence
       '@symbiosis/intervention-prioritization':
         specifier: workspace:*
         version: link:../../packages/intervention-prioritization
       '@symbiosis/tenancy':
         specifier: workspace:*
         version: link:../../packages/tenancy
+      '@symbiosis/verification':
+        specifier: workspace:*
+        version: link:../../packages/verification
 
   apps/simulator:
     dependencies:
@@ -438,7 +453,38 @@ importers:
 
   packages/clock: {}
 
-  packages/consent: {}
+  packages/consent:
+    dependencies:
+      '@symbiosis/audit':
+        specifier: workspace:*
+        version: link:../audit
+      '@symbiosis/authz':
+        specifier: workspace:*
+        version: link:../authz
+      '@symbiosis/clock':
+        specifier: workspace:*
+        version: link:../clock
+      '@symbiosis/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@symbiosis/event-bus':
+        specifier: workspace:*
+        version: link:../event-bus
+      '@symbiosis/evidence':
+        specifier: workspace:*
+        version: link:../evidence
+      '@symbiosis/repositories':
+        specifier: workspace:*
+        version: link:../repositories
+      '@symbiosis/risk-cases':
+        specifier: workspace:*
+        version: link:../risk-cases
+      '@symbiosis/tenancy':
+        specifier: workspace:*
+        version: link:../tenancy
+      '@symbiosis/verification':
+        specifier: workspace:*
+        version: link:../verification
 
   packages/contracts: {}
 
@@ -496,7 +542,32 @@ importers:
         specifier: workspace:*
         version: link:../contracts
 
-  packages/evidence: {}
+  packages/evidence:
+    dependencies:
+      '@symbiosis/audit':
+        specifier: workspace:*
+        version: link:../audit
+      '@symbiosis/authz':
+        specifier: workspace:*
+        version: link:../authz
+      '@symbiosis/clock':
+        specifier: workspace:*
+        version: link:../clock
+      '@symbiosis/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@symbiosis/event-bus':
+        specifier: workspace:*
+        version: link:../event-bus
+      '@symbiosis/repositories':
+        specifier: workspace:*
+        version: link:../repositories
+      '@symbiosis/risk-cases':
+        specifier: workspace:*
+        version: link:../risk-cases
+      '@symbiosis/tenancy':
+        specifier: workspace:*
+        version: link:../tenancy
 
   packages/intervention-prioritization:
     dependencies:

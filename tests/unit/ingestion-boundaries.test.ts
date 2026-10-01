@@ -54,19 +54,23 @@ describe("hardware independence (spec principle 7)", () => {
 describe("S4 stays within scope", () => {
   const all = [...sources("packages"), ...sources("apps"), ...sources("adapters")];
 
-  it("defines the S5 events and still no evidence, consent or sharing events (S6+)", () => {
+  it("defines the S5 and S6 events and no sharing.* or UI-specific events (S7+)", () => {
     const text = readFileSync(join(root, "packages/contracts/src/events.ts"), "utf8");
     const union = text.slice(
       text.indexOf("export type PlatformEvent ="),
       text.indexOf("export type PlatformEventType"),
     );
     // 19 S2-S4 events + verification.started/completed, recurrence.detected, case.reopened,
-    // intervention.recommendation_updated
-    expect(union.match(/^\s*\| /gm)).toHaveLength(24);
+    // intervention.recommendation_updated (S5) + evidence.package_created, evidence.shareable,
+    // consent.granted, consent.revoked, evidence.shared (S6)
+    expect(union.match(/^\s*\| /gm)).toHaveLength(29);
     expect(text).toMatch(/"verification\.started\.v1"/);
     expect(text).toMatch(/"verification\.completed\.v1"/);
     expect(text).toMatch(/"recurrence\.detected\.v1"/);
-    expect(text).not.toMatch(/"(evidence|consent|sharing)[._]/i);
+    expect(text).toMatch(/"evidence\.package_created\.v1"/);
+    expect(text).toMatch(/"consent\.granted\.v1"/);
+    expect(text).not.toMatch(/"sharing[._]/i);
+    expect(text).not.toMatch(/"(ui|workspace|portfolio)[._]/i);
     expect(text).not.toMatch(/"risk\.(verif|recurr)/i);
   });
 

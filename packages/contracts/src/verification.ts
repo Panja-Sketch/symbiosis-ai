@@ -97,6 +97,23 @@ export type EvidenceKind = (typeof EVIDENCE_KINDS)[number];
 /** A typed pointer to a record that really exists; S6 will assemble these into packages. */
 export type EvidenceReference = { readonly id: string; readonly kind: EvidenceKind };
 
+/**
+ * Device facts as they were when the verification was evaluated (a frozen copy of what the
+ * engine was given), so a later change to the live registry cannot rewrite history (S6).
+ * Holds no key material.
+ */
+export type DeviceFactSnapshot = {
+  readonly deviceId: string;
+  readonly organizationId: string;
+  readonly facilityId: string;
+  readonly status: string;
+  readonly health: string;
+  readonly assetIds: readonly string[];
+  readonly firmwareVersion?: string;
+  readonly lastSeenAt?: IsoTimestamp;
+  readonly capturedAt: IsoTimestamp;
+};
+
 export const VERIFICATION_STATUSES = ["IN_PROGRESS", "COMPLETED"] as const;
 export type VerificationStatus = (typeof VERIFICATION_STATUSES)[number];
 
@@ -133,6 +150,8 @@ export type VerificationAttempt = {
   readonly evaluatedAt?: IsoTimestamp;
   readonly assessment?: VerificationAssessment;
   readonly evidenceReferences?: readonly EvidenceReference[];
+  /** Device facts used at evaluation time; present on every attempt completed since S6. */
+  readonly deviceSnapshots?: readonly DeviceFactSnapshot[];
   /** Set when the result is VERIFIED: the hazard returning before this is a recurrence. */
   readonly recurrenceWatchEndsAt?: IsoTimestamp;
 };

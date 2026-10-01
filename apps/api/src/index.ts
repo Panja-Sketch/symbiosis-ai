@@ -8,5 +8,6 @@ export const RESOLVED_CONTRACTS_PHASE = CONTRACTS_SCAFFOLD_PHASE;
 
 export * from "./edge-handler";
 export * from "./app-handler";
+export * from "./insurance-handler";
 export * from "./html";
 export * from "./server";

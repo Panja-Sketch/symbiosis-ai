@@ -13,6 +13,12 @@ export const PERMISSIONS = [
   "OPS_TICK",
   "INTERVENTION_READ",
   "INTERVENTION_ACKNOWLEDGE",
+  "EVIDENCE_READ",
+  "SHARING_MANAGE",
+  /** Granting RAW_TELEMETRY is a separate, stronger permission (S6, D-049). */
+  "SHARING_GRANT_RAW_TELEMETRY",
+  /** Insurer-side read of consent-filtered evidence. Never an operations permission. */
+  "INSURANCE_EVIDENCE_READ",
 ] as const;
 export type Permission = (typeof PERMISSIONS)[number];
 
@@ -22,7 +28,7 @@ export type Permission = (typeof PERMISSIONS)[number];
  * local directory, and real enforcement with Firebase identity arrives in S9/S11.
  */
 const ROLE_PERMISSIONS: Readonly<Record<Role, readonly Permission[]>> = {
-  ORG_ADMIN: [...PERMISSIONS],
+  ORG_ADMIN: PERMISSIONS.filter((p) => p !== "INSURANCE_EVIDENCE_READ"),
   FACILITY_MANAGER: [
     "CASE_READ",
     "CASE_ACKNOWLEDGE",
@@ -32,13 +38,16 @@ const ROLE_PERMISSIONS: Readonly<Record<Role, readonly Permission[]>> = {
     "RISK_DISMISS",
     "INTERVENTION_READ",
     "INTERVENTION_ACKNOWLEDGE",
+    "EVIDENCE_READ",
+    "SHARING_MANAGE",
   ],
   OPERATOR: ["CASE_READ", "CASE_ACKNOWLEDGE", "ACTION_ACKNOWLEDGE", "ACTION_REPORT"],
-  READ_ONLY_AUDITOR: ["CASE_READ", "INTERVENTION_READ"],
-  // Insurer-side roles never act on the operations workflow (spec 2.2/2.3).
-  RISK_ENGINEER: [],
-  UNDERWRITER: [],
-  BROKER_RISK_MANAGER: [],
+  READ_ONLY_AUDITOR: ["CASE_READ", "INTERVENTION_READ", "EVIDENCE_READ"],
+  // Insurer-side roles never act on the operations workflow (spec 2.2/2.3); they only read the
+  // consent-filtered evidence API.
+  RISK_ENGINEER: ["INSURANCE_EVIDENCE_READ"],
+  UNDERWRITER: ["INSURANCE_EVIDENCE_READ"],
+  BROKER_RISK_MANAGER: ["INSURANCE_EVIDENCE_READ"],
 };
 
 export function permissionsFor(roles: readonly Role[]): readonly Permission[] {

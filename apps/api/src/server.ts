@@ -45,7 +45,7 @@ export function createEdgeServer(handler: EdgeHandler): Server {
       })
         .then((out) => {
           if (out.contentType !== undefined && typeof out.body === "string") {
-            res.writeHead(out.status, { "Content-Type": out.contentType });
+            res.writeHead(out.status, { "Content-Type": out.contentType, ...out.headers });
             res.end(out.body);
           } else {
             res.writeHead(out.status, { "Content-Type": "application/json" });

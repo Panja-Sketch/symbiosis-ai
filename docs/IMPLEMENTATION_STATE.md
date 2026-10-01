@@ -10,7 +10,7 @@ Allowed status: NOT_STARTED | IN_PROGRESS | BLOCKED | COMPLETE
 | S3    | Detection + baselines                                   | COMPLETE    |
 | S4    | Operations workflow                                     | COMPLETE    |
 | S5    | Verification + recurrence + intervention prioritization | COMPLETE    |
-| S6    | Evidence + consent                                      | NOT_STARTED |
+| S6    | Evidence + consent                                      | COMPLETE    |
 | S7    | Persona UI                                              | NOT_STARTED |
 | S8    | Gemini                                                  | NOT_STARTED |
 | S9    | GCP adapters                                            | NOT_STARTED |
