@@ -1,2 +1,105 @@
 export const PACKAGE_NAME = "@symbiosis/tenancy" as const;
 export const SCAFFOLD_PHASE = "S0" as const;
+
+export const ROLES = [
+  "ORG_ADMIN",
+  "FACILITY_MANAGER",
+  "OPERATOR",
+  "RISK_ENGINEER",
+  "UNDERWRITER",
+  "BROKER_RISK_MANAGER",
+  "READ_ONLY_AUDITOR",
+] as const;
+export type Role = (typeof ROLES)[number];
+
+/**
+ * Who is acting, and inside which tenant. The organization and facilities come from the
+ * server-side directory, never from request input, so a caller cannot widen their own scope.
+ * `facilityIds` of "ALL" means every facility of the organization.
+ */
+export type ActorContext = {
+  readonly actorId: string;
+  readonly organizationId: string;
+  readonly facilityIds: readonly string[] | "ALL";
+  readonly roles: readonly Role[];
+};
+
+export function canAccessFacility(actor: ActorContext, facilityId: string): boolean {
+  return actor.facilityIds === "ALL" || actor.facilityIds.includes(facilityId);
+}
+
+/**
+ * Actor/membership lookup. Local mode uses the synthetic in-memory directory below; Firebase
+ * Auth + organization membership (S9) will implement the same interface.
+ */
+export interface ActorDirectory {
+  get(actorId: string): Promise<ActorContext | undefined>;
+  /** First actor holding `role` for the facility within the organization, if any. */
+  findByRole(
+    organizationId: string,
+    facilityId: string,
+    role: Role,
+  ): Promise<ActorContext | undefined>;
+}
+
+export class InMemoryActorDirectory implements ActorDirectory {
+  private readonly actors = new Map<string, ActorContext>();
+
+  constructor(actors: readonly ActorContext[] = []) {
+    for (const a of actors) this.actors.set(a.actorId, a);
+  }
+
+  async get(actorId: string): Promise<ActorContext | undefined> {
+    return this.actors.get(actorId);
+  }
+
+  async findByRole(organizationId: string, facilityId: string, role: Role) {
+    return [...this.actors.values()].find(
+      (a) =>
+        a.organizationId === organizationId &&
+        a.roles.includes(role) &&
+        canAccessFacility(a, facilityId),
+    );
+  }
+}
+
+/**
+ * SYNTHETIC LOCAL ACTORS ONLY. These IDs map to no real person, mailbox or credential.
+ * Production identity is Firebase Authentication / Identity Platform (S9).
+ */
+export const SYNTHETIC_ACTORS: readonly ActorContext[] = [
+  {
+    actorId: "USR-FACILITY-MGR-001",
+    organizationId: "ORG-SIM-001",
+    facilityIds: ["FAC-SIM-001"],
+    roles: ["FACILITY_MANAGER"],
+  },
+  {
+    actorId: "USR-OPERATOR-001",
+    organizationId: "ORG-SIM-001",
+    facilityIds: ["FAC-SIM-001"],
+    roles: ["OPERATOR"],
+  },
+  {
+    actorId: "USR-ORG-ADMIN-001",
+    organizationId: "ORG-SIM-001",
+    facilityIds: "ALL",
+    roles: ["ORG_ADMIN"],
+  },
+  {
+    actorId: "USR-AUDITOR-001",
+    organizationId: "ORG-SIM-001",
+    facilityIds: "ALL",
+    roles: ["READ_ONLY_AUDITOR"],
+  },
+  {
+    actorId: "USR-OTHER-ORG-MGR-001",
+    organizationId: "ORG-SIM-002",
+    facilityIds: ["FAC-OTHER-001"],
+    roles: ["FACILITY_MANAGER"],
+  },
+];
+
+export function createSyntheticActorDirectory(): InMemoryActorDirectory {
+  return new InMemoryActorDirectory(SYNTHETIC_ACTORS);
+}

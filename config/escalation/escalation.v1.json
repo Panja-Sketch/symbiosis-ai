@@ -1,0 +1,16 @@
+{
+  "version": "escalation.v1",
+  "alert": {
+    "channel": "CONSOLE_EMAIL",
+    "initialRecipientRole": "FACILITY_MANAGER",
+    "escalationRecipientRole": "ORG_ADMIN",
+    "maxDeliveryAttempts": 3,
+    "retryIntervalSeconds": 60
+  },
+  "acknowledgementDeadlineSeconds": {
+    "LOW": 3600,
+    "MODERATE": 900,
+    "HIGH": 300,
+    "CRITICAL": 120
+  }
+}

@@ -1,4 +1,5 @@
 import type { CaseSeverity, CaseState } from "./case";
+import type { Alert, AlertKind, NotificationChannel, NotificationResult } from "./operations";
 import type { ObservationEvaluation, RiskDetection } from "./risk";
 import type { UnassessedObservation, CanonicalObservation, CanonicalSignal } from "./canonical";
 import type { AssetMapping, DeviceHealth, EdgeTelemetryPayload } from "./edge";
@@ -101,14 +102,116 @@ export type CaseCreatedPayload = {
   readonly baselineSnapshotId: string;
 };
 
+export const CASE_CHANGES = [
+  "DETECTION_CONTINUED",
+  "ACTION_REQUIRED",
+  "ACTION_REPORTED",
+  "CASE_CLOSED",
+] as const;
+export type CaseChange = (typeof CASE_CHANGES)[number];
+
 export type CaseUpdatedPayload = {
   readonly caseId: string;
   readonly riskEventId: string;
-  readonly detectionId: string;
-  readonly change: "DETECTION_CONTINUED";
+  readonly change: CaseChange;
+  readonly state: CaseState;
+  readonly previousState: CaseState;
   readonly severity: CaseSeverity;
   readonly previousSeverity: CaseSeverity;
-  readonly state: CaseState;
+  readonly detectionId?: string;
+  readonly actionId?: string;
+};
+
+/** Deterministic alert facts; carries no raw telemetry and no generated language. */
+export type AlertRequestedPayload = Omit<
+  Alert,
+  "attempts" | "status" | "exhausted" | "nextRetryAt" | "sentAt"
+>;
+
+export type NotificationRequestedPayload = {
+  readonly notificationId: string;
+  readonly alertId: string;
+  readonly alertKind: AlertKind;
+  readonly caseId: string;
+  readonly riskEventId: string;
+  readonly channel: NotificationChannel;
+  readonly recipientRef: string;
+  readonly subject: string;
+  readonly attempt: number;
+  readonly requestedAt: IsoTimestamp;
+};
+
+export type NotificationOutcomePayload = {
+  readonly alertId: string;
+  readonly alertKind: AlertKind;
+  readonly caseId: string;
+  readonly riskEventId: string;
+  readonly attempt: number;
+  readonly result: NotificationResult;
+  /** Set when a failed attempt will be retried. */
+  readonly nextRetryAt?: IsoTimestamp;
+};
+
+export type RiskAlertedPayload = {
+  readonly alertId: string;
+  readonly caseId: string;
+  readonly riskEventId: string;
+  readonly alertedAt: IsoTimestamp;
+};
+
+export type RiskAcknowledgedPayload = {
+  readonly caseId: string;
+  readonly riskEventId: string;
+  readonly actorId: string;
+  readonly acknowledgedAt: IsoTimestamp;
+  readonly note?: string;
+};
+
+export type RiskEscalatedPayload = {
+  readonly caseId: string;
+  readonly riskEventId: string;
+  readonly escalatedAt: IsoTimestamp;
+  readonly reason: "ACKNOWLEDGEMENT_OVERDUE" | "ALERT_DELIVERY_EXHAUSTED";
+  readonly acknowledgementDeadlineSeconds: number;
+  readonly previousState: "ALERTED" | "DETECTED";
+};
+
+export type RiskDismissedPayload = {
+  readonly caseId: string;
+  readonly riskEventId: string;
+  readonly actorId: string;
+  readonly dismissedAt: IsoTimestamp;
+  readonly reason: string;
+};
+
+export type ActionAssignedPayload = {
+  readonly actionId: string;
+  readonly caseId: string;
+  readonly riskEventId: string;
+  readonly actionLibraryId: string;
+  readonly actionLibraryVersion: string;
+  readonly assignedTo: string;
+  readonly assignedBy: string;
+  readonly assignedAt: IsoTimestamp;
+};
+
+export type ActionAcknowledgedPayload = {
+  readonly actionId: string;
+  readonly caseId: string;
+  readonly actorId: string;
+  readonly acknowledgedAt: IsoTimestamp;
+};
+
+/** A reported action is evidence that something was reported, never that risk improved. */
+export type ActionReportedPayload = {
+  readonly actionId: string;
+  readonly caseId: string;
+  readonly riskEventId: string;
+  readonly actionLibraryId: string;
+  readonly reportedBy: string;
+  readonly reportedAt: IsoTimestamp;
+  readonly hasNotes: boolean;
+  readonly attachmentCount: number;
 };
 
 export type RiskObservationEvaluatedEvent = EventEnvelope<
@@ -118,6 +221,32 @@ export type RiskObservationEvaluatedEvent = EventEnvelope<
 export type RiskDetectedEvent = EventEnvelope<"risk.detected.v1", RiskDetectedPayload>;
 export type CaseCreatedEvent = EventEnvelope<"case.created.v1", CaseCreatedPayload>;
 export type CaseUpdatedEvent = EventEnvelope<"case.updated.v1", CaseUpdatedPayload>;
+export type RiskAlertRequestedEvent = EventEnvelope<
+  "risk.alert_requested.v1",
+  AlertRequestedPayload
+>;
+export type NotificationRequestedEvent = EventEnvelope<
+  "notification.requested.v1",
+  NotificationRequestedPayload
+>;
+export type NotificationSentEvent = EventEnvelope<
+  "notification.sent.v1",
+  NotificationOutcomePayload
+>;
+export type NotificationFailedEvent = EventEnvelope<
+  "notification.failed.v1",
+  NotificationOutcomePayload
+>;
+export type RiskAlertedEvent = EventEnvelope<"risk.alerted.v1", RiskAlertedPayload>;
+export type RiskAcknowledgedEvent = EventEnvelope<"risk.acknowledged.v1", RiskAcknowledgedPayload>;
+export type RiskEscalatedEvent = EventEnvelope<"risk.escalated.v1", RiskEscalatedPayload>;
+export type RiskDismissedEvent = EventEnvelope<"risk.dismissed.v1", RiskDismissedPayload>;
+export type ActionAssignedEvent = EventEnvelope<"action.assigned.v1", ActionAssignedPayload>;
+export type ActionAcknowledgedEvent = EventEnvelope<
+  "action.acknowledged.v1",
+  ActionAcknowledgedPayload
+>;
+export type ActionReportedEvent = EventEnvelope<"action.reported.v1", ActionReportedPayload>;
 
 /** All platform events defined so far. Later phases extend this union. */
 export type PlatformEvent =
@@ -128,7 +257,18 @@ export type PlatformEvent =
   | RiskObservationEvaluatedEvent
   | RiskDetectedEvent
   | CaseCreatedEvent
-  | CaseUpdatedEvent;
+  | CaseUpdatedEvent
+  | RiskAlertRequestedEvent
+  | NotificationRequestedEvent
+  | NotificationSentEvent
+  | NotificationFailedEvent
+  | RiskAlertedEvent
+  | RiskAcknowledgedEvent
+  | RiskEscalatedEvent
+  | RiskDismissedEvent
+  | ActionAssignedEvent
+  | ActionAcknowledgedEvent
+  | ActionReportedEvent;
 
 export type PlatformEventType = PlatformEvent["event_type"];
 export type EventOfType<T extends PlatformEventType> = Extract<PlatformEvent, { event_type: T }>;

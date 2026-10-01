@@ -17,7 +17,7 @@ function check(label: string, ok: boolean, detail = ""): void {
   if (!ok) failures += 1;
 }
 
-const runtime = await createLocalRuntime();
+const runtime = await createLocalRuntime({ consoleSink: () => undefined });
 console.log(`runtime listening on ${runtime.server.baseUrl}\n`);
 
 const client = new SimulatorClient({

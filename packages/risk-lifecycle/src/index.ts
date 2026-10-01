@@ -31,7 +31,8 @@ export const SCAFFOLD_PHASE = "S0" as const;
  * revive the old one. Outcome states may re-enter ACTION_REPORTED for another action cycle.
  */
 export const RISK_EVENT_TRANSITIONS: Readonly<Record<RiskEventState, readonly RiskEventState[]>> = {
-  DETECTED: ["ALERTED", "SELF_RESOLVED", "DISMISSED_FALSE_ALARM"],
+  // DETECTED -> ESCALATED (S4): an alert that can never be delivered must still reach a human.
+  DETECTED: ["ALERTED", "ESCALATED", "SELF_RESOLVED", "DISMISSED_FALSE_ALARM"],
   ALERTED: ["ACKNOWLEDGED", "ESCALATED", "SELF_RESOLVED", "DISMISSED_FALSE_ALARM"],
   ESCALATED: ["ACKNOWLEDGED", "SELF_RESOLVED", "DISMISSED_FALSE_ALARM"],
   ACKNOWLEDGED: ["ACTION_REPORTED", "SELF_RESOLVED", "DISMISSED_FALSE_ALARM"],

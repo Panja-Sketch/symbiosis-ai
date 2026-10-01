@@ -7,4 +7,6 @@ export const SCAFFOLD_PHASE = "S0" as const;
 export const RESOLVED_CONTRACTS_PHASE = CONTRACTS_SCAFFOLD_PHASE;
 
 export * from "./edge-handler";
+export * from "./app-handler";
+export * from "./html";
 export * from "./server";

@@ -24,7 +24,7 @@ const ORG = SYNTHETIC_DEV_DEVICE.organizationId;
 const FAC = SYNTHETIC_DEV_DEVICE.facilityId;
 
 const clock = new ManualClock(Date.parse("2026-10-01T00:00:00Z"));
-const runtime = await createLocalRuntime({ clock });
+const runtime = await createLocalRuntime({ clock, consoleSink: () => undefined });
 const client = new SimulatorClient({
   baseUrl: runtime.server.baseUrl,
   deviceId: SYNTHETIC_DEV_DEVICE.deviceId,
@@ -110,10 +110,10 @@ const theCase = cases[0];
 const events = theCase ? await runtime.riskEvents.listByCase(ORG, theCase.caseId) : [];
 check("exactly one Risk Event", events.length === 1);
 check(
-  "case is OPEN with origin DETECTED_HAZARD and event is DETECTED",
+  "case is OPEN with origin DETECTED_HAZARD and its event exists (S4 alerting has moved it to ALERTED)",
   theCase?.state === "OPEN" &&
     theCase.origin.type === "DETECTED_HAZARD" &&
-    events[0]?.state === "DETECTED",
+    events[0]?.state === "ALERTED",
 );
 const detection = runtime.bus
   .history()
@@ -129,7 +129,8 @@ console.log(`  metrics:        ${JSON.stringify(detection?.metrics)}`);
 
 const tail = histTypes();
 const lastQa = tail.lastIndexOf("telemetry.quality_assessed.v1");
-const seq = tail.slice(lastQa);
+// S4 appends alerting events after case.created; the S3 chain is the first seven events.
+const seq = tail.slice(lastQa, lastQa + 7);
 check(
   "event order: quality_assessed -> observation_evaluated -> risk.detected -> case.created",
   seq[0] === "telemetry.quality_assessed.v1" &&
@@ -153,19 +154,11 @@ check(
 );
 
 console.log("\n-- scope --");
-const allowed = new Set([
-  "telemetry.received.v1",
-  "telemetry.authenticated.v1",
-  "telemetry.normalized.v1",
-  "telemetry.quality_assessed.v1",
-  "risk.observation_evaluated.v1",
-  "risk.detected.v1",
-  "case.created.v1",
-  "case.updated.v1",
-]);
 check(
-  "no S4+ events emitted",
-  [...new Set(histTypes())].every((t) => allowed.has(t)),
+  "no S5+ events emitted (verification, evidence, consent, recurrence)",
+  [...new Set(histTypes())].every(
+    (t) => !/^(verification|evidence|consent|recurrence|intervention)\./.test(t),
+  ),
 );
 check("no dead-lettered events", runtime.bus.deadLetters().length === 0);
 

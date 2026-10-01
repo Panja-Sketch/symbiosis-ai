@@ -17,7 +17,12 @@ export type EdgeRequest = {
   readonly rawBody: Uint8Array;
 };
 
-export type EdgeResponse = { readonly status: number; readonly body: unknown };
+export type EdgeResponse = {
+  readonly status: number;
+  /** A string body is sent as-is with `contentType`; anything else is JSON. */
+  readonly body: unknown;
+  readonly contentType?: string;
+};
 
 export type EdgeLogEntry = {
   readonly level: "info" | "warn";

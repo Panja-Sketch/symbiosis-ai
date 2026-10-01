@@ -22,7 +22,11 @@ let step: number;
 
 beforeEach(async () => {
   clock = new ManualClock(Date.parse("2026-10-01T00:00:00Z"));
-  runtime = await createLocalRuntime({ clock, ids: new SequentialIdGenerator() });
+  runtime = await createLocalRuntime({
+    clock,
+    ids: new SequentialIdGenerator(),
+    consoleSink: () => undefined,
+  });
   client = new SimulatorClient({
     baseUrl: runtime.server.baseUrl,
     deviceId: SYNTHETIC_DEV_DEVICE.deviceId,
@@ -190,7 +194,8 @@ describe("Scenario D: persistent compound deterioration", () => {
 
     const events = await runtime.riskEvents.listByCase(ORG, c.caseId);
     expect(events).toHaveLength(1);
-    expect(events[0]).toMatchObject({ state: "DETECTED", caseId: c.caseId });
+    // S3 creates the event DETECTED; S4's alerting then delivers the alert and moves it to ALERTED.
+    expect(events[0]).toMatchObject({ state: "ALERTED", caseId: c.caseId });
     expect(c.activeRiskEventId).toBe(events[0]?.eventId);
 
     // baseline snapshot retained and resolvable
@@ -201,7 +206,11 @@ describe("Scenario D: persistent compound deterioration", () => {
     // exact order within the detecting packet
     const tail = runtime.bus.history().slice(before);
     const lastQa = tail.map((e) => e.event_type).lastIndexOf("telemetry.quality_assessed.v1");
-    const final = tail.slice(lastQa).map((e) => e.event_type);
+    // S4 appends the alerting events after case.created; the S3 chain is unchanged up to there.
+    const final = tail
+      .slice(lastQa)
+      .map((e) => e.event_type)
+      .slice(0, 7);
     expect(final).toEqual([
       "telemetry.quality_assessed.v1",
       "risk.observation_evaluated.v1", // current
@@ -293,20 +302,12 @@ describe("Scenario E: insufficient baseline or data", () => {
 });
 
 describe("pipeline scope", () => {
-  it("emits no S4+ events and the simulator still goes through authenticated ingestion", async () => {
+  it("emits no S5+ events and the simulator still goes through authenticated ingestion", async () => {
     await warmUp();
     await run("compound-outdoor-heat", 4);
-    const allowed = new Set([
-      "telemetry.received.v1",
-      "telemetry.authenticated.v1",
-      "telemetry.normalized.v1",
-      "telemetry.quality_assessed.v1",
-      "risk.observation_evaluated.v1",
-      "risk.detected.v1",
-      "case.created.v1",
-      "case.updated.v1",
-    ]);
-    for (const t of new Set(types(runtime.bus.history()))) expect(allowed.has(t)).toBe(true);
+    for (const t of new Set(types(runtime.bus.history()))) {
+      expect(t).not.toMatch(/^(verification|evidence|consent|recurrence|intervention)\./);
+    }
     // every observation was authenticated by the edge before reaching the pipeline
     const obs = await runtime.observations.list(ORG);
     expect(obs.length).toBeGreaterThan(0);

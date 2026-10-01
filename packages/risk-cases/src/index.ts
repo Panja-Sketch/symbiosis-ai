@@ -368,8 +368,15 @@ export function applyCaseCommand(
   });
 }
 
-/** States in which a continuing detection of the same hazard may be recorded (S3). */
-const DETECTION_RECORDABLE: readonly CaseState[] = ["OPEN", "ACTION_REQUIRED", "REOPENED"];
+/** States in which a continuing detection of the same hazard may be recorded. S4 adds
+ * ACTION_REPORTED (the workflow keeps waiting for verification). VERIFYING and the verification
+ * outcome states belong to S5. */
+const DETECTION_RECORDABLE: readonly CaseState[] = [
+  "OPEN",
+  "ACTION_REQUIRED",
+  "ACTION_REPORTED",
+  "REOPENED",
+];
 
 function recordDetection(
   c: RiskImprovementCase,

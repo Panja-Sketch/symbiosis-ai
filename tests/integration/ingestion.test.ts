@@ -29,7 +29,11 @@ function makeClient(over: { key?: Uint8Array; initialSeq?: number } = {}) {
 
 beforeEach(async () => {
   clock = new ManualClock(START_MS);
-  runtime = await createLocalRuntime({ clock, ids: new SequentialIdGenerator() });
+  runtime = await createLocalRuntime({
+    clock,
+    ids: new SequentialIdGenerator(),
+    consoleSink: () => undefined,
+  });
   client = makeClient();
 });
 

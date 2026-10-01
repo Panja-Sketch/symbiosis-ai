@@ -51,21 +51,20 @@ describe("hardware independence (spec principle 7)", () => {
   });
 });
 
-describe("S3 stays within scope", () => {
+describe("S4 stays within scope", () => {
   const all = [...sources("packages"), ...sources("apps"), ...sources("adapters")];
 
-  it("defines only the telemetry, risk and case events through S3 (no S4+ events)", () => {
+  it("defines no verification, evidence, consent, recurrence or intervention events (S5+)", () => {
     const text = readFileSync(join(root, "packages/contracts/src/events.ts"), "utf8");
     const union = text.slice(
       text.indexOf("export type PlatformEvent ="),
       text.indexOf("export type PlatformEventType"),
     );
-    expect(union.match(/\| (Telemetry|Risk|Case)\w+Event/g)).toHaveLength(8);
-    expect(union.match(/^\s*\| /gm)).toHaveLength(8);
+    expect(union.match(/^\s*\| /gm)).toHaveLength(19);
     expect(text).not.toMatch(
-      /"(alert|action|acknowledg|escalat|verification|evidence|consent|recurrence|intervention|notification)[._]/i,
+      /"(verification|evidence|consent|recurrence|intervention|sharing)[._]/i,
     );
-    expect(text).not.toMatch(/"risk\.(alert|escalat|verif)/i);
+    expect(text).not.toMatch(/"risk\.(verif|recurr)/i);
   });
 
   it("has no alerting, notification, workflow or verification-evaluation code in S3 packages", () => {

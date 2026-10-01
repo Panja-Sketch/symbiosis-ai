@@ -6,10 +6,13 @@
   "main": "src/index.ts",
   "types": "src/index.ts",
   "dependencies": {
+    "@symbiosis/action-orchestration": "workspace:*",
+    "@symbiosis/authz": "workspace:*",
     "@symbiosis/clock": "workspace:*",
     "@symbiosis/contracts": "workspace:*",
     "@symbiosis/device-registry": "workspace:*",
     "@symbiosis/edge-security": "workspace:*",
-    "@symbiosis/event-bus": "workspace:*"
+    "@symbiosis/event-bus": "workspace:*",
+    "@symbiosis/tenancy": "workspace:*"
   }
 }

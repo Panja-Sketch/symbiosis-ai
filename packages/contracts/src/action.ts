@@ -8,10 +8,17 @@ export type ActionStatus = (typeof ACTION_STATUSES)[number];
  */
 export type MitigationAction = {
   readonly actionId: string;
+  readonly organizationId?: string;
   readonly caseId: string;
   readonly eventId: string;
   readonly actionLibraryId: string;
   readonly assignedTo?: string;
+  readonly assignedBy?: string;
+  readonly assignedAt?: string;
+  /** Version of the approved action library the action ID came from. */
+  readonly actionLibraryVersion?: string;
+  readonly acknowledgedBy?: string;
+  readonly acknowledgedAt?: string;
   readonly reportedBy?: string;
   readonly reportedAt?: string;
   readonly notes?: string;

@@ -10,6 +10,7 @@ import type {
   TelemetryQualityAssessedEvent,
 } from "@symbiosis/contracts";
 import { learn, parseBaselineConfig, startBaseline } from "@symbiosis/baselines";
+import { InMemoryAuditLog } from "@symbiosis/audit";
 import { ManualClock } from "@symbiosis/clock";
 import { InMemoryBus, SequentialIdGenerator, createEnvelope } from "@symbiosis/event-bus";
 import {
@@ -49,6 +50,7 @@ let states: InMemoryDetectionStateRepository;
 let cases: InMemoryCaseRepository;
 let riskEvents: InMemoryRiskEventRepository;
 let ids: SequentialIdGenerator;
+let audit: InMemoryAuditLog;
 let counter = 0;
 
 async function seedBaselines(asset: string) {
@@ -79,6 +81,7 @@ beforeEach(async () => {
   cases = new InMemoryCaseRepository();
   riskEvents = new InMemoryRiskEventRepository();
   ids = new SequentialIdGenerator();
+  audit = new InMemoryAuditLog();
   counter = 0;
   startRiskPipeline({
     bus,
@@ -88,6 +91,7 @@ beforeEach(async () => {
     detectionStates: states,
     cases,
     riskEvents,
+    audit,
     rule,
     baselineConfig,
   });
@@ -237,15 +241,45 @@ describe("risk pipeline: case creation and correlation", () => {
     expect(await cases.list(ORG)).toHaveLength(2);
   });
 
-  it("does not create a duplicate or alter a case already in a later workflow state", async () => {
+  it("records a continued detection on a case waiting in ACTION_REPORTED without resetting it (S4)", async () => {
     await deliver(compound(0), 0);
     const [c] = await cases.list(ORG);
     await cases.save({ ...c!, state: "ACTION_REPORTED" });
     await deliver(compound(5), 5);
     expect(await cases.list(ORG)).toHaveLength(1);
     expect((await cases.list(ORG))[0]?.state).toBe("ACTION_REPORTED");
+    const updates = bus.history().filter((e) => e.event_type === "case.updated.v1");
+    expect(updates).toHaveLength(1);
+    expect(updates[0]?.event_type === "case.updated.v1" && updates[0].payload).toMatchObject({
+      change: "DETECTION_CONTINUED",
+      state: "ACTION_REPORTED",
+      previousState: "ACTION_REPORTED",
+    });
+    expect(types().filter((t) => t.startsWith("verification"))).toEqual([]);
+  });
+
+  it("leaves a case in a verification state untouched (S5 owns it) but keeps the detection on the bus", async () => {
+    await deliver(compound(0), 0);
+    const [c] = await cases.list(ORG);
+    await cases.save({ ...c!, state: "VERIFYING" });
+    await deliver(compound(5), 5);
+    expect(await cases.list(ORG)).toHaveLength(1);
+    expect((await cases.list(ORG))[0]?.state).toBe("VERIFYING");
     expect(types().filter((t) => t === "case.updated.v1")).toHaveLength(0);
-    expect(types().filter((t) => t === "risk.detected.v1")).toHaveLength(2); // still on the bus
+    expect(types().filter((t) => t === "risk.detected.v1")).toHaveLength(2);
+  });
+
+  it("every detection is auditable (case created, then each continued detection)", async () => {
+    await deliver(compound(0), 0);
+    await deliver(compound(5), 5);
+    await deliver(compound(10), 10);
+    const entries = await audit.list(ORG);
+    expect(entries.map((e) => e.action)).toEqual([
+      "CASE_CREATED",
+      "DETECTION_RECORDED",
+      "DETECTION_RECORDED",
+    ]);
+    expect(entries[0]?.details?.reasonCodes).toContain("OUTDOOR_HEAT_CONTEXT");
   });
 });
 

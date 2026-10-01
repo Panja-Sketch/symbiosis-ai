@@ -64,14 +64,23 @@ describe("RECORD_DETECTION (S3: continuing detection of the same hazard)", () =>
     expect(after.latestVerificationId).toBeUndefined();
   });
 
-  it("is rejected in states that belong to later workflow phases", () => {
+  it("is recorded while the case waits in ACTION_REPORTED, with the state preserved (S4)", () => {
     let c = step(newCase(), { type: "REQUIRE_ACTION", at: T(1) });
     c = step(c, { type: "REPORT_ACTION", at: T(2), actionId: "ACT-1" });
-    const reported = applyCaseCommand(c, detect("HIGH", 9));
-    expect(reported.ok).toBe(false);
-    if (!reported.ok) expect(reported.error.code).toBe("ILLEGAL_LIFECYCLE_TRANSITION");
+    const after = step(c, detect("HIGH", 9));
+    expect(after.state).toBe("ACTION_REPORTED");
+    expect(after.severity).toBe("HIGH");
+    expect(after.latestVerificationId).toBeUndefined();
+  });
 
+  it("is rejected in verification states, which belong to S5", () => {
+    let c = step(newCase(), { type: "REQUIRE_ACTION", at: T(1) });
+    c = step(c, { type: "REPORT_ACTION", at: T(2), actionId: "ACT-1" });
     c = step(c, { type: "START_VERIFICATION", at: T(3) });
+    const verifying = applyCaseCommand(c, detect("HIGH", 9));
+    expect(verifying.ok).toBe(false);
+    if (!verifying.ok) expect(verifying.error.code).toBe("ILLEGAL_LIFECYCLE_TRANSITION");
+
     c = step(c, {
       type: "RECORD_VERIFICATION",
       at: T(4),

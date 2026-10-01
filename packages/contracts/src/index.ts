@@ -14,4 +14,5 @@ export * from "./canonical";
 export * from "./edge";
 export * from "./baseline";
 export * from "./risk";
+export * from "./operations";
 export * from "./events";

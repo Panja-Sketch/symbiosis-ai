@@ -1,6 +1,7 @@
 import { baselineKeyString } from "@symbiosis/contracts";
 import type { Baseline, TelemetryQualityAssessedEvent } from "@symbiosis/contracts";
 import type { BaselineConfig } from "@symbiosis/baselines";
+import type { AuditLog } from "@symbiosis/audit";
 import { nowIso } from "@symbiosis/clock";
 import type { Clock } from "@symbiosis/clock";
 import { createEnvelope } from "@symbiosis/event-bus";
@@ -24,6 +25,7 @@ export type RiskPipelineDeps = {
   readonly detectionStates: DetectionStateRepository;
   readonly cases: CaseRepository;
   readonly riskEvents: RiskEventRepository;
+  readonly audit: AuditLog;
   readonly rule: RuleConfig;
   readonly baselineConfig: BaselineConfig;
 };
@@ -126,6 +128,25 @@ async function process(
       if (!opened.ok) throw new Error(`cannot open case: ${opened.error.message}`);
       await deps.riskEvents.save(opened.value.event);
       await deps.cases.save(opened.value.case);
+      await deps.audit.append({
+        organizationId: org,
+        facilityId: fac,
+        caseId: opened.value.case.caseId,
+        actorId: "SYSTEM-DETECTION",
+        actorType: "SYSTEM",
+        action: "CASE_CREATED",
+        targetType: "CASE",
+        targetId: opened.value.case.caseId,
+        afterState: opened.value.case.state,
+        correlationId: event.correlation_id,
+        at: detection.detectedAt,
+        details: {
+          detectionId: detection.detectionId,
+          riskEventId: opened.value.event.eventId,
+          severity: detection.severity,
+          reasonCodes: detection.reasonCodes,
+        },
+      });
       await deps.bus.publish(
         createEnvelope(deps.ids, {
           ...base,
@@ -146,8 +167,9 @@ async function process(
       continue;
     }
 
-    // Same episode: update the existing case; never create a duplicate. If the case is in a
-    // state that cannot accept it (S4+ workflow states), the detection is still on the bus.
+    // Same episode: record the detection on the existing case (state preserved, severity may only
+    // rise) and in the audit trail; never create a duplicate case. A case in a state that cannot
+    // accept it (VERIFYING and later, S5) still has the detection on the bus.
     const updated = applyCaseCommand(existing, {
       type: "RECORD_DETECTION",
       at: detection.detectedAt,
@@ -156,6 +178,25 @@ async function process(
     });
     if (!updated.ok) continue;
     await deps.cases.save(updated.value.value);
+    await deps.audit.append({
+      organizationId: org,
+      facilityId: fac,
+      caseId: existing.caseId,
+      actorId: "SYSTEM-DETECTION",
+      actorType: "SYSTEM",
+      action: "DETECTION_RECORDED",
+      targetType: "CASE",
+      targetId: existing.caseId,
+      beforeState: existing.state,
+      afterState: updated.value.value.state,
+      correlationId: event.correlation_id,
+      at: detection.detectedAt,
+      details: {
+        detectionId: detection.detectionId,
+        severity: detection.severity,
+        reasonCodes: detection.reasonCodes,
+      },
+    });
     await deps.bus.publish(
       createEnvelope(deps.ids, {
         ...base,
@@ -166,6 +207,7 @@ async function process(
           riskEventId: existing.activeRiskEventId ?? "",
           detectionId: detection.detectionId,
           change: "DETECTION_CONTINUED" as const,
+          previousState: existing.state,
           severity: updated.value.value.severity,
           previousSeverity: existing.severity,
           state: updated.value.value.state,

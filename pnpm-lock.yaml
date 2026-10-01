@@ -169,6 +169,9 @@ importers:
       '@eslint/js':
         specifier: ^9.39.5
         version: 9.39.5
+      '@symbiosis/action-orchestration':
+        specifier: workspace:*
+        version: link:packages/action-orchestration
       '@symbiosis/adapter-esp32':
         specifier: workspace:*
         version: link:adapters/esp32
@@ -178,6 +181,12 @@ importers:
       '@symbiosis/api':
         specifier: workspace:*
         version: link:apps/api
+      '@symbiosis/audit':
+        specifier: workspace:*
+        version: link:packages/audit
+      '@symbiosis/authz':
+        specifier: workspace:*
+        version: link:packages/authz
       '@symbiosis/baselines':
         specifier: workspace:*
         version: link:packages/baselines
@@ -196,18 +205,33 @@ importers:
       '@symbiosis/edge-security':
         specifier: workspace:*
         version: link:packages/edge-security
+      '@symbiosis/escalation':
+        specifier: workspace:*
+        version: link:packages/escalation
       '@symbiosis/event-bus':
         specifier: workspace:*
         version: link:packages/event-bus
       '@symbiosis/normalization':
         specifier: workspace:*
         version: link:packages/normalization
+      '@symbiosis/notifications':
+        specifier: workspace:*
+        version: link:packages/notifications
       '@symbiosis/repositories':
         specifier: workspace:*
         version: link:packages/repositories
+      '@symbiosis/risk-cases':
+        specifier: workspace:*
+        version: link:packages/risk-cases
       '@symbiosis/risk-detection':
         specifier: workspace:*
         version: link:packages/risk-detection
+      '@symbiosis/risk-lifecycle':
+        specifier: workspace:*
+        version: link:packages/risk-lifecycle
+      '@symbiosis/tenancy':
+        specifier: workspace:*
+        version: link:packages/tenancy
       '@symbiosis/worker':
         specifier: workspace:*
         version: link:apps/worker
@@ -263,6 +287,12 @@ importers:
 
   apps/api:
     dependencies:
+      '@symbiosis/action-orchestration':
+        specifier: workspace:*
+        version: link:../../packages/action-orchestration
+      '@symbiosis/authz':
+        specifier: workspace:*
+        version: link:../../packages/authz
       '@symbiosis/clock':
         specifier: workspace:*
         version: link:../../packages/clock
@@ -278,6 +308,9 @@ importers:
       '@symbiosis/event-bus':
         specifier: workspace:*
         version: link:../../packages/event-bus
+      '@symbiosis/tenancy':
+        specifier: workspace:*
+        version: link:../../packages/tenancy
 
   apps/simulator:
     dependencies:
@@ -295,6 +328,9 @@ importers:
 
   apps/worker:
     dependencies:
+      '@symbiosis/audit':
+        specifier: workspace:*
+        version: link:../../packages/audit
       '@symbiosis/baselines':
         specifier: workspace:*
         version: link:../../packages/baselines
@@ -328,15 +364,50 @@ importers:
 
   packages/action-orchestration:
     dependencies:
+      '@symbiosis/audit':
+        specifier: workspace:*
+        version: link:../audit
+      '@symbiosis/authz':
+        specifier: workspace:*
+        version: link:../authz
+      '@symbiosis/clock':
+        specifier: workspace:*
+        version: link:../clock
+      '@symbiosis/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@symbiosis/event-bus':
+        specifier: workspace:*
+        version: link:../event-bus
+      '@symbiosis/notifications':
+        specifier: workspace:*
+        version: link:../notifications
+      '@symbiosis/repositories':
+        specifier: workspace:*
+        version: link:../repositories
+      '@symbiosis/risk-cases':
+        specifier: workspace:*
+        version: link:../risk-cases
+      '@symbiosis/risk-lifecycle':
+        specifier: workspace:*
+        version: link:../risk-lifecycle
+      '@symbiosis/tenancy':
+        specifier: workspace:*
+        version: link:../tenancy
+
+  packages/ai-explanation: {}
+
+  packages/audit:
+    dependencies:
       '@symbiosis/contracts':
         specifier: workspace:*
         version: link:../contracts
 
-  packages/ai-explanation: {}
-
-  packages/audit: {}
-
-  packages/authz: {}
+  packages/authz:
+    dependencies:
+      '@symbiosis/tenancy':
+        specifier: workspace:*
+        version: link:../tenancy
 
   packages/baselines:
     dependencies:
@@ -374,7 +445,29 @@ importers:
         specifier: workspace:*
         version: link:../device-registry
 
-  packages/escalation: {}
+  packages/escalation:
+    dependencies:
+      '@symbiosis/audit':
+        specifier: workspace:*
+        version: link:../audit
+      '@symbiosis/clock':
+        specifier: workspace:*
+        version: link:../clock
+      '@symbiosis/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@symbiosis/event-bus':
+        specifier: workspace:*
+        version: link:../event-bus
+      '@symbiosis/repositories':
+        specifier: workspace:*
+        version: link:../repositories
+      '@symbiosis/risk-lifecycle':
+        specifier: workspace:*
+        version: link:../risk-lifecycle
+      '@symbiosis/tenancy':
+        specifier: workspace:*
+        version: link:../tenancy
 
   packages/event-bus:
     dependencies:
@@ -394,7 +487,32 @@ importers:
         specifier: workspace:*
         version: link:../contracts
 
-  packages/notifications: {}
+  packages/notifications:
+    dependencies:
+      '@symbiosis/audit':
+        specifier: workspace:*
+        version: link:../audit
+      '@symbiosis/clock':
+        specifier: workspace:*
+        version: link:../clock
+      '@symbiosis/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@symbiosis/escalation':
+        specifier: workspace:*
+        version: link:../escalation
+      '@symbiosis/event-bus':
+        specifier: workspace:*
+        version: link:../event-bus
+      '@symbiosis/repositories':
+        specifier: workspace:*
+        version: link:../repositories
+      '@symbiosis/risk-lifecycle':
+        specifier: workspace:*
+        version: link:../risk-lifecycle
+      '@symbiosis/tenancy':
+        specifier: workspace:*
+        version: link:../tenancy
 
   packages/portfolio: {}
 

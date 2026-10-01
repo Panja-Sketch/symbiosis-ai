@@ -1,0 +1,33 @@
+{
+  "version": "cooling-actions.v1",
+  "actions": [
+    {
+      "actionLibraryId": "ACT-COOLING-INSPECT-PRIMARY",
+      "title": "Inspect the primary cooling assembly",
+      "description": "A qualified person inspects the primary cooling fan assembly on site, following the facility procedure, and reports what was found.",
+      "hazardTypes": ["COOLING_ELECTRICAL_DETERIORATION"],
+      "controlsEquipment": false
+    },
+    {
+      "actionLibraryId": "ACT-COOLING-INSPECT-MECHANICAL",
+      "title": "Inspect the mechanical and vibration condition",
+      "description": "A qualified person checks mounts, bearings and balance for the source of the vibration, following the facility procedure.",
+      "hazardTypes": ["COOLING_ELECTRICAL_DETERIORATION"],
+      "controlsEquipment": false
+    },
+    {
+      "actionLibraryId": "ACT-COOLING-START-BACKUP",
+      "title": "Start approved backup cooling capacity",
+      "description": "If the facility procedure requires it, a person starts the approved backup cooling capacity and reports that they did so. Symbiosis does not operate equipment.",
+      "hazardTypes": ["COOLING_ELECTRICAL_DETERIORATION"],
+      "controlsEquipment": false
+    },
+    {
+      "actionLibraryId": "ACT-COOLING-REDUCE-LOAD",
+      "title": "Reduce primary load per site procedure",
+      "description": "If the facility procedure allows it, a person reduces the load on the primary cooling assembly and reports that they did so. Symbiosis does not operate equipment.",
+      "hazardTypes": ["COOLING_ELECTRICAL_DETERIORATION"],
+      "controlsEquipment": false
+    }
+  ]
+}

@@ -35,7 +35,7 @@ function sourceFiles(dir: string): string[] {
     for (const e of readdirSync(d)) {
       const p = join(d, e);
       if (statSync(p).isDirectory()) walk(p);
-      else if (p.endsWith(".ts")) files.push(p);
+      else if (p.endsWith(".ts") && !p.endsWith(".fixture.ts")) files.push(p);
     }
   };
   walk(src);

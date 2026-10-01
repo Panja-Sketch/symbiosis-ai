@@ -44,8 +44,13 @@ export function createEdgeServer(handler: EdgeHandler): Server {
         rawBody: new Uint8Array(Buffer.concat(chunks)),
       })
         .then((out) => {
-          res.writeHead(out.status, { "Content-Type": "application/json" });
-          res.end(JSON.stringify(out.body));
+          if (out.contentType !== undefined && typeof out.body === "string") {
+            res.writeHead(out.status, { "Content-Type": out.contentType });
+            res.end(out.body);
+          } else {
+            res.writeHead(out.status, { "Content-Type": "application/json" });
+            res.end(JSON.stringify(out.body));
+          }
         })
         .catch(() => {
           res.writeHead(500, { "Content-Type": "application/json" });

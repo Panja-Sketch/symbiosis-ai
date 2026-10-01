@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { MitigationAction } from "@symbiosis/contracts";
 import { ACTION_STATUSES } from "@symbiosis/contracts";
-import { ACTION_TRANSITIONS, applyActionCommand, assignMitigationAction } from "./index";
+import { ACTION_TRANSITIONS, applyActionCommand, assignMitigationAction } from "./actions";
 
 const T1 = "2026-01-02T00:00:00Z";
 const T2 = "2026-01-02T01:00:00Z";

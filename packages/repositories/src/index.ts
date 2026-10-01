@@ -1,11 +1,13 @@
 import { baselineKeyString, observationDedupeKey } from "@symbiosis/contracts";
 import type {
+  Alert,
   Baseline,
   BaselineAuditRecord,
   BaselineKey,
   BaselineSnapshot,
   CanonicalObservation,
   DetectionState,
+  MitigationAction,
   RiskEvent,
   RiskImprovementCase,
 } from "@symbiosis/contracts";
@@ -190,6 +192,62 @@ export class InMemoryRiskEventRepository implements RiskEventRepository {
   async listByCase(organizationId: string, caseId: string): Promise<readonly RiskEvent[]> {
     return [...this.events.values()].filter(
       (e) => e.organizationId === organizationId && e.caseId === caseId,
+    );
+  }
+}
+
+/** Alert store. Escalations are separate alerts, so history is never overwritten. */
+export interface AlertRepository {
+  save(alert: Alert): Promise<void>;
+  get(organizationId: string, alertId: string): Promise<Alert | undefined>;
+  listByCase(organizationId: string, caseId: string): Promise<readonly Alert[]>;
+  /** Every alert across tenants, for the system-level escalation/retry tick only. */
+  listAllForSystemTick(): Promise<readonly Alert[]>;
+}
+
+export class InMemoryAlertRepository implements AlertRepository {
+  private readonly alerts = new Map<string, Alert>();
+
+  async save(alert: Alert): Promise<void> {
+    this.alerts.set(`${alert.organizationId}|${alert.alertId}`, alert);
+  }
+
+  async get(organizationId: string, alertId: string) {
+    return this.alerts.get(`${organizationId}|${alertId}`);
+  }
+
+  async listByCase(organizationId: string, caseId: string): Promise<readonly Alert[]> {
+    return [...this.alerts.values()].filter(
+      (a) => a.organizationId === organizationId && a.caseId === caseId,
+    );
+  }
+
+  async listAllForSystemTick(): Promise<readonly Alert[]> {
+    return [...this.alerts.values()];
+  }
+}
+
+/** Mitigation-action store (RECOMMEND_ONLY records of human assignment and reporting). */
+export interface ActionRepository {
+  save(organizationId: string, action: MitigationAction): Promise<void>;
+  get(organizationId: string, actionId: string): Promise<MitigationAction | undefined>;
+  listByCase(organizationId: string, caseId: string): Promise<readonly MitigationAction[]>;
+}
+
+export class InMemoryActionRepository implements ActionRepository {
+  private readonly actions = new Map<string, MitigationAction>();
+
+  async save(organizationId: string, action: MitigationAction): Promise<void> {
+    this.actions.set(`${organizationId}|${action.actionId}`, { ...action, organizationId });
+  }
+
+  async get(organizationId: string, actionId: string) {
+    return this.actions.get(`${organizationId}|${actionId}`);
+  }
+
+  async listByCase(organizationId: string, caseId: string): Promise<readonly MitigationAction[]> {
+    return [...this.actions.values()].filter(
+      (a) => a.organizationId === organizationId && a.caseId === caseId,
     );
   }
 }
