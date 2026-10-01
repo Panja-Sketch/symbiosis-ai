@@ -8,19 +8,33 @@
     "node": ">=20"
   },
   "scripts": {
-    "dev": "node scripts/dev-not-implemented.mjs",
+    "dev": "node scripts/dev.mjs",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "smoke:s2": "tsx scripts/smoke-s2.ts"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",
+    "@symbiosis/adapter-esp32": "workspace:*",
+    "@symbiosis/adapter-simulator": "workspace:*",
+    "@symbiosis/api": "workspace:*",
+    "@symbiosis/clock": "workspace:*",
+    "@symbiosis/contracts": "workspace:*",
+    "@symbiosis/data-quality": "workspace:*",
+    "@symbiosis/device-registry": "workspace:*",
+    "@symbiosis/edge-security": "workspace:*",
+    "@symbiosis/event-bus": "workspace:*",
+    "@symbiosis/normalization": "workspace:*",
+    "@symbiosis/repositories": "workspace:*",
+    "@symbiosis/worker": "workspace:*",
     "@types/node": "^26.6.3",
     "eslint": "^9.39.5",
     "globals": "^17.12.0",
     "prettier": "^3.9.9",
+    "tsx": "^4.23.15",
     "typescript": "~6.0.3",
     "typescript-eslint": "^8.71.0",
     "vitest": "^5.0.2"

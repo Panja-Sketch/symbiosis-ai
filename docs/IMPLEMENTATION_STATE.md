@@ -6,7 +6,7 @@ Allowed status: NOT_STARTED | IN_PROGRESS | BLOCKED | COMPLETE
 | ----- | ------------------------------------------------------- | ----------- |
 | S0    | Repository foundation                                   | COMPLETE    |
 | S1    | Domain core                                             | COMPLETE    |
-| S2    | Local ingestion                                         | NOT_STARTED |
+| S2    | Local ingestion                                         | COMPLETE    |
 | S3    | Detection + baselines                                   | NOT_STARTED |
 | S4    | Operations workflow                                     | NOT_STARTED |
 | S5    | Verification + recurrence + intervention prioritization | NOT_STARTED |

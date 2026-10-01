@@ -10,3 +10,6 @@ export * from "./recommendation";
 export * from "./risk-event";
 export * from "./action";
 export * from "./case";
+export * from "./canonical";
+export * from "./edge";
+export * from "./events";

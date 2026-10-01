@@ -4,5 +4,11 @@
   "private": true,
   "type": "module",
   "main": "src/index.ts",
-  "types": "src/index.ts"
+  "types": "src/index.ts",
+  "dependencies": {
+    "@symbiosis/clock": "workspace:*",
+    "@symbiosis/contracts": "workspace:*",
+    "@symbiosis/edge-security": "workspace:*",
+    "@symbiosis/normalization": "workspace:*"
+  }
 }

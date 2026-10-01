@@ -1,0 +1,13 @@
+{
+  "_comment": "SYNTHETIC test vector. The key is the public fake dev key, not a real credential. Firmware must reproduce signing_material and signature exactly. Body file bytes are hashed as-is (no trailing newline).",
+  "device_key_hex": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+  "method": "POST",
+  "path": "/edge/v1/telemetry",
+  "x_timestamp": "1790000000",
+  "x_nonce": "vector_nonce_0001",
+  "x_seq": "42",
+  "body_file": "telemetry.sample.json",
+  "body_sha256": "c743552ae5c7e2458fd98e5ea86d46ea16417ada09810e3d0a7bdb81aaabfa1e",
+  "signing_material": "POST\n/edge/v1/telemetry\n1790000000\nvector_nonce_0001\n42\nc743552ae5c7e2458fd98e5ea86d46ea16417ada09810e3d0a7bdb81aaabfa1e",
+  "x_signature": "16de8c3f2d864a673edc272cd4b3182ee66ebe70b380e2aacf85fd7e14b1f025"
+}

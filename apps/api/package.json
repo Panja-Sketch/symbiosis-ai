@@ -6,6 +6,10 @@
   "main": "src/index.ts",
   "types": "src/index.ts",
   "dependencies": {
-    "@symbiosis/contracts": "workspace:*"
+    "@symbiosis/clock": "workspace:*",
+    "@symbiosis/contracts": "workspace:*",
+    "@symbiosis/device-registry": "workspace:*",
+    "@symbiosis/edge-security": "workspace:*",
+    "@symbiosis/event-bus": "workspace:*"
   }
 }

@@ -6,12 +6,12 @@ architecture (single source of truth).
 
 ## Status
 
-Phases **S0 (repository foundation)** and **S1 (domain core)** are complete: pure, deterministic
-domain models and lifecycle state machines (recommendation, Risk Improvement Case, Risk Event,
-mitigation action, verification assessment contract) with tests. There is still **no ingestion,
-detection, verification evaluation, or local runtime**: `pnpm dev` intentionally fails with a
-"not implemented" message. Progress is tracked in
-[docs/IMPLEMENTATION_STATE.md](docs/IMPLEMENTATION_STATE.md).
+Phases **S0** (repository foundation), **S1** (domain core) and **S2** (local ingestion) are
+complete. A local simulator can send signed telemetry through the same edge endpoints future
+hardware will use; the packet is authenticated, replay-checked, normalized into canonical
+observations, quality-assessed and emitted as typed in-memory events. There is still **no risk
+detection, baselines, case workflow, verification evaluation, UI or cloud integration**. Progress
+is tracked in [docs/IMPLEMENTATION_STATE.md](docs/IMPLEMENTATION_STATE.md).
 
 ## Layout
 
@@ -21,14 +21,32 @@ detection, verification evaluation, or local runtime**: `pnpm dev` intentionally
 
 ## Commands
 
-Requires Node >= 20 and pnpm.
+Requires Node >= 20 and pnpm 12.
 
 ```
 pnpm install
 pnpm lint
 pnpm typecheck
 pnpm test
+pnpm format:check
 ```
+
+## Running locally (S2)
+
+```
+pnpm dev          # api + worker (one process, in-memory bus) and the simulator
+pnpm smoke:s2     # self-checking end-to-end run over real HTTP, exits non-zero on failure
+```
+
+`pnpm dev` listens on `http://127.0.0.1:8787` (override with `EDGE_PORT`) and prints each
+telemetry event as the simulator's signed packets flow through. The **web app is not part of
+`pnpm dev` yet** (Next.js arrives in S7); api and worker share a process only because the local
+event bus is in-memory. Everything uses a public, obviously synthetic dev device (`DEV-SIM-001`);
+no real credentials exist in the repo.
+
+Edge endpoints: `POST /edge/v1/telemetry` and `POST /edge/v1/heartbeat`, signed per
+PROJECT_SPEC section 32. A known-answer signing vector for firmware is in
+`firmware-contracts/sample-packets/signing-vector.json`.
 
 ## Secrets
 

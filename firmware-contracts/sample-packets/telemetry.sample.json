@@ -1,0 +1,1 @@
+{"device_id":"DEV-SIM-001","firmware_version":"sim-0.1.0","source":"SIMULATOR","batch":[{"observed_at":"2026-09-29T20:00:00Z","readings":{"temperature_c":4.2,"relative_humidity_pct":55.1,"vibration_rms_ms2":0.18,"current_ma":312.0,"fan_a_load_pct":100,"chiller_b_running":false}}]}

@@ -74,3 +74,44 @@ source of truth; this log records choices made while implementing it. Not a sess
 
 - **Decision:** `validateVerificationAssessment` rejects a `VERIFIED` result unless there is at least one required criterion, all required criteria passed, and at least one evidence ID; it also checks ranges, windows and required fields. Lifecycle code accepts a verification outcome only through a valid assessment whose case/event match.
 - **Reason:** Principle 3 / section 8.1: a verified state must be unforgeable by a bare status change. This is structural validation only; threshold evaluation, windows and policy execution remain S5.
+
+## D-015 — Local edge API on `node:http`, transport-neutral handler (S2, 2026-09-30)
+
+- **Decision:** `apps/api` exposes `createEdgeHandler(deps)`, a pure `(EdgeRequest) => EdgeResponse` function over raw body bytes, plus a thin `node:http` wrapper (`createEdgeServer`). No web framework was added.
+- **Reason:** The signature covers the original bytes, so nothing may parse and re-serialize JSON first; `node:http` hands over the raw buffer with zero dependencies. Because the handler is transport-neutral, the Cloud Run deployment (S9) can reuse it unchanged. Bodies over 64 KiB get 413.
+- **Alternatives:** Fastify/Express — rejected: extra dependency, body-parser hooks that risk altering raw bytes.
+
+## D-016 — Edge signing format details left open by the spec (S2, 2026-09-30)
+
+- **Decision:** The signed material is exactly the six spec lines joined by LF (no trailing newline). Choices the spec did not fix: `X-Timestamp` is Unix epoch seconds (decimal), `X-Seq` a non-negative decimal integer with no leading zeros, `X-Nonce` 16-64 chars of `[A-Za-z0-9_-]`, signature lowercase hex of HMAC-SHA256 (hex input accepted case-insensitively). PATH is the path alone; requests with a query string are rejected (400) because a query would be unsigned. Defaults: timestamps older than 300 s are stale, more than 60 s ahead are rejected. `firmware-contracts/sample-packets/signing-vector.json` is a known-answer vector computed independently (Python `hmac`) so firmware can reproduce it byte for byte.
+- **Reason:** Epoch seconds avoid ISO formatting ambiguity on a microcontroller; canonical integer forms remove signing ambiguities.
+
+## D-017 — Replay protection behind an atomic interface; recorded only after the signature verifies (S2, 2026-09-30)
+
+- **Decision:** `ReplayGuard.checkAndRecord` atomically enforces per device+key: nonce uniqueness within a retention window and a strictly increasing `seq` (gaps allowed; reuse and rollback rejected). It is called only after HMAC verification, so unauthenticated traffic cannot burn nonces or advance sequences. `InMemoryReplayGuard` is local-only; a shared store can replace it in S9. Telemetry and heartbeat share one counter per device/key.
+- **Reason:** Atomicity avoids check/record races; ordering prevents a denial-of-service on a legitimate device. Firmware must therefore persist its sequence (or seed it from trusted time) across reboots. This is HTTP request replay protection, distinct from observation dedupe.
+
+## D-018 — Device registry holds no secrets; unknown health is not healthy (S2, 2026-09-30)
+
+- **Decision:** `DeviceRegistry` (identity, org/facility/asset, status, active key ID, expected signals, firmware, last-seen, health) is separate from `DeviceKeyStore` (raw 32-byte keys), so Secret Manager can back the latter. Only `activeKeyId` is accepted. Health starts `UNKNOWN` and becomes concrete only through a heartbeat; `UNKNOWN` is treated as not healthy. The spec does not define a heartbeat payload, so S2 defines `{device_id, firmware_version, sent_at, health}`. The fixture device `DEV-SIM-001` and its key (the repeating pattern `0123456789abcdef` x4) are public, obviously synthetic, and grant nothing; no real ESP32 key exists in the repository.
+- **Reason:** Principle 3 (missing data never becomes trusted) and secrets-out-of-Git.
+
+## D-019 — S2 event flow and bus semantics (S2, 2026-09-30)
+
+- **Decision:** `api` emits `telemetry.received` and `telemetry.authenticated` only for requests that passed authentication and schema validation (so unauthenticated traffic cannot flood the bus); `worker` emits `telemetry.normalized` then `telemetry.quality_assessed`, each caused by the previous event under one correlation ID. Payloads use camelCase; envelopes follow the spec (snake_case). `normalized` carries observations without quality; `quality_assessed` carries full `CanonicalObservation`s plus per-observation reason codes; duplicates are dropped (and counted) before either is emitted via `ObservationRepository.insertIfAbsent` on `device + signal + observedAt`. `EventBus` is `publish`/`subscribe` by event type; `InMemoryBus` delivers in order, queues events published from handlers, records history, and dead-letters handler failures. Event IDs come from an injectable `IdGenerator`. Time comes from the `clock` package.
+- **Reason:** Keeps the flow deterministic and testable, and keeps a future `PubSubBus` drop-in. The domain packages from S1 still take explicit timestamps.
+
+## D-020 — One shared edge-v1 mapping for hardware and simulator (S2, 2026-09-30)
+
+- **Decision:** `normalization` owns `createEdgeV1Adapter`; `adapters/esp32` and `adapters/simulator` are thin instances differing only by adapter name and source type, so equivalent packets normalize identically (spec principle 16). Mapped fields: `temperature_c`→temperature (degC), `relative_humidity_pct`→relative_humidity (%), `vibration_rms_ms2`→vibration_rms (m/s2), `current_ma`→current (converted to A), `fan_a_load_pct`→load_percent (%), `chiller_b_running`→equipment_running. Unmapped fields, type mismatches and signals the device does not declare are reported as rejected readings, never silently dropped. `observed_at` is canonicalized to UTC ISO with milliseconds so equal instants share one dedupe identity. Known limitation: every reading is attributed to the device's single asset; separate assets for backup equipment (Fan B) need a later registry extension.
+- **Reason:** Principle 16 and "no failure silently becomes success".
+
+## D-021 — Plausibility thresholds in config; quality factors (S2, 2026-09-30)
+
+- **Decision:** Physical plausibility ranges, staleness window and confidence factors live in `config/rules/data-quality.v1.json`, parsed and validated by `data-quality`; the file is loaded by the composition root, not by the package. Confidence is 1, halved when stale, halved when the device is not healthy, and 0 when out of range, observed in the future, or unauthenticated.
+- **Reason:** Spec 50.10 (thresholds in versioned config). Deterministic, no baselines or statistics (S3).
+
+## D-022 — Local runtime composition, `tsx`, and `pnpm dev` (S2, 2026-09-30)
+
+- **Decision:** `scripts/local-runtime.ts` is the local composition root (the root package depends on the workspace packages it wires). `pnpm dev` (`scripts/dev.mjs`) starts api+worker as one process (they share the in-memory bus; separate Cloud Run deployables in S9) and the simulator as a separate process talking over HTTP. `web` is NOT started (Next.js arrives in S7); the launcher says so. `tsx` was added as a devDependency to run TypeScript sources (Node's type stripping cannot resolve our extensionless imports), and pnpm 12 required explicitly approving esbuild's install script (`allowBuilds` in `pnpm-workspace.yaml`). `pnpm smoke:s2` runs a real-HTTP smoke test against the runtime.
+- **Reason:** Spec section 39 asks for `pnpm dev` to run web, api, worker and simulator; this is the honest S2 subset. The locked four-deployable architecture is unchanged.

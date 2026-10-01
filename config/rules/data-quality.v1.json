@@ -1,0 +1,16 @@
+{
+  "version": "data-quality.v1",
+  "staleAfterSeconds": 120,
+  "futureToleranceSeconds": 60,
+  "staleConfidenceFactor": 0.5,
+  "unhealthyConfidenceFactor": 0.5,
+  "ranges": {
+    "temperature": { "min": -80, "max": 150 },
+    "relative_humidity": { "min": 0, "max": 100 },
+    "vibration_rms": { "min": 0, "max": 200 },
+    "current": { "min": 0, "max": 100 },
+    "load_percent": { "min": 0, "max": 100 },
+    "flow": { "min": 0, "max": 100000 },
+    "outdoor_temperature": { "min": -80, "max": 150 }
+  }
+}
