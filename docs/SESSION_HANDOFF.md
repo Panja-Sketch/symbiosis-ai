@@ -2,7 +2,7 @@
 
 ## Current phase
 
-S3 — Detection + baselines (finished; S4 not started)
+S4 — Operations workflow (finished; S5 not started)
 
 ## Current phase status
 
@@ -10,76 +10,81 @@ COMPLETE
 
 ## Last completed phase
 
-S3 — Detection + baselines (S0, S1, S2 completed earlier)
+S4 — Operations workflow (S0 to S3 completed earlier)
 
 ## Completed work
 
-- **Step 0, multi-asset mapping (D-023):** `DeviceRecord.assetMapping { byField, bySignal }` over a default `assetId`; resolved in `normalization.resolveAssetId`; carried in `telemetry.authenticated`. Synthetic device maps zone readings to `AST-SIM-ZONE-1`, outdoor temperature to `AST-SIM-OUTDOOR`, `chiller_b_running` to `AST-SIM-FAN-B`; vibration/current/load stay on `AST-SIM-FAN-A`. One-asset devices unchanged. `outdoor_temperature_c` added to the shared edge-v1 mapping.
-- **`packages/baselines`:** config parsing, operating-mode resolution, `startBaseline`, `learn` (Welford), `zScore` (with stddev floor), `percentDeviation`, `rebaseline` (supersede + audit record). Statuses LEARNING / READY / INSUFFICIENT_DATA / SUPERSEDED (D-024, D-025).
-- **`packages/risk-detection`:** rule config parsing and `evaluateSample` (pure): per-instant facts, baseline learning, hero rule, persistence, severity, per-observation evaluations and detections (D-026).
-- **`packages/data-quality`:** `assessTrust` / `TrustPolicy`.
-- **`packages/repositories`:** baseline (history, snapshots, audit), detection-state, case (correlation lookup) and risk-event interfaces with in-memory implementations.
-- **`packages/risk-cases`:** `RECORD_DETECTION` command (state-neutral, severity only escalates). **`packages/risk-lifecycle`:** `openCaseFromDetection`, `caseMatchesDetection`, `isEpisodeActive` (D-027).
-- **`packages/contracts`:** baseline, snapshot, audit, detection, evaluation, `DetectionState` types; events `risk.observation_evaluated.v1`, `risk.detected.v1`, `case.created.v1`, `case.updated.v1`; `BASELINE` domain entity.
-- **`apps/worker/src/risk-pipeline.ts`:** `startRiskPipeline` wires `telemetry.quality_assessed` to evaluation, detection and case creation/update (D-028).
-- **Config (versioned, `config/rules/`):** `baselines.v1.json`, `cooling-electrical.v1.json` (alongside `data-quality.v1.json`).
-- **Simulator scenarios (`adapters/simulator/src/scenarios.ts`):** normal, isolated-vibration, isolated-current, context-only, compound-outdoor-heat, compound-rising-temperature; `SIMULATOR_SCENARIO` env in the CLI. All still go through signed, authenticated ingestion.
-- **Scripts:** `pnpm smoke:s3` (new), `pnpm smoke:s2` updated; `pnpm dev` now logs risk/case events.
-- Bug found by the S3 smoke and fixed with a regression test: a perfectly flat temperature series produced a slope of about -2e-29, so with `slope > 0` float noise could read as "rising"; slopes below 1e-9 degC/h are now zero.
-- Not implemented (by design): alerts/notifications, acknowledgement, assignment, actions, escalation, verification, recurrence after verified improvement, evidence, consent, UI, AI, cloud, firmware.
+- **Alerting (`packages/notifications`):** `NotificationSender` port, `ConsoleEmail` (local; nothing is emailed), deterministic rule-based alert text, `createAlerting`/`startAlerting`. `case.created` requests the INITIAL alert; the event becomes `ALERTED` only when the channel returns SENT. Failures are stored, retried (config), and become `exhausted` (D-030, D-031).
+- **Escalation (`packages/escalation`):** versioned policy (`config/escalation/escalation.v1.json`), `runEscalationTick` (pure over repositories + Clock). Unacknowledged `ALERTED` events escalate after the severity deadline; exhausted undelivered alerts escalate `DETECTED` events; separate ESCALATION alert to ORG_ADMIN (D-033).
+- **Operations service (`packages/action-orchestration`):** `createOperations` for acknowledge case, assign action, acknowledge action, report action, dismiss, case view/list; approved action library (`config/action-library/cooling-actions.v1.json`, RECOMMEND_ONLY enforced at parse); all-or-nothing commands (D-034).
+- **Identity/authz (`packages/tenancy`, `packages/authz`):** synthetic actor directory (org/facility scope from the server side), role→permission table. Development identity only (D-032).
+- **Audit (`packages/audit`):** append-only in-memory log of material actions (no hash chain yet).
+- **API/UI (`apps/api`):** `app-handler` (`/api/v1/me`, `cases`, `cases/:id`, `acknowledge`, `assignments`, `actions`, `actions/:id/acknowledge`, `dismiss`, `ops/tick`) and minimal server-rendered, script-free pages `/ui/cases`, `/ui/cases/:id` (workflow-proof, not the S7 UI). A router separates signed `/edge/*` traffic from `/api` and `/ui` (D-036).
+- **Detections in workflow states (D-035):** `RECORD_DETECTION` legal in `ACTION_REPORTED`; every detection audited (`CASE_CREATED`, `DETECTION_RECORDED`); worker pipeline now needs an `AuditLog`.
+- **S1 adjustment (D-033):** event table gained `DETECTED -> ESCALATED` (pinned by regression tests). `MitigationAction` gained optional metadata fields. `case.updated` payload generalized (`change`, `previousState`).
+- **Events (all `.v1`):** `risk.alert_requested`, `notification.requested|sent|failed`, `risk.alerted`, `risk.acknowledged`, `risk.escalated`, `risk.dismissed`, `action.assigned|acknowledged|reported`.
+- **Runtime:** `scripts/local-runtime.ts` wires everything; `runtime.tick()` = retries then escalation; `pnpm dev` runs a scheduler-stand-in tick (`OPS_TICK_INTERVAL_MS`) and logs the new events; `pnpm smoke:s4` added.
+- Not implemented (by design): verification (any), recurrence, evidence, consent, intervention prioritization, Next.js/persona UI, Gemini, Firebase/Firestore/Pub/Sub/Cloud Scheduler/Storage, SMTP, firmware, equipment control.
 
 ## Files changed
 
-Commit `33479de` (`feat(s3): implement baselines and deterministic risk detection`): 48 files, +4346/-50 (17 new, 31 modified). New sources: `packages/baselines`, `packages/risk-detection/src/{config,evaluate}.ts`, `packages/contracts/src/{baseline,risk}.ts`, `apps/worker/src/risk-pipeline.ts`, `adapters/simulator/src/scenarios.ts`, `scripts/smoke-s3.ts`, the two rule configs, and tests. Modified: contracts events/errors/edge, device-registry, normalization, data-quality, repositories, risk-cases, risk-lifecycle, api handler, worker, simulator CLI, local runtime, dev scripts, S2 tests/smoke (updated where S3 legitimately changed them), README, DECISIONS (D-023 to D-029), IMPLEMENTATION_STATE.
+Commit `6d1a3c0` (`feat(s4): implement operations risk workflow`): 65 files, +5926/-189. New: `packages/{audit,authz,tenancy,escalation,notifications}` sources and tests, `packages/action-orchestration/src/{actions,library,operations,view,world.fixture}.ts` (S1 code moved to `actions.ts`), `packages/contracts/src/operations.ts`, `apps/api/src/{app-handler,html}.ts`, `config/escalation/escalation.v1.json`, `config/action-library/cooling-actions.v1.json`, `scripts/smoke-s4.ts`, `tests/integration/operations.test.ts`, `tests/unit/operations-boundaries.test.ts`. Modified: contracts events/action, repositories (alerts, actions), risk-cases and risk-lifecycle (S1 adjustments), worker risk pipeline (audit), local runtime and dev scripts, S3-era tests/smokes that S4 legitimately changed, README, DECISIONS (D-030 to D-036), IMPLEMENTATION_STATE, `.env.example`.
 The follow-up docs commit updates only this file.
 
 ## Commands executed
 
-`pnpm install`, `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm format:check`, `pnpm vitest run --reporter=json` (counts), `pnpm smoke:s2`, `pnpm smoke:s3`, `pnpm dev` (several short runs incl. scenario env), mutation checks on the detector (inclusive threshold flipped to exclusive: 4 tests failed; single signal allowed to be a candidate: 21 failed; both restored), grep audits (cloud SDKs, AI references, secrets, 64-hex literals, S4 terms, hard-coded thresholds), dependency-graph listing, `git status/log`.
+`pnpm install`, `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm format:check`, `pnpm vitest run --reporter=json` (counts), `pnpm smoke:s2`, `pnpm smoke:s3`, `pnpm smoke:s4`, `pnpm dev` (live curl of UI, API, edge), three mutation checks (see below), grep audits (cloud SDKs, AI refs, secrets, 64-hex, S5 calls, email addresses), dependency-graph listing, `git status/log`.
 
 ## Exact test results
 
 - `pnpm lint`: exit 0. `pnpm typecheck`: exit 0. `pnpm format:check`: clean.
-- `pnpm test`: **27 test files, 409 tests, 409 passed, 0 failed.**
-  - risk-detection 59; risk-cases 36 (+6 in detection.test.ts); edge-security authenticate 32; risk-lifecycle 31 (+5 in detection.test.ts); contracts edge 25; baselines 25; api edge-handler 16; edge-security signing 15; data-quality 15 (+10 trust); tests/integration/detection 13; repositories s3 13 (+5); worker risk-pipeline 13; recommendations 12; tests/integration/ingestion 11; normalization 11; tests/unit/domain-boundaries 10; worker telemetry 9; action-orchestration 8; tests/unit/workspace.smoke 7; tests/unit/ingestion-boundaries 7; event-bus 7; verification 6; clock 2.
-- **`pnpm smoke:s2`: exit 0, 9 PASS, 0 FAIL.**
-- **`pnpm smoke:s3`: exit 0, 21 PASS, 0 FAIL** (real HTTP, default config, simulated clock, no waiting): 25 normal samples (the default 120 s warm-up) → vibration/current/temperature/humidity baselines READY; healthy samples NORMAL, no case; isolated vibration and isolated current → WATCH, no `risk.detected`, no case; 3 persistent compound samples → exactly one `risk.detected`, exactly one case (OPEN, DETECTED_HAZARD, MODERATE, assets AST-SIM-FAN-A + AST-SIM-OUTDOOR), exactly one risk event (DETECTED); order `quality_assessed → observation_evaluated ×3 → risk.detected → case.created`; four more compound samples → still one case and one event, `case.updated` ×4; no S4+ events; no dead letters. Reason codes: VIBRATION_Z_AT_OR_ABOVE_THRESHOLD, CURRENT_DEVIATION_AT_OR_ABOVE_THRESHOLD, OUTDOOR_HEAT_CONTEXT, PERSISTED_3_OF_3 (z = 8.5, current +12.2%, outdoor 107.6 F).
-- Audits: no cloud SDK dependency/import; no AI references in S3 code; no secret patterns; the only 64-hex strings are the public synthetic signing vector; only `.env.example` tracked; no S4 terms except one comment; no hard-coded thresholds in detector source; dependency graph acyclic (also asserted by a test).
+- `pnpm test`: **37 test files, 527 tests, 527 passed, 0 failed.** Largest: risk-detection 59, risk-cases 36 (+7), action-orchestration operations 35 (+10 library, +8 S1 actions), authenticate 32, risk-lifecycle 31 (+5 +4 escalation-path), contracts edge 25, baselines 25, notifications 17, integration operations 16, api edge-handler 16, escalation 13, tests/unit boundaries (domain 10, ingestion 7, operations 9), plus the S1–S3 suites; new small suites: tenancy 4, authz 4, audit 3.
+- **`pnpm smoke:s2`: exit 0, 9 PASS. `pnpm smoke:s3`: exit 0, 21 PASS. `pnpm smoke:s4`: exit 0, 31 PASS, 0 FAIL.**
+  - S4 smoke (real HTTP, simulated time): baseline → compound deterioration → exactly one case and one risk event → alert requested, ConsoleEmail printed, event ALERTED in order → facility manager acknowledges (event ACKNOWLEDGED, case OPEN, duplicate acknowledgement 409) → approved action assigned (201, case ACTION_REQUIRED, action ASSIGNED with library version; unapproved action 400) → assignee acknowledges → report (action REPORTED_COMPLETE, event ACTION_REPORTED, case ACTION_REPORTED) → case is not VERIFIED_IMPROVED, no verification id, no `verification.*` event, API and UI say VERIFICATION PENDING and never render the word VERIFIED → three more compound samples keep one case in ACTION_REPORTED → other-organization actor gets 404 → no dead letters. S4 event order: `risk.alert_requested > notification.requested > notification.sent > risk.alerted > risk.acknowledged > action.assigned > action.acknowledged > action.reported`. Audit: CASE_CREATED, ALERT_REQUESTED, ALERT_SENT, RISK_ALERTED, RISK_ACKNOWLEDGED, ACTION_ASSIGNED, ACTION_ACKNOWLEDGED, ACTION_REPORTED, DETECTION_RECORDED.
+- Mutation checks: failed alert still marking ALERTED → 8 tests failed; removing facility scoping → 1 failed; escalating regardless of acknowledgement → no failure because the S1 state machine independently rejects `ACKNOWLEDGED -> ESCALATED` (defense in depth). All restored.
+- Audits: no cloud SDK dependency/import (only two older comments name Firestore/PubSubBus); no AI references in S4 code; no secrets; only 64-hex strings are the public synthetic signing vector; only `.env.example` tracked; no email addresses; no verification calls in S4 code; dependency graph acyclic (asserted by a test).
+
+## Alert / acknowledgement / action / escalation behavior
+
+- Alert: INITIAL alert id `ALR-<riskEventId>-INITIAL`; recipient = first FACILITY_MANAGER of the facility; ALERTED only after SENT; failure → stays DETECTED, retry every 60 s up to 3 attempts, then exhausted and escalated by the tick.
+- Acknowledgement: needs ALERTED or ESCALATED; changes only the event (audited, `risk.acknowledged`); duplicate → 409.
+- Actions: assign (event ACKNOWLEDGED; OPEN→ACTION_REQUIRED, owner set), assignee-only acknowledgement, report (event ACKNOWLEDGED→ACTION_REPORTED, case →ACTION_REPORTED; also allowed for further actions while ACTION_REPORTED); duplicate report 409; actions must be in the approved library and apply to the hazard.
+- Escalation: deadline from alert `sentAt` by case severity (MODERATE 900 s); acknowledged events never escalate; escalation alert goes to ORG_ADMIN; original alert untouched; physical severity unchanged.
+- Continued detections: ACTION_REQUIRED and ACTION_REPORTED keep their state, no duplicate case, recorded and audited; VERIFYING and later untouched (S5).
 
 ## Known issues
 
-- **Recurrence is not handled (S5):** `isEpisodeActive`/`findActive` treat `VERIFIED_IMPROVED` as inactive, so a detection against a verified case would currently open a second case. S5 must intercept that match first (D-027).
-- **`RECORD_DETECTION` extends the S1 aggregate** (the only S1 change in S3); detections against cases in `ACTION_REPORTED`, `VERIFYING` and other later states are published but not applied to the case until S4/S5 define behavior.
-- **Episodes never end in S3:** no `SELF_RESOLVED`/closure logic; continued qualifying instants keep producing `risk.detected` + `case.updated`.
-- **Backup equipment state** (`equipment_running` on `AST-SIM-FAN-B`) is stored as a fact but does not influence severity yet ("control availability", spec 15.2).
-- **Timing assumptions:** primary signals must share one `observed_at` (a telemetry sample); out-of-order or late observations are ignored by baselines and may be ignored by persistence. Detector state is per (org, facility, rule) and is loaded/saved per event (fine in memory; revisit contention in S9).
-- **Baseline learning from the first samples assumes a known-normal start** (operator responsibility). Re-baseline exists as a domain function with audit record but has no API/UI/authz yet.
-- **Severity in the demo is MODERATE** because current rises +12.2% (HIGH needs z >= 4 and +15%); thresholds are config and should be tuned after hardware characterization (H4).
-- Smoke scripts set `process.exitCode` (calling `process.exit()` while sockets close crashes Node on Windows).
-- Carried over: TypeScript pinned `~6.0`; pnpm notes `eslint@9` deprecated; auth failures return specific codes; firmware must persist its sequence; event payloads camelCase vs wire snake_case.
+- **Dismissal then flapping:** a dismissed case is CLOSED, so the next qualifying detection opens a new case. False-alarm suppression needs a later design (S5/S6).
+- **Failed alert blocks acknowledgement until escalation:** an event still `DETECTED` cannot be acknowledged; it escalates only after all delivery attempts fail (about 2 minutes with the default policy), then can be acknowledged. A shorter path (acknowledge from the UI while delivery is failing) was deliberately not added.
+- **Event timestamps for workflow commands** use `max(clock, entity.updatedAt)` so device-clock skew cannot cause regressions; times in audit and events are therefore not strictly wall-clock.
+- **Ownership:** the case owner is set only when an action is assigned (or reported); the alert recipient is recorded on the alert, not as case owner.
+- **S5 must intercept:** recurrence (a detection against `VERIFIED_IMPROVED`, still opens a second case per D-027), `NOT_IMPROVING`/`INCONCLUSIVE` handling of detections during ACTION_REPORTED, and when `VERIFYING` starts.
+- **Local only:** development identity header, in-memory repositories/audit/replay state, `POST /api/v1/ops/tick`, ConsoleEmail. The S4 pages are not the final UI.
+- Detection-continued `case.updated` events are emitted on every qualifying instant (noisy but auditable).
+- Carried over: TypeScript pinned `~6.0`; pnpm notes `eslint@9` deprecated; specific edge auth error codes; firmware must persist its sequence; Windows `process.exit()` crash avoided via `process.exitCode`.
 
 ## Architectural decisions made
 
-See `docs/DECISIONS.md` (D-001 to D-029).
+See `docs/DECISIONS.md` (D-001 to D-036).
 
 ## Current git status
 
-Clean after the S3 handoff commit; `main` pushed to `origin/main`.
+Clean after the S4 handoff commit; `main` pushed to `origin/main`.
 
 ## Last known good commit SHA
 
-`33479de39e2b92e75da3106b44f1314ea5a593c0` (S3 implementation). Check `git log` for the later handoff commit.
+`6d1a3c0ea59e63ee2a50d23076d5356f35645681` (S4 implementation). Check `git log` for the later handoff commit.
 
 ## Exact next task
 
-S4 — Operations workflow (PROJECT_SPEC section 45; sections 6, 7, 24.1, 25): alert request, acknowledgement (audited), action report, escalation, notifications (console email), and the case UI/API surface for the operations side, all on the S1 lifecycle and the S3 cases. Do not start until explicitly instructed. Suggested first slice: the `risk.alert_requested` event and a notifications port (`ConsoleEmail`), then acknowledgement/escalation using `applyRiskEventCommand` and the case state machine, keeping S5 verification out.
+S5 — Verification + recurrence + intervention prioritization (PROJECT_SPEC section 45; sections 8, 16, 23A, 35 stages 5-7 and 10): versioned verification policy in `config/verification-policy/`, verification windows and the deterministic policy engine, INCONCLUSIVE behavior for missing or untrusted data, evidence IDs, `verification.started`/`verification.completed`, recurrence monitoring and reopening, and risk-engineer intervention prioritization (`config/intervention-policy/`). Do not start until explicitly instructed. Suggested first slice: the verification-policy config and a pure engine over canonical observations that consumes the S3 baselines, then the `ACTION_REPORTED -> VERIFYING` trigger in `action-orchestration`/`risk-lifecycle`, keeping the S4 view's `VERIFICATION PENDING` label until a result exists.
 
 ## Exact commands needed to resume
 
 ```
-git status && git log --oneline -8
+git status && git log --oneline -10
 pnpm install && pnpm lint && pnpm typecheck && pnpm test && pnpm format:check
-pnpm smoke:s2 && pnpm smoke:s3
+pnpm smoke:s2 && pnpm smoke:s3 && pnpm smoke:s4
 ```
 
 ## Cloud resources touched
@@ -88,4 +93,4 @@ None
 
 ## Secrets referenced (NAME ONLY)
 
-None referenced in code. Placeholder names in `.env.example`: GCP_PROJECT_ID, GCP_REGION, FIREBASE_PROJECT_ID, DEVICE_KEY_SECRET_NAME, SMTP_SECRET_NAME, EVIDENCE_SIGNING_SECRET_NAME, EDGE_PORT, EDGE_BASE_URL, SIMULATOR_INTERVAL_MS, SIMULATOR_DEVICE_ID, SIMULATOR_KEY_ID, SIMULATOR_DEVICE_KEY_HEX, SIMULATOR_SCENARIO. The simulator's default key is the public synthetic dev key from `@symbiosis/device-registry`; no real device key exists in the repository.
+None referenced in code. Placeholder names in `.env.example`: GCP_PROJECT_ID, GCP_REGION, FIREBASE_PROJECT_ID, DEVICE_KEY_SECRET_NAME, SMTP_SECRET_NAME, EVIDENCE_SIGNING_SECRET_NAME, EDGE_PORT, EDGE_BASE_URL, SIMULATOR_INTERVAL_MS, SIMULATOR_DEVICE_ID, SIMULATOR_KEY_ID, SIMULATOR_DEVICE_KEY_HEX, SIMULATOR_SCENARIO, OPS_TICK_INTERVAL_MS. The simulator's default key is the public synthetic dev key from `@symbiosis/device-registry`; the local actor IDs are synthetic; no real device key, credential or email address exists in the repository.
