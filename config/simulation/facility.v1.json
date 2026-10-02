@@ -1,0 +1,55 @@
+{
+  "schema": "simulation-facility.v1",
+  "organizationId": "ORG-SIM-001",
+  "facilityId": "FAC-SIM-PHX-01",
+  "name": "Northgate Cold Storage - Phoenix",
+  "description": "A synthetic cold-storage facility used for the Facility Simulation. Every reading, building and weather value shown for it that is not labelled LIVE WEATHER is simulation data.",
+  "location": { "label": "Phoenix, AZ", "latitude": 33.4484, "longitude": -112.074 },
+  "weatherDeviceId": "DEV-SIM-WX-01",
+  "assets": [
+    { "assetId": "AST-SIM-ZONE-1", "name": "Cold Storage Zone 1", "kind": "ZONE" },
+    { "assetId": "AST-SIM-FAN-A", "name": "Primary Cooling Unit (CU-A)", "kind": "COOLING_PRIMARY" },
+    { "assetId": "AST-SIM-FAN-B", "name": "Backup Cooling Unit (CU-B)", "kind": "COOLING_BACKUP" },
+    { "assetId": "AST-SIM-OUTDOOR", "name": "Outdoor / Site Weather", "kind": "WEATHER" }
+  ],
+  "devices": [
+    {
+      "deviceId": "DEV-SIM-HVAC-01",
+      "keyId": "KEY-SIM-HVAC-01",
+      "profileId": "sim-hvac-controller",
+      "displayName": "HVAC Controller",
+      "group": "hvac",
+      "assetId": "AST-SIM-ZONE-1",
+      "assetMapping": { "bySignal": { "equipment_running": "AST-SIM-FAN-B" } },
+      "expectedSignals": ["temperature", "relative_humidity", "equipment_running"]
+    },
+    {
+      "deviceId": "DEV-SIM-VIB-01",
+      "keyId": "KEY-SIM-VIB-01",
+      "profileId": "sim-vibration-gateway",
+      "displayName": "Vibration Sensor Gateway",
+      "group": "vibration",
+      "assetId": "AST-SIM-FAN-A",
+      "expectedSignals": ["vibration_rms"]
+    },
+    {
+      "deviceId": "DEV-SIM-PWR-01",
+      "keyId": "KEY-SIM-PWR-01",
+      "profileId": "sim-electrical-meter",
+      "displayName": "Electrical Meter Gateway",
+      "group": "meter",
+      "assetId": "AST-SIM-FAN-A",
+      "expectedSignals": ["current", "load_percent", "equipment_running"]
+    }
+  ],
+  "sensors": [
+    { "sensorId": "SNS-ZONE-TEMP", "name": "Zone temperature", "assetId": "AST-SIM-ZONE-1", "signal": "temperature", "displayUnit": "degC", "group": "hvac" },
+    { "sensorId": "SNS-ZONE-RH", "name": "Zone humidity", "assetId": "AST-SIM-ZONE-1", "signal": "relative_humidity", "displayUnit": "%", "group": "hvac" },
+    { "sensorId": "SNS-CUA-VIB", "name": "CU-A vibration", "assetId": "AST-SIM-FAN-A", "signal": "vibration_rms", "displayUnit": "m/s2", "group": "vibration" },
+    { "sensorId": "SNS-CUA-CURRENT", "name": "CU-A electrical current", "assetId": "AST-SIM-FAN-A", "signal": "current", "displayUnit": "A", "group": "meter" },
+    { "sensorId": "SNS-CUA-LOAD", "name": "CU-A load", "assetId": "AST-SIM-FAN-A", "signal": "load_percent", "displayUnit": "%", "group": "meter" },
+    { "sensorId": "SNS-CUA-RUN", "name": "CU-A running", "assetId": "AST-SIM-FAN-A", "signal": "equipment_running", "displayUnit": "state", "group": "meter" },
+    { "sensorId": "SNS-CUB-RUN", "name": "CU-B running", "assetId": "AST-SIM-FAN-B", "signal": "equipment_running", "displayUnit": "state", "group": "hvac" },
+    { "sensorId": "SNS-OUTDOOR-TEMP", "name": "Outdoor temperature", "assetId": "AST-SIM-OUTDOOR", "signal": "outdoor_temperature", "displayUnit": "degC", "group": "weather" }
+  ]
+}

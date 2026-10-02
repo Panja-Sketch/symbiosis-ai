@@ -621,11 +621,21 @@ export async function resolveEvidence(
   deps: Pick<
     VerificationRunnerDeps,
     "observations" | "baselines" | "actions" | "audit" | "registry"
-  > & { readonly knownPolicies: readonly { policyId: string; policyVersion: string }[] },
+  > & {
+    readonly knownPolicies:
+      | readonly { policyId: string; policyVersion: string }[]
+      | ((
+          attempt: VerificationAttempt,
+        ) =>
+          | readonly { policyId: string; policyVersion: string }[]
+          | Promise<readonly { policyId: string; policyVersion: string }[]>);
+  },
   attempt: VerificationAttempt,
 ): Promise<readonly EvidenceResolution[]> {
   const org = attempt.organizationId;
   const trail = await deps.audit.listByCase(org, attempt.caseId);
+  const knownPolicies =
+    typeof deps.knownPolicies === "function" ? await deps.knownPolicies(attempt) : deps.knownPolicies;
   const out: EvidenceResolution[] = [];
   for (const ref of attempt.evidenceReferences ?? []) {
     let exists = false;
@@ -643,7 +653,7 @@ export async function resolveEvidence(
         exists = trail.some((e) => e.auditId === ref.id);
         break;
       case "POLICY":
-        exists = deps.knownPolicies.some(
+        exists = knownPolicies.some(
           (p) => `POLICY:${p.policyId}:${p.policyVersion}` === ref.id,
         );
         break;

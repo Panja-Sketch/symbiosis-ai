@@ -10,10 +10,16 @@ import { parseEscalationPolicy } from "@symbiosis/escalation";
 import type { EscalationPolicy } from "@symbiosis/escalation";
 import { parseInterventionPolicy } from "@symbiosis/intervention-prioritization";
 import type { InterventionPolicy } from "@symbiosis/intervention-prioritization";
+import type { SourceMappingDefinition } from "@symbiosis/contracts";
+import { parseSourceMapping } from "@symbiosis/normalization";
+import { parseFollowUpPolicy } from "@symbiosis/notifications";
+import type { FollowUpPolicy } from "@symbiosis/notifications";
+import { parseFacilityModel, parseScenarios } from "@symbiosis/simulation";
 import { parseRuleConfig } from "@symbiosis/risk-detection";
 import type { RuleConfig } from "@symbiosis/risk-detection";
 import { parseVerificationPolicy } from "@symbiosis/verification";
 import type { VerificationPolicy } from "@symbiosis/verification";
+import { parsePolicyParameters } from "./simulation-policy";
 
 /**
  * Runtime selection and validation (S9).
@@ -182,3 +188,29 @@ export const loadActionLibrary = (env?: Env): ActionLibrary =>
   parseActionLibrary(readJson("action-library/cooling-actions.v1.json", env));
 export const loadExplanationConfig = (env: Env = process.env) =>
   resolveExplanationConfig(readJson("explanation/explanation.v1.json", env), env);
+
+/** Production files exactly as read, before any simulation override (D-092). */
+export const loadRawPolicyBase = (env?: Env) => ({
+  rule: readJson("rules/cooling-electrical.v1.json", env),
+  baseline: readJson("rules/baselines.v1.json", env),
+  dataQuality: readJson("rules/data-quality.v1.json", env),
+  verification: readJson("verification-policy/cooling-electrical.v1.json", env),
+  escalation: readJson("escalation/escalation.v1.json", env),
+  followUp: readJson("notifications/follow-up.v1.json", env),
+});
+export const loadFollowUpPolicy = (env?: Env): FollowUpPolicy =>
+  parseFollowUpPolicy(readJson("notifications/follow-up.v1.json", env));
+export const loadPolicyParameters = (env?: Env) =>
+  parsePolicyParameters(readJson("simulation/policy.v1.json", env));
+export const loadSimulationFacility = (env?: Env) =>
+  parseFacilityModel(readJson("simulation/facility.v1.json", env));
+export const loadScenarios = (env?: Env) =>
+  parseScenarios(readJson("simulation/scenarios.v1.json", env));
+export const loadAdapterProfiles = (env?: Env): SourceMappingDefinition[] =>
+  ["sim-bas-gateway", "sim-hvac-controller", "sim-vibration-gateway", "sim-electrical-meter"].map(
+    (id) => {
+      const parsed = parseSourceMapping(readJson(`adapters/${id}.v1.json`, env));
+      if (!parsed.ok) throw new Error(`invalid adapter profile ${id}: ${parsed.issues.join("; ")}`);
+      return parsed.value;
+    },
+  );

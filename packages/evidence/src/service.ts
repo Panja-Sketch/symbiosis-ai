@@ -49,8 +49,13 @@ export type EvidenceServiceDeps = {
   readonly verifications: VerificationRepository;
   readonly packages: EvidencePackageRepository;
   readonly store: EvidenceObjectStore;
-  /** Verification policies in force; each referenced POLICY artifact must be one of these. */
-  readonly policies: readonly PolicyDocument[];
+  /**
+   * Verification policies in force; each referenced POLICY artifact must be one of these. A function
+   * resolves the exact versions an attempt used (the simulation tenant has versioned policies, D-092).
+   */
+  readonly policies:
+    | readonly PolicyDocument[]
+    | ((attempt: VerificationAttempt) => readonly PolicyDocument[] | Promise<readonly PolicyDocument[]>);
   /** Approved actions for a hazard, from the versioned action library. */
   approvedActionsFor(hazardType: string): readonly ApprovedActionFact[];
 };
@@ -169,7 +174,7 @@ export function createEvidenceService(deps: EvidenceServiceDeps): EvidenceServic
       observations,
       baselines,
       auditEntries,
-      policies: deps.policies,
+      policies: typeof deps.policies === "function" ? await deps.policies(attempt) : deps.policies,
       approvedActions: deps.approvedActionsFor(caseRecord.hazardType),
     });
     if (!built.ok) return built;

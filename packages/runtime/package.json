@@ -7,8 +7,10 @@
   "types": "src/index.ts",
   "dependencies": {
     "@symbiosis/action-orchestration": "workspace:*",
+    "@symbiosis/adapter-email": "workspace:*",
     "@symbiosis/adapter-gcp": "workspace:*",
     "@symbiosis/adapter-simulator": "workspace:*",
+    "@symbiosis/adapter-weather": "workspace:*",
     "@symbiosis/ai-explanation": "workspace:*",
     "@symbiosis/api": "workspace:*",
     "@symbiosis/audit": "workspace:*",
@@ -27,6 +29,7 @@
     "@symbiosis/notifications": "workspace:*",
     "@symbiosis/repositories": "workspace:*",
     "@symbiosis/risk-detection": "workspace:*",
+    "@symbiosis/simulation": "workspace:*",
     "@symbiosis/tenancy": "workspace:*",
     "@symbiosis/verification": "workspace:*",
     "@symbiosis/worker": "workspace:*"

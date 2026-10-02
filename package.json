@@ -58,6 +58,7 @@
     "@symbiosis/risk-detection": "workspace:*",
     "@symbiosis/risk-lifecycle": "workspace:*",
     "@symbiosis/runtime": "workspace:*",
+    "@symbiosis/simulation": "workspace:*",
     "@symbiosis/tenancy": "workspace:*",
     "@symbiosis/verification": "workspace:*",
     "@symbiosis/worker": "workspace:*",

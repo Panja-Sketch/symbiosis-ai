@@ -1,0 +1,128 @@
+{
+  "schema": "simulation-scenarios.v1",
+  "scenarios": [
+    {
+      "id": "NORMAL",
+      "label": "Normal operation",
+      "summary": "Healthy cooling plant on a normal day. Everything reads inside its learned range.",
+      "values": {
+        "zoneTemperatureC": 4.2,
+        "relativeHumidityPct": 55,
+        "vibrationRmsMs2": 0.3,
+        "currentA": 12,
+        "loadPercent": 80,
+        "primaryRunning": true,
+        "backupRunning": false,
+        "outdoorTemperatureC": 30,
+        "sensors": {
+          "hvac": { "health": "HEALTHY", "staleSeconds": 0, "dropout": false },
+          "vibration": { "health": "HEALTHY", "staleSeconds": 0, "dropout": false },
+          "meter": { "health": "HEALTHY", "staleSeconds": 0, "dropout": false }
+        }
+      },
+      "rampSeconds": 0,
+      "weatherMode": "LIVE",
+      "world": "Equipment and zone are steady. Weather is the live outside conditions when live weather is configured.",
+      "expectation": "No case should open. Use this first: the system learns what normal looks like."
+    },
+    {
+      "id": "EMERGING_DETERIORATION",
+      "label": "Emerging deterioration",
+      "summary": "Vibration and current creep upward while the zone warms slowly. Nothing changes suddenly.",
+      "values": {
+        "zoneTemperatureC": 5.2,
+        "vibrationRmsMs2": 0.42,
+        "currentA": 13.6,
+        "outdoorTemperatureC": 38
+      },
+      "rampSeconds": 150,
+      "weatherMode": "SIMULATED",
+      "world": "Over about 2.5 minutes the primary unit vibrates more and draws more current; the zone temperature drifts up. Simulated outdoor weather stays just below the heat limit.",
+      "expectation": "A single abnormal signal is only a watch; a case should open only if the combined condition persists."
+    },
+    {
+      "id": "COMPOUND_COOLING_RISK",
+      "label": "Compound cooling risk",
+      "summary": "Strong vibration and current anomalies on a very hot day while the zone warms.",
+      "values": {
+        "zoneTemperatureC": 5.0,
+        "vibrationRmsMs2": 0.62,
+        "currentA": 14,
+        "backupRunning": false,
+        "outdoorTemperatureC": 42
+      },
+      "rampSeconds": 20,
+      "weatherMode": "SIMULATED",
+      "world": "The primary cooling unit is mechanically degraded: high vibration, high current, a warming zone, and a simulated 108 F day.",
+      "expectation": "Several consecutive checks should confirm the pattern, open one case and send one alert."
+    },
+    {
+      "id": "INEFFECTIVE_MITIGATION",
+      "label": "Ineffective mitigation",
+      "summary": "A person reports an action, but the primary unit stays degraded.",
+      "values": {
+        "zoneTemperatureC": 5.0,
+        "vibrationRmsMs2": 0.62,
+        "currentA": 14,
+        "backupRunning": true,
+        "outdoorTemperatureC": 42
+      },
+      "rampSeconds": 0,
+      "weatherMode": "SIMULATED",
+      "world": "The backup unit is running, but the primary unit's vibration and current stay abnormal.",
+      "expectation": "Reporting an action must not close the case: later sensor readings decide, and a follow-up is expected if they do not improve."
+    },
+    {
+      "id": "SUCCESSFUL_MITIGATION",
+      "label": "Successful mitigation",
+      "summary": "The primary unit is repaired: vibration and current return to normal.",
+      "values": {
+        "zoneTemperatureC": 4.2,
+        "vibrationRmsMs2": 0.3,
+        "currentA": 12,
+        "backupRunning": true,
+        "outdoorTemperatureC": 42
+      },
+      "rampSeconds": 10,
+      "weatherMode": "SIMULATED",
+      "world": "Mechanical condition and current draw are back at their learned values; the zone cools. The hot day continues.",
+      "expectation": "After a reported action and enough trusted post-action readings, verification should be able to confirm the improvement."
+    },
+    {
+      "id": "SENSOR_QUALITY_FAILURE",
+      "label": "Sensor quality failure",
+      "summary": "The vibration gateway stops reporting and the meter sends old readings.",
+      "values": {
+        "sensors": {
+          "vibration": { "health": "FAULT", "staleSeconds": 0, "dropout": true },
+          "meter": { "health": "DEGRADED", "staleSeconds": 600, "dropout": false }
+        }
+      },
+      "rampSeconds": 0,
+      "weatherMode": "SIMULATED",
+      "world": "Missing vibration data and ten-minute-old current readings from a degraded meter.",
+      "expectation": "Missing, stale or untrusted data must never read as healthy or as verified."
+    },
+    {
+      "id": "RECURRENCE",
+      "label": "Recurrence",
+      "summary": "After an improvement was verified, the same fault comes back.",
+      "values": {
+        "zoneTemperatureC": 5.0,
+        "vibrationRmsMs2": 0.62,
+        "currentA": 14,
+        "backupRunning": false,
+        "outdoorTemperatureC": 42,
+        "sensors": {
+          "hvac": { "health": "HEALTHY", "staleSeconds": 0, "dropout": false },
+          "vibration": { "health": "HEALTHY", "staleSeconds": 0, "dropout": false },
+          "meter": { "health": "HEALTHY", "staleSeconds": 0, "dropout": false }
+        }
+      },
+      "rampSeconds": 5,
+      "weatherMode": "SIMULATED",
+      "world": "The original fault is reintroduced: strong vibration, high current, a warming zone, a hot day.",
+      "expectation": "If this happens while a verified improvement is still being watched, the same case should reopen."
+    }
+  ]
+}

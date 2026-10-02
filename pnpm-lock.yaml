@@ -256,6 +256,9 @@ importers:
       '@symbiosis/runtime':
         specifier: workspace:*
         version: link:packages/runtime
+      '@symbiosis/simulation':
+        specifier: workspace:*
+        version: link:packages/simulation
       '@symbiosis/tenancy':
         specifier: workspace:*
         version: link:packages/tenancy
@@ -841,12 +844,18 @@ importers:
       '@symbiosis/action-orchestration':
         specifier: workspace:*
         version: link:../action-orchestration
+      '@symbiosis/adapter-email':
+        specifier: workspace:*
+        version: link:../../adapters/email
       '@symbiosis/adapter-gcp':
         specifier: workspace:*
         version: link:../../adapters/gcp
       '@symbiosis/adapter-simulator':
         specifier: workspace:*
         version: link:../../adapters/simulator
+      '@symbiosis/adapter-weather':
+        specifier: workspace:*
+        version: link:../../adapters/weather
       '@symbiosis/ai-explanation':
         specifier: workspace:*
         version: link:../ai-explanation
@@ -901,6 +910,9 @@ importers:
       '@symbiosis/risk-detection':
         specifier: workspace:*
         version: link:../risk-detection
+      '@symbiosis/simulation':
+        specifier: workspace:*
+        version: link:../simulation
       '@symbiosis/tenancy':
         specifier: workspace:*
         version: link:../tenancy
@@ -910,6 +922,33 @@ importers:
       '@symbiosis/worker':
         specifier: workspace:*
         version: link:../../apps/worker
+
+  packages/simulation:
+    dependencies:
+      '@symbiosis/audit':
+        specifier: workspace:*
+        version: link:../audit
+      '@symbiosis/clock':
+        specifier: workspace:*
+        version: link:../clock
+      '@symbiosis/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@symbiosis/device-registry':
+        specifier: workspace:*
+        version: link:../device-registry
+      '@symbiosis/edge-security':
+        specifier: workspace:*
+        version: link:../edge-security
+      '@symbiosis/event-bus':
+        specifier: workspace:*
+        version: link:../event-bus
+      '@symbiosis/repositories':
+        specifier: workspace:*
+        version: link:../repositories
+      '@symbiosis/tenancy':
+        specifier: workspace:*
+        version: link:../tenancy
 
   packages/tenancy: {}
 
