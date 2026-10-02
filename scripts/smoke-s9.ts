@@ -647,7 +647,17 @@ try {
 } catch {
   /* ignore */
 }
-const finalView = await tickLoop();
+let finalView = await tickLoop();
+// The evidence package is created by the worker AFTER the verification event; wait for it instead of
+// reading the case at the very instant its state changes.
+for (
+  let i = 0;
+  i < 24 && finalView !== undefined && ((finalView.evidencePackages ?? []) as Json[]).length === 0;
+  i += 1
+) {
+  await sleep(5000);
+  finalView = (await call("GET", `/api/v1/cases/${caseId}`, mgrToken)).body;
+}
 check(
   "verification completed deterministically on the cloud runtime",
   finalView !== undefined,
