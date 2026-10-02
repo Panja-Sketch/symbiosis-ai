@@ -24,6 +24,7 @@
     "smoke:s7": "pnpm web:build && tsx scripts/smoke-s7.ts",
     "smoke:s8": "tsx scripts/smoke-s8.ts",
     "seed:gcp": "tsx scripts/seed-gcp.ts",
+    "seed:sim": "tsx scripts/seed-simulation.ts",
     "smoke:s9": "tsx scripts/smoke-s9.ts",
     "provision:device": "tsx scripts/provision-device.ts"
   },
