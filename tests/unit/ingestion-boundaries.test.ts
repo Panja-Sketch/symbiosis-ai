@@ -61,8 +61,8 @@ describe("S4 stays within scope", () => {
     );
     // 19 S2-S4 events + verification.started/completed, recurrence.detected, case.reopened,
     // intervention.recommendation_updated (S5) + evidence.package_created, evidence.shareable,
-    // consent.granted, consent.revoked, evidence.shared (S6)
-    expect(union.match(/^\s*\| /gm)).toHaveLength(29);
+    // consent.granted, consent.revoked, evidence.shared (S6) + telemetry.source_authenticated (S10, D-088)
+    expect(union.match(/^\s*\| /gm)).toHaveLength(30);
     expect(text).toMatch(/"verification\.started\.v1"/);
     expect(text).toMatch(/"verification\.completed\.v1"/);
     expect(text).toMatch(/"recurrence\.detected\.v1"/);

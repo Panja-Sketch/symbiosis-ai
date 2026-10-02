@@ -34,6 +34,7 @@
     "@symbiosis/action-orchestration": "workspace:*",
     "@symbiosis/adapter-gcp": "workspace:*",
     "@symbiosis/adapter-simulator": "workspace:*",
+    "@symbiosis/adapter-weather": "workspace:*",
     "@symbiosis/ai-explanation": "workspace:*",
     "@symbiosis/api": "workspace:*",
     "@symbiosis/audit": "workspace:*",

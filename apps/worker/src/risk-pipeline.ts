@@ -1,5 +1,5 @@
-import { baselineKeyString } from "@symbiosis/contracts";
-import type { Baseline, TelemetryQualityAssessedEvent } from "@symbiosis/contracts";
+import { baselineKeyString, resolveValue } from "@symbiosis/contracts";
+import type { Baseline, Resolvable, TelemetryQualityAssessedEvent } from "@symbiosis/contracts";
 import type { BaselineConfig } from "@symbiosis/baselines";
 import type { AuditLog } from "@symbiosis/audit";
 import { nowIso } from "@symbiosis/clock";
@@ -29,8 +29,9 @@ export type RiskPipelineDeps = {
   readonly riskEvents: RiskEventRepository;
   readonly verifications: VerificationRepository;
   readonly audit: AuditLog;
-  readonly rule: RuleConfig;
-  readonly baselineConfig: BaselineConfig;
+  /** Fixed in production; the simulation tenant resolves its versioned policy (D-092). */
+  readonly rule: Resolvable<RuleConfig>;
+  readonly baselineConfig: Resolvable<BaselineConfig>;
 };
 
 /**
@@ -53,11 +54,13 @@ async function process(
 
   const org = event.organization_id;
   const fac = event.facility_id;
+  const rule = await resolveValue(deps.rule, org, fac);
+  const baselineConfig = await resolveValue(deps.baselineConfig, org, fac);
   const book: Record<string, Baseline> = {};
   for (const b of await deps.baselines.listActive(org, fac)) book[baselineKeyString(b.key)] = b;
   const state =
-    (await deps.detectionStates.get(detectionStateKey(org, fac, deps.rule.ruleId))) ??
-    emptyDetectionState(org, fac, deps.rule.ruleId);
+    (await deps.detectionStates.get(detectionStateKey(org, fac, rule.ruleId))) ??
+    emptyDetectionState(org, fac, rule.ruleId);
 
   const result = evaluateSample({
     organizationId: org,
@@ -65,8 +68,8 @@ async function process(
     observations: payload.observations,
     state,
     baselines: book,
-    rule: deps.rule,
-    baselineConfig: deps.baselineConfig,
+    rule,
+    baselineConfig,
   });
 
   for (const b of result.changedBaselines) await deps.baselines.save(b);

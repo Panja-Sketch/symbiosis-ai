@@ -1,0 +1,22 @@
+{
+  "schema": "source-mapping.v1",
+  "profileId": "sim-vibration-gateway",
+  "version": 1,
+  "displayName": "Vibration Sensor Gateway",
+  "vendorLabel": "Synthetic condition-monitoring vendor C (g units, epoch milliseconds)",
+  "description": "Synthetic vibration gateway reporting RMS acceleration in g with an epoch-millisecond timestamp. A demonstration profile, not a real vendor integration.",
+  "sourceType": "SIMULATOR",
+  "synthetic": true,
+  "timestamp": { "path": "sampledAtMs", "format": "EPOCH_MILLIS" },
+  "asset": { "path": "channel", "map": { "motor-DE": "AST-SIM-FAN-A" } },
+  "fields": [
+    {
+      "signal": "vibration_rms",
+      "path": "rms.value",
+      "valueType": "number",
+      "unit": { "path": "rms.unit", "allowed": ["g", "m/s2"] },
+      "bounds": { "min": 0, "max": 100 },
+      "note": "RMS acceleration; converted from g to m/s2."
+    }
+  ]
+}

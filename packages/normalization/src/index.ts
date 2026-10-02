@@ -11,6 +11,9 @@ import { BOOLEAN_SIGNALS } from "@symbiosis/contracts";
 export const PACKAGE_NAME = "@symbiosis/normalization" as const;
 export const SCAFFOLD_PHASE = "S0" as const;
 
+export * from "./source-mapping";
+export * from "./catalog";
+
 /**
  * Normalization is where source-specific field names end. Everything downstream (quality,
  * detection, verification) sees only canonical signals; no hardware or sensor model names

@@ -1,7 +1,8 @@
 import { EDGE_PATHS, parseEdgeHeartbeat, parseEdgeTelemetry } from "@symbiosis/contracts";
 import { nowIso } from "@symbiosis/clock";
 import type { Clock } from "@symbiosis/clock";
-import type { DeviceKeyStore, DeviceRegistry } from "@symbiosis/device-registry";
+import type { DeviceKeyStore, DeviceRecord, DeviceRegistry } from "@symbiosis/device-registry";
+import type { AdapterCatalog } from "@symbiosis/normalization";
 import { authenticateEdgeRequest } from "@symbiosis/edge-security";
 import type { EdgeAuthConfig, EdgeAuthFailureCode, ReplayGuard } from "@symbiosis/edge-security";
 import { createEnvelope } from "@symbiosis/event-bus";
@@ -41,6 +42,11 @@ export type EdgeApiDeps = {
   readonly clock: Clock;
   readonly ids: IdGenerator;
   readonly authConfig?: EdgeAuthConfig;
+  /**
+   * Versioned source-adapter catalog (D-088). Present: `/edge/v1/source` exists and accepts a vendor
+   * payload from a device bound to a source profile. Absent: that endpoint answers 404.
+   */
+  readonly adapters?: AdapterCatalog;
   readonly log?: (entry: EdgeLogEntry) => void;
 };
 
@@ -89,9 +95,11 @@ export function createEdgeHandler(
       return error(400, "INVALID_REQUEST", "query strings are not allowed on edge endpoints");
     }
     const path = request.target;
-    if (path !== EDGE_PATHS.telemetry && path !== EDGE_PATHS.heartbeat) {
-      return error(404, "NOT_FOUND", "unknown endpoint");
-    }
+    const knownPath =
+      path === EDGE_PATHS.telemetry ||
+      path === EDGE_PATHS.heartbeat ||
+      (path === EDGE_PATHS.source && deps.adapters !== undefined);
+    if (!knownPath) return error(404, "NOT_FOUND", "unknown endpoint");
     if (request.method.toUpperCase() !== "POST") {
       return error(405, "METHOD_NOT_ALLOWED", "edge endpoints accept POST only");
     }
@@ -143,6 +151,20 @@ export function createEdgeHandler(
       });
       return { status: 200, body: { status: "ok", receivedAt } };
     }
+
+    if (path === EDGE_PATHS.source)
+      return acceptSource({
+        deps,
+        device,
+        deviceId,
+        keyId,
+        seq,
+        bodySha256,
+        receivedAt,
+        byteLength: request.rawBody.byteLength,
+        payload: decoded.value,
+        log,
+      });
 
     const parsed = parseEdgeTelemetry(decoded.value);
     if (!parsed.ok) return error(400, "INVALID_PAYLOAD", "invalid telemetry", parsed.error);
@@ -200,4 +222,76 @@ export function createEdgeHandler(
     log({ level: "info", message: "telemetry accepted", fields: { deviceId, seq } });
     return { status: 202, body: { status: "accepted", correlationId, receivedAt } };
   };
+}
+
+/**
+ * A vendor payload from an authenticated device. The device record (never the request) names the
+ * source profile; the active version is pinned into the event so the worker interprets the payload
+ * exactly as it was accepted, and the raw JSON travels unchanged.
+ */
+async function acceptSource(input: {
+  readonly deps: EdgeApiDeps;
+  readonly device: DeviceRecord;
+  readonly deviceId: string;
+  readonly keyId: string;
+  readonly seq: number;
+  readonly bodySha256: string;
+  readonly receivedAt: string;
+  readonly byteLength: number;
+  readonly payload: unknown;
+  readonly log: (entry: EdgeLogEntry) => void;
+}): Promise<EdgeResponse> {
+  const { deps, device, deviceId, keyId, seq, bodySha256, receivedAt, payload } = input;
+  const profile = device.sourceProfile;
+  if (profile === undefined) {
+    return error(400, "NO_SOURCE_PROFILE", "this device is not bound to a source-adapter profile");
+  }
+  if (typeof payload !== "object" || payload === null || Array.isArray(payload)) {
+    return error(400, "INVALID_PAYLOAD", "a source payload must be a JSON object");
+  }
+  const definition = await deps.adapters?.getActive(device.organizationId, profile.profileId);
+  if (definition === undefined) {
+    return error(503, "PROFILE_UNAVAILABLE", "the device's source-adapter profile is unavailable");
+  }
+  await deps.registry.recordSeen(deviceId, { seenAt: receivedAt });
+  const current = (await deps.registry.get(deviceId)) ?? device;
+  const correlationId = deps.ids.next("CORR");
+  const base = {
+    correlationId,
+    organizationId: device.organizationId,
+    facilityId: device.facilityId,
+    occurredAt: receivedAt,
+    producer: "api" as const,
+  };
+  const received = createEnvelope(deps.ids, {
+    ...base,
+    type: "telemetry.received.v1",
+    causationId: null,
+    payload: { deviceId, keyId, seq, bodySha256, byteLength: input.byteLength, receivedAt },
+  });
+  const authenticated = createEnvelope(deps.ids, {
+    ...base,
+    type: "telemetry.source_authenticated.v1",
+    causationId: received.event_id,
+    payload: {
+      deviceId,
+      keyId,
+      seq,
+      receivedAt,
+      assetId: device.assetId,
+      ...(device.assetMapping !== undefined && { assetMapping: device.assetMapping }),
+      expectedSignals: device.expectedSignals,
+      deviceHealth: current.health,
+      profile: { profileId: definition.profileId, version: definition.version },
+      payload,
+    },
+  });
+  await deps.bus.publish(received);
+  await deps.bus.publish(authenticated);
+  input.log({
+    level: "info",
+    message: "source payload accepted",
+    fields: { deviceId, seq, profile: definition.profileId, version: definition.version },
+  });
+  return { status: 202, body: { status: "accepted", correlationId, receivedAt } };
 }

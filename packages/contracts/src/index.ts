@@ -13,6 +13,8 @@ export * from "./action";
 export * from "./case";
 export * from "./canonical";
 export * from "./edge";
+export * from "./source-adapter";
+export * from "./weather";
 export * from "./baseline";
 export * from "./risk";
 export * from "./operations";

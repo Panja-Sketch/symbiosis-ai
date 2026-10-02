@@ -4,5 +4,13 @@
   "private": true,
   "type": "module",
   "main": "src/index.ts",
-  "types": "src/index.ts"
+  "types": "src/index.ts",
+  "dependencies": {
+    "@symbiosis/audit": "workspace:*",
+    "@symbiosis/clock": "workspace:*",
+    "@symbiosis/contracts": "workspace:*",
+    "@symbiosis/device-registry": "workspace:*",
+    "@symbiosis/event-bus": "workspace:*",
+    "@symbiosis/repositories": "workspace:*"
+  }
 }

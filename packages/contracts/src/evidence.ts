@@ -15,7 +15,10 @@ export const EVIDENCE_BUILDER_VERSION = "evidence-builder.v1" as const;
 /** Where the underlying observations came from. Synthetic data is never presented as real. */
 export const EVIDENCE_DATA_ORIGINS = [
   "SYNTHETIC_SIMULATOR",
+  /** Legacy value (the abandoned bench prototype, D-085). Never produced; kept so old packages parse. */
   "PROTOTYPE_HARDWARE",
+  /** Data from a customer's real integration (a building system, gateway or equipment API). */
+  "CUSTOMER_INTEGRATION",
   "MIXED",
   "NONE",
 ] as const;

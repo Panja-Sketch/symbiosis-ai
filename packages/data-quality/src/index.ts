@@ -16,6 +16,12 @@ export type DataQualityConfig = {
   readonly futureToleranceSeconds: number;
   readonly staleConfidenceFactor: number;
   readonly unhealthyConfidenceFactor: number;
+  /**
+   * Optional per-signal staleness window (seconds) that replaces `staleAfterSeconds` for that signal.
+   * Slow external context such as outdoor temperature is not "stale" after two minutes (S10, D-089).
+   * Absent in the production file, so production behavior is unchanged.
+   */
+  readonly staleAfterSecondsBySignal?: Readonly<Partial<Record<CanonicalSignal, number>>>;
   /** Plausible physical range per numeric signal, in canonical units. */
   readonly ranges: Readonly<Partial<Record<CanonicalSignal, { min: number; max: number }>>>;
 };
@@ -36,6 +42,16 @@ export function parseDataQualityConfig(value: unknown): DataQualityConfig {
     v.ranges === null
   ) {
     throw new Error("invalid data-quality configuration");
+  }
+  if (v.staleAfterSecondsBySignal !== undefined) {
+    if (typeof v.staleAfterSecondsBySignal !== "object" || v.staleAfterSecondsBySignal === null) {
+      throw new Error("invalid data-quality staleAfterSecondsBySignal");
+    }
+    for (const [signal, seconds] of Object.entries(v.staleAfterSecondsBySignal)) {
+      if (!(CANONICAL_SIGNALS as readonly string[]).includes(signal) || !positive(seconds)) {
+        throw new Error(`invalid data-quality stale window for ${signal}`);
+      }
+    }
   }
   for (const [signal, range] of Object.entries(v.ranges)) {
     if (
@@ -76,7 +92,9 @@ export function assessObservation(
   const ageSeconds =
     (Date.parse(observation.receivedAt) - Date.parse(observation.observedAt)) / 1000;
 
-  const stale = !(ageSeconds <= config.staleAfterSeconds);
+  const staleAfter =
+    config.staleAfterSecondsBySignal?.[observation.signal] ?? config.staleAfterSeconds;
+  const stale = !(ageSeconds <= staleAfter);
   if (stale) reasons.push("STALE");
   const inFuture = ageSeconds < -config.futureToleranceSeconds;
   if (inFuture) reasons.push("OBSERVED_IN_FUTURE");

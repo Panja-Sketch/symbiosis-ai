@@ -1,0 +1,36 @@
+{
+  "schema": "source-mapping.v1",
+  "profileId": "sim-electrical-meter",
+  "version": 1,
+  "displayName": "Electrical Meter Gateway",
+  "vendorLabel": "Synthetic power-metering vendor D (milliamps, epoch seconds)",
+  "description": "Synthetic electrical meter gateway reporting totals in its own units and a contactor state. A demonstration profile, not a real vendor integration.",
+  "sourceType": "SIMULATOR",
+  "synthetic": true,
+  "timestamp": { "path": "t", "format": "EPOCH_SECONDS" },
+  "asset": { "fixed": "AST-SIM-FAN-A" },
+  "fields": [
+    {
+      "signal": "current",
+      "path": "totals.current.v",
+      "valueType": "number",
+      "unit": { "path": "totals.current.u", "allowed": ["A", "mA"] },
+      "bounds": { "min": 0, "max": 100 },
+      "note": "Line current; converted from mA to A."
+    },
+    {
+      "signal": "load_percent",
+      "path": "totals.load.v",
+      "valueType": "number",
+      "unit": { "path": "totals.load.u", "allowed": ["%", "fraction"] },
+      "bounds": { "min": 0, "max": 100 }
+    },
+    {
+      "signal": "equipment_running",
+      "path": "contactor",
+      "valueType": "boolean",
+      "enum": { "CLOSED": true, "OPEN": false },
+      "note": "Contactor closed means the primary cooling unit is running."
+    }
+  ]
+}

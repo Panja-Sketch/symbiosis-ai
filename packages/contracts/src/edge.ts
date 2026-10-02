@@ -6,6 +6,12 @@ import { isIsoTimestamp, isNonEmptyString } from "./primitives";
 export const EDGE_PATHS = {
   telemetry: "/edge/v1/telemetry",
   heartbeat: "/edge/v1/heartbeat",
+  /**
+   * A device bound to a versioned source-adapter profile sends its OWN vendor payload here (D-088).
+   * The body is the vendor's JSON as-is; the authenticated device record, not the request, decides
+   * which adapter interprets it.
+   */
+  source: "/edge/v1/source",
 } as const;
 
 import type { CanonicalSignal } from "./canonical";
@@ -21,7 +27,11 @@ export type AssetMapping = {
   readonly bySignal?: Readonly<Partial<Record<CanonicalSignal, string>>>;
 };
 
-export const EDGE_SOURCES = ["HARDWARE", "SIMULATOR"] as const;
+/**
+ * `HARDWARE`: a real integration speaking the edge v1 contract. `SIMULATOR`: synthetic data.
+ * `WEATHER_API`: external weather the platform pulls itself (never sent by a device).
+ */
+export const EDGE_SOURCES = ["HARDWARE", "SIMULATOR", "WEATHER_API"] as const;
 export type EdgeSource = (typeof EDGE_SOURCES)[number];
 
 export type EdgeReadingValue = number | boolean;
@@ -67,7 +77,7 @@ export function parseEdgeTelemetry(
   if (!isNonEmptyString(value.device_id)) issues.push("device_id is required");
   if (!isNonEmptyString(value.firmware_version)) issues.push("firmware_version is required");
   if (!(EDGE_SOURCES as readonly unknown[]).includes(value.source)) {
-    issues.push("source must be HARDWARE or SIMULATOR");
+    issues.push("source must be HARDWARE, SIMULATOR or WEATHER_API");
   }
   const batch = value.batch;
   if (!Array.isArray(batch) || batch.length === 0) {

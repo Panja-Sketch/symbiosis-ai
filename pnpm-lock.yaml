@@ -184,6 +184,9 @@ importers:
       '@symbiosis/adapter-simulator':
         specifier: workspace:*
         version: link:adapters/simulator
+      '@symbiosis/adapter-weather':
+        specifier: workspace:*
+        version: link:adapters/weather
       '@symbiosis/ai-explanation':
         specifier: workspace:*
         version: link:packages/ai-explanation
@@ -364,7 +367,26 @@ importers:
         specifier: workspace:*
         version: link:../../packages/normalization
 
-  adapters/weather: {}
+  adapters/weather:
+    dependencies:
+      '@symbiosis/audit':
+        specifier: workspace:*
+        version: link:../../packages/audit
+      '@symbiosis/clock':
+        specifier: workspace:*
+        version: link:../../packages/clock
+      '@symbiosis/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+      '@symbiosis/device-registry':
+        specifier: workspace:*
+        version: link:../../packages/device-registry
+      '@symbiosis/event-bus':
+        specifier: workspace:*
+        version: link:../../packages/event-bus
+      '@symbiosis/repositories':
+        specifier: workspace:*
+        version: link:../../packages/repositories
 
   apps/api:
     dependencies:
@@ -401,6 +423,9 @@ importers:
       '@symbiosis/intervention-prioritization':
         specifier: workspace:*
         version: link:../../packages/intervention-prioritization
+      '@symbiosis/normalization':
+        specifier: workspace:*
+        version: link:../../packages/normalization
       '@symbiosis/tenancy':
         specifier: workspace:*
         version: link:../../packages/tenancy
@@ -702,6 +727,9 @@ importers:
       '@symbiosis/contracts':
         specifier: workspace:*
         version: link:../contracts
+      '@symbiosis/repositories':
+        specifier: workspace:*
+        version: link:../repositories
 
   packages/notifications:
     dependencies:

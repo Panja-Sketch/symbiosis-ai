@@ -1,0 +1,42 @@
+{
+  "schema": "source-mapping.v1",
+  "profileId": "sim-bas-gateway",
+  "version": 1,
+  "displayName": "Building Automation Gateway",
+  "vendorLabel": "Synthetic BAS vendor A (flat JSON)",
+  "description": "Synthetic building-automation gateway reporting one equipment tag with flat fields. A demonstration profile, not a real vendor integration.",
+  "sourceType": "SIMULATOR",
+  "synthetic": true,
+  "timestamp": { "path": "ts", "format": "ISO_8601" },
+  "asset": { "path": "equipment", "map": { "CH-01": "AST-SIM-FAN-A" } },
+  "fields": [
+    {
+      "signal": "vibration_rms",
+      "path": "vib_rms",
+      "valueType": "number",
+      "unit": { "fixed": "m/s2" },
+      "bounds": { "min": 0, "max": 100 },
+      "note": "Vendor field vib_rms is acceleration RMS in m/s2."
+    },
+    {
+      "signal": "current",
+      "path": "amps",
+      "valueType": "number",
+      "unit": { "fixed": "A" },
+      "bounds": { "min": 0, "max": 100 }
+    },
+    {
+      "signal": "load_percent",
+      "path": "load_pct",
+      "valueType": "number",
+      "unit": { "fixed": "%" },
+      "bounds": { "min": 0, "max": 100 }
+    },
+    {
+      "signal": "equipment_running",
+      "path": "run_state",
+      "valueType": "boolean",
+      "enum": { "RUN": true, "STOP": false }
+    }
+  ]
+}

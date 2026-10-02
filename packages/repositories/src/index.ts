@@ -20,6 +20,8 @@ import type {
 export const PACKAGE_NAME = "@symbiosis/repositories" as const;
 export const SCAFFOLD_PHASE = "S0" as const;
 
+export * from "./tenant-documents";
+
 /**
  * Canonical observation store. Uniqueness is the architecture dedupe identity
  * (device_id + signal + observed_at). Only the S2 need is modelled here; Firestore (S9)

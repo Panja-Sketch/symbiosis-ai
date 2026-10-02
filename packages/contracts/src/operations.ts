@@ -1,7 +1,8 @@
 import type { CaseSeverity } from "./case";
 import type { IsoTimestamp } from "./primitives";
 
-export const NOTIFICATION_CHANNELS = ["CONSOLE_EMAIL"] as const;
+/** CONSOLE_EMAIL: local log channel. EMAIL: a real mail provider behind the same port (D-090). */
+export const NOTIFICATION_CHANNELS = ["CONSOLE_EMAIL", "EMAIL"] as const;
 export type NotificationChannel = (typeof NOTIFICATION_CHANNELS)[number];
 
 /** `ref` is an actor ID (never an address): addresses stay inside the channel adapter. */
@@ -19,6 +20,8 @@ export type NotificationRequest = {
   readonly riskEventId: string;
   readonly severity: CaseSeverity;
   readonly requestedAt: IsoTimestamp;
+  /** What kind of communication this is; the channel may use it for wording only. */
+  readonly kind?: AlertKind;
 };
 
 /**
@@ -32,11 +35,37 @@ export type NotificationResult = {
   readonly recipientRef: string;
   readonly requestedAt: IsoTimestamp;
   readonly completedAt: IsoTimestamp;
-  readonly failure?: { readonly code: string; readonly message: string };
+  readonly failure?: {
+    readonly code: string;
+    readonly message: string;
+    /** False: a permanent failure (bad address, rejected credentials). Never retried. */
+    readonly retryable?: boolean;
+  };
 };
 
-export const ALERT_KINDS = ["INITIAL", "ESCALATION"] as const;
+export const ALERT_KINDS = ["INITIAL", "ESCALATION", "FOLLOW_UP", "RECURRENCE"] as const;
 export type AlertKind = (typeof ALERT_KINDS)[number];
+
+/**
+ * Why a FOLLOW_UP or RECURRENCE alert exists. Follow-ups are deterministic policy output
+ * (`config/notifications/follow-up.v1.json`); no AI model decides whether anyone is told.
+ */
+export const FOLLOW_UP_TRIGGERS = [
+  "VERIFICATION_NOT_IMPROVING",
+  "VERIFICATION_PARTIALLY_VERIFIED",
+  "VERIFICATION_INCONCLUSIVE",
+  "ACTION_OVERDUE",
+  "RECURRENCE",
+] as const;
+export type FollowUpTrigger = (typeof FOLLOW_UP_TRIGGERS)[number];
+
+export type AlertTrigger = {
+  readonly type: FollowUpTrigger;
+  /** The record that caused it (verification id, action id, recurrence risk event id). */
+  readonly referenceId: string;
+  /** Deterministic wording of why this communication exists. */
+  readonly why: string;
+};
 
 export const ALERT_STATUSES = ["REQUESTED", "SENT", "FAILED"] as const;
 export type AlertStatus = (typeof ALERT_STATUSES)[number];
@@ -68,6 +97,41 @@ export type Alert = {
   readonly requestedAt: IsoTimestamp;
   readonly sentAt?: IsoTimestamp;
   readonly correlationId: string;
+  /** Present on FOLLOW_UP and RECURRENCE alerts. */
+  readonly trigger?: AlertTrigger;
+};
+
+export const DELIVERY_STATUSES = ["PENDING", "SENT", "FAILED"] as const;
+export type DeliveryStatus = (typeof DELIVERY_STATUSES)[number];
+
+/**
+ * One persisted delivery attempt of one alert (D-090). The id is deterministic (`alertId#attempt`)
+ * and created atomically before a send, so a redelivered event can never cause a second send for
+ * the same attempt. No address is stored: only a masked hint for display.
+ */
+export type NotificationDelivery = {
+  readonly deliveryId: string;
+  readonly notificationId: string;
+  readonly organizationId: string;
+  readonly facilityId: string;
+  readonly alertId: string;
+  readonly alertKind: AlertKind;
+  readonly caseId: string;
+  readonly riskEventId: string;
+  readonly recipientRef: string;
+  readonly recipientRole?: string;
+  readonly channel: NotificationChannel;
+  readonly attempt: number;
+  readonly status: DeliveryStatus;
+  readonly subject: string;
+  readonly requestedAt: IsoTimestamp;
+  readonly completedAt?: IsoTimestamp;
+  readonly addressHint?: string;
+  readonly failure?: {
+    readonly code: string;
+    readonly message: string;
+    readonly retryable: boolean;
+  };
 };
 
 export const AUDIT_ACTIONS = [
@@ -98,6 +162,18 @@ export const AUDIT_ACTIONS = [
   "SHARING_STATE_CHANGED",
   "INSURER_EVIDENCE_READ",
   "INSURER_ACCESS_DENIED",
+  // S10: notifications and the facility simulation control plane.
+  "FOLLOW_UP_REQUESTED",
+  "FOLLOW_UP_SUPPRESSED",
+  "WEATHER_STATUS_CHANGED",
+  "SIMULATION_STARTED",
+  "SIMULATION_STATE_CHANGED",
+  "SIMULATION_SCENARIO_APPLIED",
+  "SIMULATION_RESET",
+  "SIMULATION_POLICY_PUBLISHED",
+  "SIMULATION_POLICY_ACTIVATED",
+  "ADAPTER_MAPPING_PUBLISHED",
+  "ADAPTER_MAPPING_ACTIVATED",
 ] as const;
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
 
@@ -121,7 +197,11 @@ export type AuditEntry = {
     | "VERIFICATION"
     | "INTERVENTION"
     | "EVIDENCE_PACKAGE"
-    | "SHARING_AGREEMENT";
+    | "SHARING_AGREEMENT"
+    | "SIMULATION"
+    | "POLICY"
+    | "ADAPTER"
+    | "WEATHER";
   readonly targetId: string;
   readonly beforeState?: string;
   readonly afterState?: string;

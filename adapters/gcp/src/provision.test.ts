@@ -76,13 +76,27 @@ describe("provisionDevice", () => {
     expect(JSON.stringify(stored)).not.toContain(result.keyHex);
   });
 
-  it("maps vibration/current to the primary asset, zone signals to the zone, Fan B to the backup", async () => {
-    const r = record();
-    expect(r.assetId).toBe("AST-SIM-FAN-A");
+  it("builds a generic edge-device record: active, never healthy until a heartbeat, no vendor names", async () => {
+    const r = createEdgeDeviceRecord({
+      deviceId: "DEV-GATEWAY-009",
+      keyId: "KEY-GATEWAY-009",
+      organizationId: "ORG-SIM-001",
+      facilityId: "FAC-SIM-001",
+      assetId: "AST-SIM-FAN-A",
+      assetMapping: { bySignal: { temperature: "AST-SIM-ZONE-1" } },
+      expectedSignals: ["vibration_rms", "temperature"],
+      sourceProfile: { profileId: "sim-hvac-controller" },
+    });
+    expect(r).toMatchObject({
+      status: "ACTIVE",
+      health: "UNKNOWN",
+      assetId: "AST-SIM-FAN-A",
+      sourceProfile: { profileId: "sim-hvac-controller" },
+    });
     expect(r.assetMapping?.bySignal?.temperature).toBe("AST-SIM-ZONE-1");
-    expect(r.assetMapping?.bySignal?.relative_humidity).toBe("AST-SIM-ZONE-1");
-    expect(r.assetMapping?.byField?.chiller_b_running).toBe("AST-SIM-FAN-B");
-    expect(r.expectedSignals).not.toContain("load_percent");
+    expect(() =>
+      createEdgeDeviceRecord({ ...r, expectedSignals: [], keyId: r.activeKeyId }),
+    ).toThrow();
   });
 
   it("generates a different key every time", async () => {
@@ -122,9 +136,9 @@ describe("provisionDevice", () => {
         { record: record(), apiServiceAccount: API_SA },
       ),
     ).rejects.toMatchObject({ code: "KEY_EXISTS" });
-    expect(f.secrets.get(deviceKeySecretId("DEV-GATEWAY-001", "KEY-GATEWAY-001"))?.versions).toEqual([
-      "existing-key",
-    ]);
+    expect(
+      f.secrets.get(deviceKeySecretId("DEV-GATEWAY-001", "KEY-GATEWAY-001"))?.versions,
+    ).toEqual(["existing-key"]);
   });
 
   it("rolls back the secret it created when registration fails, so a retry is possible", async () => {

@@ -6,11 +6,13 @@ import type {
   DomainError,
   EvidenceReference,
   MitigationAction,
+  Resolvable,
   RiskImprovementCase,
   TimeWindow,
   VerificationAssessment,
   VerificationAttempt,
 } from "@symbiosis/contracts";
+import { resolveValue } from "@symbiosis/contracts";
 import type { AuditLog } from "@symbiosis/audit";
 import type { BaselineConfig } from "@symbiosis/baselines";
 import { nowIso } from "@symbiosis/clock";
@@ -47,8 +49,19 @@ export type VerificationRunnerDeps = {
   readonly baselines: BaselineRepository;
   readonly verifications: VerificationRepository;
   readonly registry: DeviceRegistry;
-  readonly policy: VerificationPolicy;
-  readonly baselineConfig: BaselineConfig;
+  /** Fixed in production; the simulation tenant resolves its versioned policy (D-092). */
+  readonly policy: Resolvable<VerificationPolicy>;
+  readonly baselineConfig: Resolvable<BaselineConfig>;
+  /**
+   * Finds the exact policy version an attempt started under, so a policy edited while a verification
+   * is open never changes how that verification is judged. Absent: only the current policy is known.
+   */
+  readonly policyByVersion?: (
+    organizationId: string,
+    facilityId: string,
+    policyId: string,
+    policyVersion: string,
+  ) => VerificationPolicy | undefined | Promise<VerificationPolicy | undefined>;
 };
 
 export type VerificationFailure = {
@@ -95,7 +108,28 @@ const laterIso = (...isos: string[]) =>
  * attempt IN_PROGRESS (or the case untouched) and is reported in the tick result.
  */
 export function createVerificationRunner(deps: VerificationRunnerDeps): VerificationRunner {
-  const { policy } = deps;
+  const policyFor = (organizationId: string, facilityId: string) =>
+    resolveValue(deps.policy, organizationId, facilityId);
+
+  /** The policy an attempt started under: the current one if it matches, else the pinned version. */
+  async function policyForAttempt(attempt: VerificationAttempt): Promise<VerificationPolicy> {
+    const current = await policyFor(attempt.organizationId, attempt.facilityId);
+    if (current.policyId === attempt.policyId && current.policyVersion === attempt.policyVersion) {
+      return current;
+    }
+    const pinned = await deps.policyByVersion?.(
+      attempt.organizationId,
+      attempt.facilityId,
+      attempt.policyId,
+      attempt.policyVersion,
+    );
+    if (pinned === undefined) {
+      throw new Error(
+        `verification policy ${attempt.policyId} version ${attempt.policyVersion} is unavailable`,
+      );
+    }
+    return pinned;
+  }
 
   /**
    * The device facts the engine is given, plus a frozen copy of them. The copy is stored on the
@@ -152,6 +186,7 @@ export function createVerificationRunner(deps: VerificationRunnerDeps): Verifica
       try {
         const event = await deps.riskEvents.get(c.organizationId, c.activeRiskEventId);
         if (event === undefined || event.state !== "ACTION_REPORTED") continue;
+        const policy = await policyFor(c.organizationId, c.facilityId);
         if (c.hazardType !== policy.hazardType) {
           failures.push({
             caseId: c.caseId,
@@ -395,10 +430,17 @@ export function createVerificationRunner(deps: VerificationRunnerDeps): Verifica
           attempt.startedAt,
         );
 
+        let policy: VerificationPolicy | undefined;
         let evaluated: ReturnType<typeof evaluateVerification> | undefined;
         let processingError: string | undefined;
         let deviceSnapshots: DeviceFactSnapshot[] = [];
         try {
+          policy = await policyForAttempt(attempt);
+          const baselineConfig = await resolveValue(
+            deps.baselineConfig,
+            c.organizationId,
+            c.facilityId,
+          );
           const lookbackMs = policy.reference.preActionLookbackSeconds * 1000;
           const observations = await deps.observations.listForWindow({
             organizationId: c.organizationId,
@@ -412,7 +454,7 @@ export function createVerificationRunner(deps: VerificationRunnerDeps): Verifica
           evaluated = evaluateVerification({
             verificationId: attempt.verificationId,
             policy,
-            baselineConfig: deps.baselineConfig,
+            baselineConfig,
             caseRecord: c,
             event,
             actions: cycleActions,

@@ -9,6 +9,24 @@ export type FacilityId = Brand<string, "FacilityId">;
 export type AssetId = Brand<string, "AssetId">;
 export type DeviceId = Brand<string, "DeviceId">;
 
+/**
+ * A value that is either fixed or resolved per organization and facility. Production uses fixed
+ * versioned configuration; the simulation tenant resolves its versioned DEMO / SIMULATION POLICY
+ * (S10, D-092). Consumers call `resolveValue` at the point of use so a new policy version applies
+ * to the next evaluation without a restart.
+ */
+export type Resolvable<T> = T | ((organizationId: string, facilityId: string) => T | Promise<T>);
+
+export function resolveValue<T>(
+  value: Resolvable<T>,
+  organizationId: string,
+  facilityId: string,
+): T | Promise<T> {
+  return typeof value === "function"
+    ? (value as (o: string, f: string) => T | Promise<T>)(organizationId, facilityId)
+    : value;
+}
+
 export function isNonEmptyString(value: unknown): value is string {
   return typeof value === "string" && value.trim().length > 0;
 }

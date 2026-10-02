@@ -6,6 +6,7 @@ import type { ObservationEvaluation, RiskDetection } from "./risk";
 import type { UnassessedObservation, CanonicalObservation, CanonicalSignal } from "./canonical";
 import type { AssetMapping, DeviceHealth, EdgeTelemetryPayload } from "./edge";
 import type { IsoTimestamp, TimeWindow } from "./primitives";
+import type { RejectReason } from "./source-adapter";
 import type { InterventionLevel, InterventionStatus } from "./intervention";
 import type { RequiredSignal, VerificationResult } from "./verification";
 
@@ -49,12 +50,40 @@ export type TelemetryAuthenticatedPayload = {
   /** Registry-known health at receipt. UNKNOWN is never treated as healthy. */
   readonly deviceHealth: DeviceHealth;
   readonly telemetry: EdgeTelemetryPayload;
+  /**
+   * EDGE_SIGNED (default): the request passed HMAC authentication. INTERNAL_PULL: the platform
+   * itself fetched the data from a configured provider (weather); no device signed it (D-089).
+   */
+  readonly origin?: "EDGE_SIGNED" | "INTERNAL_PULL";
+};
+
+/**
+ * A signed request to `/edge/v1/source` passed authentication. The vendor payload travels unchanged;
+ * the worker applies the pinned, versioned source-adapter mapping (D-088).
+ */
+export type TelemetrySourceAuthenticatedPayload = {
+  readonly deviceId: string;
+  readonly keyId: string;
+  readonly seq: number;
+  readonly receivedAt: IsoTimestamp;
+  readonly assetId: string;
+  readonly assetMapping?: AssetMapping;
+  readonly expectedSignals: readonly CanonicalSignal[];
+  readonly deviceHealth: DeviceHealth;
+  readonly profile: { readonly profileId: string; readonly version: number };
+  /** The vendor's JSON exactly as received (size-limited by the edge handler). */
+  readonly payload: unknown;
 };
 
 export type RejectedReading = {
   readonly observedAt: IsoTimestamp;
   readonly field: string;
-  readonly reason: "UNMAPPED_FIELD" | "VALUE_TYPE_MISMATCH" | "SIGNAL_NOT_EXPECTED";
+  readonly reason:
+    | "UNMAPPED_FIELD"
+    | "VALUE_TYPE_MISMATCH"
+    | "SIGNAL_NOT_EXPECTED"
+    // Source-adapter rejections (D-088)
+    | RejectReason;
 };
 
 export type TelemetryNormalizedPayload = {
@@ -81,6 +110,10 @@ export type TelemetryReceivedEvent = EventEnvelope<
 export type TelemetryAuthenticatedEvent = EventEnvelope<
   "telemetry.authenticated.v1",
   TelemetryAuthenticatedPayload
+>;
+export type TelemetrySourceAuthenticatedEvent = EventEnvelope<
+  "telemetry.source_authenticated.v1",
+  TelemetrySourceAuthenticatedPayload
 >;
 export type TelemetryNormalizedEvent = EventEnvelope<
   "telemetry.normalized.v1",
@@ -412,6 +445,7 @@ export type EvidenceSharedEvent = EventEnvelope<"evidence.shared.v1", EvidenceSh
 export type PlatformEvent =
   | TelemetryReceivedEvent
   | TelemetryAuthenticatedEvent
+  | TelemetrySourceAuthenticatedEvent
   | TelemetryNormalizedEvent
   | TelemetryQualityAssessedEvent
   | RiskObservationEvaluatedEvent
