@@ -75,7 +75,7 @@ export function createGcpPlatform(config: GcpConfig, logger: Logger): GcpPlatfor
   const firestore = new Firestore({ projectId: config.projectId });
   const o = { db: firestore, collectionPrefix: config.collectionPrefix };
 
-  const bus = new PubSubBus(createTopicPublisher(config.projectId, config.topic));
+  const bus = new PubSubBus(createTopicPublisher(config.projectId, config.topic, config.region));
   const directory = new FirestoreActorDirectory(o);
   const identity = new FirebaseIdentityResolver({
     verify: createFirebaseTokenVerifier({

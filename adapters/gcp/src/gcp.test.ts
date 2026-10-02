@@ -60,6 +60,20 @@ describe("PubSubBus", () => {
     });
   });
 
+  it("publishes with a per-tenant, per-facility ordering key so a facility's events keep their order", async () => {
+    const keys: (string | undefined)[] = [];
+    const topic: TopicPublisher = {
+      publish: async (_data, _attributes, orderingKey) => {
+        keys.push(orderingKey);
+        return "id";
+      },
+    };
+    await new PubSubBus(topic).publish(event());
+    await new PubSubBus(topic).publish({ ...event(), facility_id: "FAC-B" });
+    await new PubSubBus(topic).publish({ ...event(), organization_id: "ORG-B" });
+    expect(keys).toEqual(["ORG-A:FAC-1", "ORG-A:FAC-B", "ORG-B:FAC-1"]);
+  });
+
   it("a failed publish rejects: no false success", async () => {
     const bus = new PubSubBus({
       publish: async () => {

@@ -19,9 +19,21 @@ export type PushResponse = {
 
 /** The one thing the bus needs from a topic; the real one wraps `@google-cloud/pubsub`. */
 export interface TopicPublisher {
-  /** Resolves with the message id only once Pub/Sub has durably accepted the message. */
-  publish(data: Buffer, attributes: Record<string, string>): Promise<string>;
+  /**
+   * Resolves with the message id only once Pub/Sub has durably accepted the message. Messages that
+   * share an `orderingKey` are delivered to the subscriber in the order they were published.
+   */
+  publish(data: Buffer, attributes: Record<string, string>, orderingKey?: string): Promise<string>;
 }
+
+/**
+ * Events of one facility are delivered in the order they were published (S10, D-098). The domain
+ * assumes it (a gateway's load reading is stored before the vibration reading of the same instant;
+ * the in-memory bus is FIFO), and unordered delivery broke it in the cloud. The key is the tenant
+ * and facility, so unrelated tenants never wait for each other.
+ */
+export const orderingKeyFor = (event: Pick<PlatformEvent, "organization_id" | "facility_id">) =>
+  `${event.organization_id}:${event.facility_id}`;
 
 /**
  * Pub/Sub implementation of the `EventBus` port.
@@ -39,13 +51,17 @@ export class PubSubBus implements EventBus {
   constructor(private readonly topic: TopicPublisher) {}
 
   async publish(event: PlatformEvent): Promise<void> {
-    await this.topic.publish(Buffer.from(JSON.stringify(event), "utf8"), {
-      event_type: event.event_type,
-      event_id: event.event_id,
-      organization_id: event.organization_id,
-      correlation_id: event.correlation_id,
-      schema_version: event.schema_version,
-    });
+    await this.topic.publish(
+      Buffer.from(JSON.stringify(event), "utf8"),
+      {
+        event_type: event.event_type,
+        event_id: event.event_id,
+        organization_id: event.organization_id,
+        correlation_id: event.correlation_id,
+        schema_version: event.schema_version,
+      },
+      orderingKeyFor(event),
+    );
   }
 
   subscribe<T extends PlatformEventType>(

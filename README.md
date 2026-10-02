@@ -22,7 +22,7 @@ evidence package** (canonical JSON, SHA-256 manifest, frozen device facts, expli
 synthetic-data label) that preserves its actual result; the insured controls what an insurer
 sees through scoped, revocable **sharing agreements**, raw telemetry is off by default, and
 every insurer read is authorization-checked and audited. The system deliberately stops there:
-S7 added the Next.js persona web app, S8 a strictly bounded explanation layer (AI explains, never decides), and S9 the cloud runtime: the same services on Firestore, Pub/Sub, Cloud Storage, Secret Manager and Firebase Auth, deployed to Cloud Run (see [docs/GCP_RUNTIME.md](docs/GCP_RUNTIME.md)). **S10 is the Enterprise Facility Simulation & Integration Demonstration (IN PROGRESS); the physical hardware prototype was removed from active scope by product decision (see [docs/HARDWARE.md](docs/HARDWARE.md)).** Progress is tracked in
+S7 added the Next.js persona web app, S8 a strictly bounded explanation layer (AI explains, never decides), and S9 the cloud runtime: the same services on Firestore, Pub/Sub, Cloud Storage, Secret Manager and Firebase Auth, deployed to Cloud Run (see [docs/GCP_RUNTIME.md](docs/GCP_RUNTIME.md)). **S10 is the Enterprise Facility Simulation & Integration Demonstration; the physical hardware prototype was removed from active scope by product decision (see [docs/HARDWARE.md](docs/HARDWARE.md)).** Progress is tracked in
 [docs/IMPLEMENTATION_STATE.md](docs/IMPLEMENTATION_STATE.md).
 
 ## Layout
@@ -53,7 +53,7 @@ pnpm smoke:s4     # detected -> alert -> acknowledge -> assign -> report -> VERI
 pnpm smoke:s5     # ... -> trusted post-action data -> VERIFIED -> hazard returns -> same case REOPENED
 pnpm smoke:s6     # ... VERIFIED -> evidence package + hashes -> SHAREABLE -> consent -> insurer read -> revoke
 pnpm smoke:s7     # builds the web app, then drives both personas in a real browser (incl. phone width)
-pnpm test:e2e     # builds the web app, then the 26 Playwright browser tests
+pnpm test:e2e     # builds the web app, then the Playwright browser tests (S7 to S10)
 pnpm smoke:s8     # grounded explanations: Gemini adapter over a scripted endpoint, consent, fallback
 ```
 
@@ -67,20 +67,50 @@ Edge endpoints: `POST /edge/v1/telemetry` and `POST /edge/v1/heartbeat`, signed 
 PROJECT_SPEC section 32. A known-answer signing vector for firmware is in
 `firmware-contracts/sample-packets/signing-vector.json`.
 
-## Integrations (no proprietary hardware)
+## Facility Simulation and integrations (S10)
 
-Symbiosis does not require Symbiosis sensors. A building-automation system, IoT gateway, equipment API or
-sensor platform integrates through a source adapter into the canonical observation contract and the
-signed edge boundary (`/edge/v1/*`). No real vendor integration exists yet; the facility simulation uses
-clearly labelled synthetic vendor profiles to prove the abstraction. The ESP32 bench prototype was
-removed from the product by decision D-085 (history keeps it).
+Symbiosis does not require Symbiosis sensors, and **the physical hardware prototype is REMOVED FROM
+ACTIVE SCOPE BY PRODUCT DECISION** (D-085; Git history keeps it, last at `c55ecec`; the old gates H0 to
+H8 were never run and are not claimed). A building-automation system, IoT gateway, equipment API or
+sensor platform integrates through a **versioned, declarative source adapter** into the canonical
+observation contract and the signed edge boundary (`/edge/v1/*`). No real vendor integration exists yet;
+the **Facility Simulation** (`/operations/simulation`, operations and admin roles only) drives a synthetic
+cold-storage facility through the real pipeline with clearly labelled synthetic vendor profiles
+([docs/ADAPTERS.md](docs/ADAPTERS.md)).
 
 ```
+simulated physical state -> vendor payload -> signed edge request -> versioned adapter -> canonical
+observation -> validation / quality -> deterministic rule -> case -> alert email -> human action ->
+post-action telemetry -> deterministic verification -> follow-up or VERIFIED -> evidence -> consent ->
+recurrence
+```
+
+The simulation produces source data only: it has no code path to cases, verification, evidence or
+recurrence (an architectural test and mutation checks enforce it). The workspace shows: a facility
+diagram with every sensor, scenarios (normal, emerging deterioration, compound risk, ineffective and
+successful mitigation, sensor failure, recurrence) and manual controls, live or simulated weather
+(`LIVE WEATHER`, `SIMULATED WEATHER`, `WEATHER UNAVAILABLE`, never faked), the rule's own conclusion and
+persistence, the case and its notifications (a reported action and a verified improvement are different
+facts), verification criteria and charts, evidence and customer-controlled sharing, a timeline of real
+records, the Integration Lab (source payload -> mapping -> canonical -> ingested, with provenance) and
+the **DEMO / SIMULATION POLICY** (versioned, bounded, labelled; production policy files are untouched).
+Provenance is always visible: **Simulation data**, **Live weather**, **Deterministic system result**,
+**AI-generated explanation** are four different things. Time is real time (a shortened demo policy, not a
+faster clock: D-087).
+
+```
+pnpm smoke:s10                 # local closed-loop smoke over real HTTP (simulated clock)
+pnpm test:e2e                  # Playwright, including the S10 browser tests and axe
+node scripts/mutation-s10.mjs  # 14 mutation checks (needs a clean tree)
+GCP_PROJECT_ID=<id> pnpm seed:sim --confirm-project <id> [--contact USR-FACILITY-MGR-001=<address>]
+SMOKE_S10_CLOUD=1 GCP_PROJECT_ID=<id> pnpm smoke:s10:cloud --confirm-project <id>   # OPT-IN, real time
 pnpm provision:device --confirm-project <id> --device-id DEV-SITE-GATEWAY-001 --asset AST-SIM-FAN-A --signals vibration_rms,current
 ```
 
-`pnpm provision:device` is operator-only (your own Google credentials); the device key is stored in
-Secret Manager and a git-ignored local file and is never printed.
+`pnpm provision:device` and `pnpm seed:sim` are operator-only (your own Google credentials); device keys
+live in Secret Manager and are never printed. Email uses the console provider until SMTP credentials
+are added directly to Secret Manager (docs/GCP_RUNTIME.md): **real email smoke: PENDING EXTERNAL DEMO
+CREDENTIALS**. Known limitations: [docs/SESSION_HANDOFF.md](docs/SESSION_HANDOFF.md).
 
 ## Secrets
 

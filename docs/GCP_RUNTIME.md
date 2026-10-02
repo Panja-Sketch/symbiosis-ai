@@ -155,19 +155,68 @@ touches the real project is opt-in: `pnpm seed:gcp`, `pnpm smoke:s9`, `scripts/v
 - One worker instance, concurrency 1: correct but low throughput; Pub/Sub ordering is not used.
 - No DLQ reprocessing tool or UI; alerting on DLQ depth is not configured (Cloud Monitoring metrics and
   logs are available; no alert policies were created).
-- Notifications are `ConsoleEmail` (structured log lines); no mail delivery exists.
+- Notifications use the `console` provider until the operator supplies SMTP credentials (see S10 below); the delivery record always says which channel was used.
 - The cloud UI shows ids instead of names for people and organizations.
 - The retirement schedule of the selected Gemini model was not independently confirmed (D-076).
 - The Compute default service account and `firebase-adminsdk` service account still carry broad
   project roles from project creation; the Firebase web API key is unrestricted by referrer.
 - The audit log has no hash chain; per-organization sequence contention limits sustained write rate.
 
-## Physical device provisioning (S10)
+## S10: Facility Simulation, weather, email and device provisioning
 
-`pnpm provision:device` (operator, ADC) creates the secret `symbiosis-device-key-<deviceId>-<keyId>`
-(automatic replication, `secretAccessor` for `symbiosis-api@` only) and the Firestore `devices/<id>`
-record (atomic create; duplicate ids refused). Rotation (`--rotate-key` with a new key id) is the
-recovery path for a sequence error. Registered so far: `DEV-PHX-BENCH-001` (key id
-`KEY-PHX-BENCH-001`, organization `ORG-SIM-001`, facility `FAC-SIM-001`), health `UNKNOWN` until its
-first heartbeat. No Cloud Run revision changed in S10. To remove a device: delete the Firestore
-document `devices/<id>` and the secret (all versions).
+The Facility Simulation runs inside the existing three services (no separate demo app). The API signs
+the simulation's vendor payloads with the registered device keys (Secret Manager, API identity only) and
+submits them to its own edge boundary; the worker applies the pinned adapter version and the unchanged
+S3 to S9 pipeline. Records: Firestore tenant documents `simulationControl`, `simulationSessions`,
+`simulationStates`, `simulationPolicyVersions`/`simulationPolicyActive`, `adapterMappingVersions`/
+`adapterMappingActive`, `adapterTraces`, `notificationDeliveries`, `followUpState`, `contacts`,
+`ruleEvaluations`, `weatherCache` (equality-only queries, no new index).
+
+| Setting (environment name)                      | Services     | Value / meaning                                                            |
+| ----------------------------------------------- | ------------ | -------------------------------------------------------------------------- |
+| `SYMBIOSIS_WEATHER_PROVIDER`                    | api, worker  | `google` (Weather API `currentConditions:lookup`) or `none`                |
+| `SYMBIOSIS_WEATHER_AUTH`                        | api, worker  | `adc` (runtime identity OAuth token; deployed) or `api-key` (Secret Manager name in `SYMBIOSIS_WEATHER_API_KEY_SECRET`) |
+| `SYMBIOSIS_WEATHER_CACHE_SECONDS` / `_MAX_CALLS_PER_DAY` | api, worker | 600 s cache; 100 provider calls per facility per day (hard budget)   |
+| `SYMBIOSIS_EMAIL_PROVIDER`                      | worker (api) | `console` (deployed) or `smtp`                                             |
+| `SYMBIOSIS_SMTP_HOST/_PORT/_SECURITY/_SECRET_NAME`, `SYMBIOSIS_EMAIL_FROM` | worker | SMTP demo transport; the secret holds `{"username","password"}`        |
+| `SYMBIOSIS_WEB_BASE_URL`                        | api, worker  | link base used in email text                                               |
+| `SYMBIOSIS_WORKER_URL`, `SYMBIOSIS_API_SERVICE_ACCOUNT` | api / worker | lets the API ask the private worker for one scheduler pass          |
+
+**Weather semantics.** `LIVE WEATHER` is a real provider reading with the provider's own observation
+time; a cached reading keeps that timestamp (never re-stamped); `SIMULATED WEATHER` is an explicit mode
+and enters as simulation data; `WEATHER UNAVAILABLE` is shown when the provider fails or is not
+configured, and it never falls back to simulated data. Only the outdoor temperature enters risk logic.
+The Weather API was enabled on 2026-10-02; the API and worker identities call it with their own OAuth
+token (no API key exists). Quota protection is the application budget above; no Google-side quota
+override was configured.
+
+**Email.** `console` writes the alert text to the structured log and records the delivery as such. For
+real email: create the secret `symbiosis-smtp-credentials` (value `{"username":"...","password":"..."}`,
+added by the operator directly in Secret Manager, never in chat or Git), grant `secretAccessor` on that
+secret to `symbiosis-worker` only, set the contacts with `pnpm seed:sim --contact ACTOR=address`, then
+redeploy with `SYMBIOSIS_EMAIL_PROVIDER=smtp SYMBIOSIS_SMTP_HOST=smtp.gmail.com SYMBIOSIS_EMAIL_FROM=<sender>`
+(`02-deploy.sh` reads those). **Real email smoke: PENDING EXTERNAL DEMO CREDENTIALS.**
+
+**Provisioning and seeding.**
+
+- `pnpm seed:gcp` (S9) updates the synthetic organizations, actors (including the simulation facility
+  scope) and demo users. `pnpm seed:sim --confirm-project <id> [--dry-run] [--contact ACTOR=address]`
+  registers `DEV-SIM-HVAC-01`, `DEV-SIM-PWR-01`, `DEV-SIM-VIB-01` (each with its own random key) and the
+  keyless weather feed `DEV-SIM-WX-01`; reruns change nothing. Contacts come only from the operator, only
+  for actors of `ORG-SIM-001`, and are masked in output.
+- `pnpm provision:device` (generic): any asset, signals and optional source profile for a customer
+  gateway; `--rotate-key` is the sequence-recovery path. To remove a device: delete the Firestore document
+  `devices/<id>` and the secret (all versions).
+
+**Cleanup of the abandoned prototype device (D-096).** `DEV-PHX-BENCH-001` / `KEY-PHX-BENCH-001` were
+inspected (never seen, referenced by no data) and deleted together with the key secret and the local key
+file. `DEV-SIM-001` and all shared edge infrastructure were retained.
+
+**IAM added in S10:** `roles/run.invoker` for `symbiosis-api` on `symbiosis-worker`; `secretAccessor` for
+`symbiosis-api` on each of the three simulation device-key secrets (created by `seed:sim`). No role was
+widened and no identity was added.
+
+**Deployed (2026-10-02, image tag `1776efcda017`):** `symbiosis-api-00005-lp8`, `symbiosis-web-00005-hh4`,
+`symbiosis-worker-00005-mhz` (previous revisions `...-00004-gdw`, `...-00004-mgk`, `...-00004-86k` remain
+available for rollback). Images by digest: worker `sha256:9d7393a46955283edb9383904b9613eb06dea45ad055bc8a639fb0e309706a4a`
+API `sha256:0a0d663a235e1619a80aa124e97a380db5888cef24f16f9793f224d4ea8bb1a7`, web `sha256:3cc58edf9ca4e9f14a27c42f8e2d2305b223ad0e615160fd1a97814689b317f2`).

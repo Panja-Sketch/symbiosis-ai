@@ -27,6 +27,7 @@
     "seed:sim": "tsx scripts/seed-simulation.ts",
     "smoke:s9": "tsx scripts/smoke-s9.ts",
     "smoke:s10": "tsx scripts/smoke-s10.ts",
+    "smoke:s10:cloud": "tsx scripts/smoke-s10-cloud.ts",
     "provision:device": "tsx scripts/provision-device.ts"
   },
   "devDependencies": {

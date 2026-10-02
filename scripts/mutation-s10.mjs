@@ -125,6 +125,13 @@ const mutations = [
       "tests/security/simulation-authz.test.ts",
     ],
   },
+  {
+    id: "M15 facility events lose their publish order in the cloud bus",
+    file: "adapters/gcp/src/pubsub/bus.ts",
+    from: "`${event.organization_id}:${event.facility_id}`",
+    to: "`${event.organization_id}`",
+    tests: ["adapters/gcp/src/gcp.test.ts"],
+  },
 ];
 
 const only = process.argv[2]; // optional: run one mutation, e.g. `node scripts/mutation-s10.mjs M7`

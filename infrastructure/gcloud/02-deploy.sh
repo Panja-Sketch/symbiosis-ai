@@ -40,12 +40,18 @@ for s in pubsub-push scheduler api; do
 done
 
 # --- Pub/Sub: push subscription with retry + dead-letter policy, and a pull subscription on the DLQ ---
+# Events of one facility must reach the worker in publish order (D-098), so the subscription has
+# message ordering enabled. That can only be set at creation: an existing unordered subscription is
+# recreated (undelivered messages are not carried over; none are expected between deploys).
+if gcloud pubsub subscriptions describe symbiosis-events-worker --project "$P" >/dev/null 2>&1; then
+  ORDERED=$(gcloud pubsub subscriptions describe symbiosis-events-worker --project "$P" --format='value(enableMessageOrdering)')
+  if [ "$ORDERED" != "True" ]; then
+    echo "recreating symbiosis-events-worker with message ordering"
+    gcloud pubsub subscriptions delete symbiosis-events-worker --project "$P" --quiet
+  fi
+fi
 if ! gcloud pubsub subscriptions describe symbiosis-events-worker --project "$P" >/dev/null 2>&1; then
-  gcloud pubsub subscriptions create symbiosis-events-worker --project "$P" --topic symbiosis-events \
-    --push-endpoint "$WORKER_URL/pubsub/push" --push-auth-service-account "$(SA pubsub-push)" \
-    --push-auth-token-audience "$WORKER_URL" --ack-deadline 60 \
-    --min-retry-delay 10s --max-retry-delay 300s \
-    --dead-letter-topic symbiosis-events-dlq --max-delivery-attempts 5 --expiration-period never
+  gcloud pubsub subscriptions create symbiosis-events-worker --project "$P" --topic symbiosis-events     --push-endpoint "$WORKER_URL/pubsub/push" --push-auth-service-account "$(SA pubsub-push)"     --push-auth-token-audience "$WORKER_URL" --ack-deadline 60     --min-retry-delay 10s --max-retry-delay 300s --enable-message-ordering     --dead-letter-topic symbiosis-events-dlq --max-delivery-attempts 5 --expiration-period never
 fi
 gcloud pubsub subscriptions add-iam-policy-binding symbiosis-events-worker --project "$P" \
   --member "serviceAccount:service-$PN@gcp-sa-pubsub.iam.gserviceaccount.com" --role roles/pubsub.subscriber --quiet >/dev/null

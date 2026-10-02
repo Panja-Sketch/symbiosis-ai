@@ -20,6 +20,10 @@ proj "$(SA symbiosis-api)" roles/aiplatform.user
 proj "$(SA symbiosis-api)" roles/firebaseauth.viewer
 # Worker: Firestore data only at project level.
 proj "$(SA symbiosis-worker)" roles/datastore.user
+# S10 live weather: API and worker call the Weather API with their own OAuth token, which needs the
+# right to use the project's enabled services (a 403 without it). No other role is added.
+proj "$(SA symbiosis-api)" roles/serviceusage.serviceUsageConsumer
+proj "$(SA symbiosis-worker)" roles/serviceusage.serviceUsageConsumer
 
 # Pub/Sub: both publish events; nobody else gets topic access.
 for s in symbiosis-api symbiosis-worker; do
