@@ -17,14 +17,24 @@ digest() { gcloud artifacts docker images describe "$REPO/$1:$TAG" --project "$P
 W_IMG="$REPO/worker@$(digest worker)"; A_IMG="$REPO/api@$(digest api)"; WEB_IMG="$REPO/web@$(digest web)"
 echo "worker=$W_IMG"; echo "api=$A_IMG"; echo "web=$WEB_IMG"
 
+WEB_URL="https://symbiosis-web-$PN.$R.run.app"
+# S10 (D-089, D-090). Live weather uses the runtime identity's OAuth token (nothing to store); a hard
+# per-facility daily call budget and a 10-minute cache protect the demo quota. Email is the console
+# channel until the operator adds the SMTP secret and sets SYMBIOSIS_EMAIL_PROVIDER=smtp (see
+# docs/GCP_RUNTIME.md); the delivery record always says what really happened.
+S10="SYMBIOSIS_WEATHER_PROVIDER=${SYMBIOSIS_WEATHER_PROVIDER:-google},SYMBIOSIS_WEATHER_AUTH=adc,SYMBIOSIS_WEATHER_MAX_CALLS_PER_DAY=100,SYMBIOSIS_WEATHER_CACHE_SECONDS=600,SYMBIOSIS_WEB_BASE_URL=$WEB_URL,SYMBIOSIS_EMAIL_PROVIDER=${SYMBIOSIS_EMAIL_PROVIDER:-console}"
+if [ "${SYMBIOSIS_EMAIL_PROVIDER:-console}" = "smtp" ]; then
+  S10="$S10,SYMBIOSIS_SMTP_HOST=${SYMBIOSIS_SMTP_HOST:?},SYMBIOSIS_SMTP_PORT=${SYMBIOSIS_SMTP_PORT:-465},SYMBIOSIS_SMTP_SECURITY=${SYMBIOSIS_SMTP_SECURITY:-tls},SYMBIOSIS_SMTP_SECRET_NAME=${SYMBIOSIS_SMTP_SECRET_NAME:-symbiosis-smtp-credentials},SYMBIOSIS_EMAIL_FROM=${SYMBIOSIS_EMAIL_FROM:?}"
+fi
+
 COMMON="SYMBIOSIS_RUNTIME=gcp,GCP_PROJECT_ID=$P,GCP_REGION=$R,SYMBIOSIS_EVENTS_TOPIC=symbiosis-events,SYMBIOSIS_EVIDENCE_BUCKET=$P-evidence,FIREBASE_PROJECT_ID=$P,SYMBIOSIS_VERSION=$TAG"
 
 # --- worker: PRIVATE (no allUsers). One instance, one request at a time. ---
 gcloud run deploy symbiosis-worker --project "$P" --region "$R" --image "$W_IMG" \
   --service-account "$(SA worker)" --no-allow-unauthenticated \
   --concurrency 1 --max-instances 1 --min-instances 0 --cpu 1 --memory 512Mi --timeout 300 \
-  --set-env-vars "$COMMON,SYMBIOSIS_WORKER_AUDIENCE=$WORKER_URL,SYMBIOSIS_PUSH_SERVICE_ACCOUNT=$(SA pubsub-push),SYMBIOSIS_SCHEDULER_SERVICE_ACCOUNT=$(SA scheduler)" --quiet
-for s in pubsub-push scheduler; do
+  --set-env-vars "$COMMON,SYMBIOSIS_WORKER_AUDIENCE=$WORKER_URL,SYMBIOSIS_PUSH_SERVICE_ACCOUNT=$(SA pubsub-push),SYMBIOSIS_SCHEDULER_SERVICE_ACCOUNT=$(SA scheduler),SYMBIOSIS_API_SERVICE_ACCOUNT=$(SA api),$S10" --quiet
+for s in pubsub-push scheduler api; do
   gcloud run services add-iam-policy-binding symbiosis-worker --project "$P" --region "$R" \
     --member "serviceAccount:$(SA $s)" --role roles/run.invoker --quiet >/dev/null
 done
@@ -57,7 +67,7 @@ gcloud scheduler jobs "$VERB" http symbiosis-tick --project "$P" --location "$R"
 gcloud run deploy symbiosis-api --project "$P" --region "$R" --image "$A_IMG" \
   --service-account "$(SA api)" --allow-unauthenticated \
   --concurrency 40 --max-instances 3 --min-instances 0 --cpu 1 --memory 512Mi --timeout 60 \
-  --set-env-vars "$COMMON,SYMBIOSIS_AI_PROVIDER=gemini" --quiet
+  --set-env-vars "$COMMON,SYMBIOSIS_AI_PROVIDER=gemini,SYMBIOSIS_WORKER_URL=$WORKER_URL,$S10" --quiet
 
 # --- web: public; talks to the API server-side with the person's own ID token ---
 gcloud run deploy symbiosis-web --project "$P" --region "$R" --image "$WEB_IMG" \
