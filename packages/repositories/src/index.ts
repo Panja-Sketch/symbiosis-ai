@@ -78,7 +78,7 @@ export interface ObservationRepository {
   }): Promise<readonly CanonicalObservation[]>;
 }
 
-export class InMemoryObservationRepository implements ObservationRepository , FacilityPurgeable {
+export class InMemoryObservationRepository implements ObservationRepository, FacilityPurgeable {
   private readonly byKey = new Map<string, CanonicalObservation>();
 
   async purgeFacility(org: string, fac: string, caseIds: ReadonlySet<string>) {
@@ -143,12 +143,12 @@ export interface BaselineRepository {
   listAudit(organizationId: string): Promise<readonly BaselineAuditRecord[]>;
 }
 
-export class InMemoryBaselineRepository implements BaselineRepository , FacilityPurgeable {
+export class InMemoryBaselineRepository implements BaselineRepository, FacilityPurgeable {
   private readonly byId = new Map<string, Baseline>();
   private readonly snapshots = new Map<string, BaselineSnapshot>();
   private readonly audit: BaselineAuditRecord[] = [];
 
-  async purgeFacility(org: string, fac: string, _caseIds: ReadonlySet<string>) {
+  async purgeFacility(org: string, fac: string) {
     const before = this.audit.length;
     for (let i = this.audit.length - 1; i >= 0; i -= 1) {
       const a = this.audit[i];
@@ -216,7 +216,9 @@ export interface DetectionStateRepository {
   save(state: DetectionState): Promise<void>;
 }
 
-export class InMemoryDetectionStateRepository implements DetectionStateRepository , FacilityPurgeable {
+export class InMemoryDetectionStateRepository
+  implements DetectionStateRepository, FacilityPurgeable
+{
   private readonly states = new Map<string, DetectionState>();
 
   async purgeFacility(org: string, fac: string, caseIds: ReadonlySet<string>) {
@@ -258,7 +260,7 @@ export interface CaseRepository {
   listAllForSystemTick(): Promise<readonly RiskImprovementCase[]>;
 }
 
-export class InMemoryCaseRepository implements CaseRepository , FacilityPurgeable {
+export class InMemoryCaseRepository implements CaseRepository, FacilityPurgeable {
   private readonly cases = new Map<string, RiskImprovementCase>();
 
   async purgeFacility(org: string, fac: string, caseIds: ReadonlySet<string>) {
@@ -323,7 +325,7 @@ export interface RiskEventRepository {
   listByCase(organizationId: string, caseId: string): Promise<readonly RiskEvent[]>;
 }
 
-export class InMemoryRiskEventRepository implements RiskEventRepository , FacilityPurgeable {
+export class InMemoryRiskEventRepository implements RiskEventRepository, FacilityPurgeable {
   private readonly events = new Map<string, RiskEvent>();
 
   async purgeFacility(org: string, fac: string, caseIds: ReadonlySet<string>) {
@@ -354,7 +356,7 @@ export interface AlertRepository {
   listAllForSystemTick(): Promise<readonly Alert[]>;
 }
 
-export class InMemoryAlertRepository implements AlertRepository , FacilityPurgeable {
+export class InMemoryAlertRepository implements AlertRepository, FacilityPurgeable {
   private readonly alerts = new Map<string, Alert>();
 
   async purgeFacility(org: string, fac: string, caseIds: ReadonlySet<string>) {
@@ -387,7 +389,7 @@ export interface ActionRepository {
   listByCase(organizationId: string, caseId: string): Promise<readonly MitigationAction[]>;
 }
 
-export class InMemoryActionRepository implements ActionRepository , FacilityPurgeable {
+export class InMemoryActionRepository implements ActionRepository, FacilityPurgeable {
   private readonly actions = new Map<string, MitigationAction>();
 
   async purgeFacility(org: string, fac: string, caseIds: ReadonlySet<string>) {
@@ -422,7 +424,7 @@ export interface VerificationRepository {
   listAllForSystemTick(): Promise<readonly VerificationAttempt[]>;
 }
 
-export class InMemoryVerificationRepository implements VerificationRepository , FacilityPurgeable {
+export class InMemoryVerificationRepository implements VerificationRepository, FacilityPurgeable {
   private readonly attempts = new Map<string, VerificationAttempt>();
 
   async purgeFacility(org: string, fac: string, caseIds: ReadonlySet<string>) {
@@ -470,7 +472,7 @@ export interface InterventionRepository {
   ): Promise<readonly RiskEngineerInterventionRecommendation[]>;
 }
 
-export class InMemoryInterventionRepository implements InterventionRepository , FacilityPurgeable {
+export class InMemoryInterventionRepository implements InterventionRepository, FacilityPurgeable {
   private readonly items = new Map<string, RiskEngineerInterventionRecommendation>();
 
   async purgeFacility(org: string, fac: string, caseIds: ReadonlySet<string>) {
@@ -513,7 +515,9 @@ export interface EvidencePackageRepository {
   listByCase(organizationId: string, caseId: string): Promise<readonly EvidencePackageRecord[]>;
 }
 
-export class InMemoryEvidencePackageRepository implements EvidencePackageRepository , FacilityPurgeable {
+export class InMemoryEvidencePackageRepository
+  implements EvidencePackageRepository, FacilityPurgeable
+{
   private readonly records = new Map<string, EvidencePackageRecord>();
 
   async purgeFacility(org: string, fac: string, caseIds: ReadonlySet<string>) {
@@ -581,10 +585,12 @@ export interface SharingAgreementRepository {
   listAllForSystemTick(): Promise<readonly SharingAgreement[]>;
 }
 
-export class InMemorySharingAgreementRepository implements SharingAgreementRepository , FacilityPurgeable {
+export class InMemorySharingAgreementRepository
+  implements SharingAgreementRepository, FacilityPurgeable
+{
   private readonly items = new Map<string, SharingAgreement>();
 
-  async purgeFacility(org: string, fac: string, _caseIds: ReadonlySet<string>) {
+  async purgeFacility(org: string, fac: string) {
     return purgeWhere(this.items, (v) => v.organizationId === org && v.facilityIds.includes(fac));
   }
 
@@ -653,7 +659,9 @@ export interface SharedEvidenceRepository {
   ): Promise<readonly SharedEvidenceRecord[]>;
 }
 
-export class InMemorySharedEvidenceRepository implements SharedEvidenceRepository , FacilityPurgeable {
+export class InMemorySharedEvidenceRepository
+  implements SharedEvidenceRepository, FacilityPurgeable
+{
   private readonly items = new Map<string, SharedEvidenceRecord>();
 
   async purgeFacility(org: string, fac: string, caseIds: ReadonlySet<string>) {

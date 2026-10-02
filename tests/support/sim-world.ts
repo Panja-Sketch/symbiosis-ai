@@ -105,7 +105,9 @@ export async function makeSimWorld(options: { transport?: FakeEmailTransport } =
     },
     async reportAction(caseId: string, library = BACKUP, acknowledge = true) {
       if (acknowledge) {
-        expect((await api("POST", `/api/v1/cases/${caseId}/acknowledge`, MGR, {})).status).toBe(200);
+        expect((await api("POST", `/api/v1/cases/${caseId}/acknowledge`, MGR, {})).status).toBe(
+          200,
+        );
       }
       const assign = await api("POST", `/api/v1/cases/${caseId}/assignments`, MGR, {
         actionLibraryId: library,
@@ -125,4 +127,3 @@ export async function makeSimWorld(options: { transport?: FakeEmailTransport } =
   return w;
 }
 export type SimWorld = Awaited<ReturnType<typeof makeSimWorld>>;
-

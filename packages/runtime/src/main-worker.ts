@@ -131,7 +131,8 @@ async function main(): Promise<void> {
       let allowed = false;
       try {
         allowed = await verifyScheduler(request.headers.authorization);
-        if (!allowed && verifyApi !== undefined) allowed = await verifyApi(request.headers.authorization);
+        if (!allowed && verifyApi !== undefined)
+          allowed = await verifyApi(request.headers.authorization);
       } catch {
         allowed = false;
       }

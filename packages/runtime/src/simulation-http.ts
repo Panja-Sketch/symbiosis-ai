@@ -1,8 +1,4 @@
-import {
-  createContactsApi,
-  createSimulationApi,
-  createSimulationViews,
-} from "@symbiosis/api";
+import { createContactsApi, createSimulationApi, createSimulationViews } from "@symbiosis/api";
 import type { ContactsApi, SimulationApi } from "@symbiosis/api";
 import type { Clock } from "@symbiosis/clock";
 import type { IdGenerator } from "@symbiosis/event-bus";
@@ -24,7 +20,11 @@ export function createSimulationHttp(args: {
   readonly submit: EdgeSubmit;
   /** Runs the scheduler pass now. Absent: `POST /simulation/tick` does not exist. */
   readonly tick?: () => Promise<unknown>;
-}): { readonly simulation?: SimulationApi; readonly contacts: ContactsApi; readonly engine?: SimulationEngine } {
+}): {
+  readonly simulation?: SimulationApi;
+  readonly contacts: ContactsApi;
+  readonly engine?: SimulationEngine;
+} {
   const { services, ports, clock, ids } = args;
   const contacts = createContactsApi({
     contacts: services.contacts,

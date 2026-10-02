@@ -200,9 +200,7 @@ export function evaluateSample(input: EvaluateInput): EvaluateOutput {
     const siblings: CanonicalObservation[] = [];
     const eventAssets = new Set(
       obs
-        .filter(
-          (o) => o.signal === rule.signals.vibration || o.signal === rule.signals.current,
-        )
+        .filter((o) => o.signal === rule.signals.vibration || o.signal === rule.signals.current)
         .map((o) => o.assetId),
     );
     for (const assetId of eventAssets) {

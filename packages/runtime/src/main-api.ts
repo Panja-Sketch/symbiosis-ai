@@ -126,7 +126,12 @@ async function main(): Promise<void> {
     clock,
     ids,
     submit: async (r) => {
-      const res = await edge({ method: r.method, target: r.target, headers: r.headers, rawBody: r.rawBody });
+      const res = await edge({
+        method: r.method,
+        target: r.target,
+        headers: r.headers,
+        rawBody: r.rawBody,
+      });
       return { status: res.status, body: res.body };
     },
     ...(s10.workerUrl !== undefined && { tick: createWorkerTickInvoker(s10.workerUrl) }),

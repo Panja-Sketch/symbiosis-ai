@@ -59,7 +59,11 @@ export function createContactsApi(deps: ContactsApiDeps) {
       if (method !== "PUT") return problem(405, "METHOD_NOT_ALLOWED", "GET or PUT");
       for (const k of Object.keys(body)) {
         if (k !== "enabled" && k !== "categories") {
-          return problem(400, "INVALID_REQUEST", `"${k}" cannot be changed here (an address is set by an administrator)`);
+          return problem(
+            400,
+            "INVALID_REQUEST",
+            `"${k}" cannot be changed here (an address is set by an administrator)`,
+          );
         }
       }
       if (body.enabled !== undefined && typeof body.enabled !== "boolean") {
@@ -69,7 +73,11 @@ export function createContactsApi(deps: ContactsApiDeps) {
       if (body.categories !== undefined) {
         const c = body.categories;
         if (!Array.isArray(c) || !c.every((x) => (ALERT_KINDS as readonly unknown[]).includes(x))) {
-          return problem(400, "INVALID_REQUEST", `categories must be a list of ${ALERT_KINDS.join(", ")}`);
+          return problem(
+            400,
+            "INVALID_REQUEST",
+            `categories must be a list of ${ALERT_KINDS.join(", ")}`,
+          );
         }
         categories = [...new Set(c as AlertKind[])];
       }
@@ -87,7 +95,8 @@ export function createContactsApi(deps: ContactsApiDeps) {
     }
 
     if (route[0] === "contacts") {
-      if (!can(actor, "CONTACT_MANAGE")) return problem(403, "FORBIDDEN", "Missing permission CONTACT_MANAGE");
+      if (!can(actor, "CONTACT_MANAGE"))
+        return problem(403, "FORBIDDEN", "Missing permission CONTACT_MANAGE");
       if (route.length === 1 && method === "GET") {
         const all = await deps.contacts.list(org);
         return json(200, { contacts: all.map((c) => dto(c, c.actorId)) });
@@ -96,8 +105,10 @@ export function createContactsApi(deps: ContactsApiDeps) {
         const target = route[1] as string;
         const who = await deps.directory.get(target);
         // Another organization's actor is "not found", exactly like an unknown one.
-        if (who === undefined || who.organizationId !== org) return problem(404, "NOT_FOUND", "Unknown actor");
-        if (!isValidEmail(body.email)) return problem(400, "INVALID_REQUEST", "email must be a single valid address");
+        if (who === undefined || who.organizationId !== org)
+          return problem(404, "NOT_FOUND", "Unknown actor");
+        if (!isValidEmail(body.email))
+          return problem(400, "INVALID_REQUEST", "email must be a single valid address");
         const current = await deps.contacts.get(org, target);
         const next: ContactRecord = {
           actorId: target,

@@ -7,7 +7,6 @@ import {
   createSmtpCredentialsReader,
   createWeatherAuthHeaders,
 } from "@symbiosis/adapter-gcp";
-import type { Firestore } from "@google-cloud/firestore";
 import type { Clock } from "@symbiosis/clock";
 import type { WeatherProvider } from "@symbiosis/contracts";
 import { ConsoleEmail } from "@symbiosis/notifications";
@@ -88,9 +87,12 @@ export function parseS10CloudConfig(env: Env): S10CloudConfig {
     const secretName = env.SYMBIOSIS_SMTP_SECRET_NAME ?? "";
     const from = env.SYMBIOSIS_EMAIL_FROM ?? "";
     if (!HOST.test(host)) problems.push("SYMBIOSIS_SMTP_HOST is required for the smtp provider");
-    if (security !== "tls" && security !== "starttls") problems.push("SYMBIOSIS_SMTP_SECURITY must be tls or starttls");
-    if (!NAME.test(secretName)) problems.push("SYMBIOSIS_SMTP_SECRET_NAME is required for the smtp provider");
-    if (from !== "" && !EMAIL.test(from)) problems.push("SYMBIOSIS_EMAIL_FROM is not an email address");
+    if (security !== "tls" && security !== "starttls")
+      problems.push("SYMBIOSIS_SMTP_SECURITY must be tls or starttls");
+    if (!NAME.test(secretName))
+      problems.push("SYMBIOSIS_SMTP_SECRET_NAME is required for the smtp provider");
+    if (from !== "" && !EMAIL.test(from))
+      problems.push("SYMBIOSIS_EMAIL_FROM is not an email address");
     email = {
       provider: "smtp",
       host,
@@ -108,15 +110,18 @@ export function parseS10CloudConfig(env: Env): S10CloudConfig {
     problems.push("SYMBIOSIS_WEATHER_PROVIDER must be google or none");
   }
   const auth = env.SYMBIOSIS_WEATHER_AUTH ?? "adc";
-  if (auth !== "adc" && auth !== "api-key") problems.push("SYMBIOSIS_WEATHER_AUTH must be adc or api-key");
+  if (auth !== "adc" && auth !== "api-key")
+    problems.push("SYMBIOSIS_WEATHER_AUTH must be adc or api-key");
   const keySecret = env.SYMBIOSIS_WEATHER_API_KEY_SECRET ?? "";
   if (auth === "api-key" && weatherProvider === "google" && !NAME.test(keySecret)) {
     problems.push("SYMBIOSIS_WEATHER_API_KEY_SECRET is required for api-key authentication");
   }
   const webBaseUrl = env.SYMBIOSIS_WEB_BASE_URL ?? "";
-  if (webBaseUrl !== "" && !/^https?:\/\/[^\s]+$/.test(webBaseUrl)) problems.push("SYMBIOSIS_WEB_BASE_URL must be a URL");
+  if (webBaseUrl !== "" && !/^https?:\/\/[^\s]+$/.test(webBaseUrl))
+    problems.push("SYMBIOSIS_WEB_BASE_URL must be a URL");
   const workerUrl = env.SYMBIOSIS_WORKER_URL ?? "";
-  if (workerUrl !== "" && !/^https:\/\/[^\s]+$/.test(workerUrl)) problems.push("SYMBIOSIS_WORKER_URL must be an https URL");
+  if (workerUrl !== "" && !/^https:\/\/[^\s]+$/.test(workerUrl))
+    problems.push("SYMBIOSIS_WORKER_URL must be an https URL");
   const policy: WeatherPolicy = {
     cacheTtlSeconds: num("SYMBIOSIS_WEATHER_CACHE_SECONDS", 600, 60, 3600),
     failureBackoffSeconds: 120,
@@ -184,7 +189,7 @@ export function cloudSimulationOptions(options: {
   readonly config: S10CloudConfig;
   readonly projectId: string;
   readonly clock: Clock;
-  readonly firestore: Firestore;
+  readonly firestore: Parameters<typeof createFirestoreFacilityPurge>[0]["db"];
   readonly collectionPrefix: string;
   readonly env?: Env;
 }): SimulationOptions {
@@ -195,7 +200,10 @@ export function cloudSimulationOptions(options: {
     parameters: loadPolicyParameters(options.env),
     rawBase: loadRawPolicyBase(options.env),
     weather: { policy: options.config.weather.policy, ...(live !== undefined && { live }) },
-    purge: createFirestoreFacilityPurge({ db: options.firestore, collectionPrefix: options.collectionPrefix }),
+    purge: createFirestoreFacilityPurge({
+      db: options.firestore,
+      collectionPrefix: options.collectionPrefix,
+    }),
   };
 }
 

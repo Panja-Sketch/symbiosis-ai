@@ -233,7 +233,10 @@ export async function createLocalRuntime(options: LocalRuntimeOptions = {}): Pro
   const registry =
     facilityModel === undefined
       ? synthetic.registry
-      : new InMemoryDeviceRegistry([SYNTHETIC_DEV_DEVICE, ...simulationDeviceRecords(facilityModel)]);
+      : new InMemoryDeviceRegistry([
+          SYNTHETIC_DEV_DEVICE,
+          ...simulationDeviceRecords(facilityModel),
+        ]);
   const keys: DeviceKeyStore =
     facilityModel === undefined
       ? synthetic.keys
@@ -256,7 +259,9 @@ export async function createLocalRuntime(options: LocalRuntimeOptions = {}): Pro
   const purge = async (scope: { organizationId: string; facilityId: string }) => {
     const caseIds = new Set(
       (await cases.listAllForSystemTick())
-        .filter((c) => c.organizationId === scope.organizationId && c.facilityId === scope.facilityId)
+        .filter(
+          (c) => c.organizationId === scope.organizationId && c.facilityId === scope.facilityId,
+        )
         .map((c) => c.caseId),
     );
     const removed: Record<string, number> = {};
@@ -348,7 +353,12 @@ export async function createLocalRuntime(options: LocalRuntimeOptions = {}): Pro
           parameters: loadPolicyParameters(),
           rawBase: loadRawPolicyBase(),
           weather: {
-            policy: { cacheTtlSeconds: 600, failureBackoffSeconds: 120, maxFetchesPerDay: 200, staleAfterSeconds: 3600 },
+            policy: {
+              cacheTtlSeconds: 600,
+              failureBackoffSeconds: 120,
+              maxFetchesPerDay: 200,
+              staleAfterSeconds: 3600,
+            },
             ...(options.weatherProvider !== undefined && { live: options.weatherProvider }),
           },
           purge,

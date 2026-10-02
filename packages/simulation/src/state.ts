@@ -190,7 +190,8 @@ export function applyPatch(base: PhysicalValues, patch: StatePatch): PhysicalVal
       ...cond,
     };
   }
-  const { sensors: _ignored, ...rest } = patch;
+  const rest: Partial<StatePatch> = { ...patch };
+  delete rest.sensors;
   return { ...base, ...rest, sensors };
 }
 

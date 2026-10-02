@@ -47,37 +47,49 @@ export function startEvaluationRecorder(deps: {
       cur !== undefined && Date.parse(cur.evaluation.observedAt) > Date.parse(e.observedAt)
         ? undefined
         : {
-            doc: { organizationId: org, facilityId: fac, evaluation: e, recordedFromEvent: event.event_id },
+            doc: {
+              organizationId: org,
+              facilityId: fac,
+              evaluation: e,
+              recordedFromEvent: event.event_id,
+            },
             index: { facilityId: fac, kind: "LATEST" },
           },
     );
     // One history record per sample instant (the instant-level outcome is repeated on every
     // observation of that instant, so a redelivery or a sibling observation changes nothing).
     if (e.persistence !== undefined || e.instantOutcome !== undefined) {
-      await deps.store.update<EvaluationHistory>("ruleEvaluations", org, `${EVALUATION_HISTORY_ID}.${fac}`, (cur) => {
-        const instants = cur?.instants ?? [];
-        const at = new Date(e.observedAt).toISOString();
-        const existing = instants.find((i) => i.at === at);
-        // Signals of one sample can arrive in separate events (several gateways): the first event
-        // may only see part of the sample. The complete conclusion replaces a partial one, and a
-        // conclusion is otherwise never rewritten.
-        if (existing !== undefined && existing.outcome !== "INSUFFICIENT_DATA") return undefined;
-        if (existing !== undefined && e.instantOutcome === "INSUFFICIENT_DATA") return undefined;
-        const next: InstantRecord = {
-          at,
-          outcome: e.instantOutcome,
-          qualifying: e.persistence?.qualifyingEvaluations ?? 0,
-          required: e.persistence?.required ?? 0,
-          reasonCodes: e.reasonCodes,
-        };
-        return {
-          doc: {
-            facilityId: fac,
-            instants: [...instants.filter((i) => i.at !== at), next].sort((a, b) => Date.parse(a.at) - Date.parse(b.at)).slice(-MAX_INSTANTS),
-          },
-          index: { facilityId: fac, kind: "HISTORY" },
-        };
-      });
+      await deps.store.update<EvaluationHistory>(
+        "ruleEvaluations",
+        org,
+        `${EVALUATION_HISTORY_ID}.${fac}`,
+        (cur) => {
+          const instants = cur?.instants ?? [];
+          const at = new Date(e.observedAt).toISOString();
+          const existing = instants.find((i) => i.at === at);
+          // Signals of one sample can arrive in separate events (several gateways): the first event
+          // may only see part of the sample. The complete conclusion replaces a partial one, and a
+          // conclusion is otherwise never rewritten.
+          if (existing !== undefined && existing.outcome !== "INSUFFICIENT_DATA") return undefined;
+          if (existing !== undefined && e.instantOutcome === "INSUFFICIENT_DATA") return undefined;
+          const next: InstantRecord = {
+            at,
+            outcome: e.instantOutcome,
+            qualifying: e.persistence?.qualifyingEvaluations ?? 0,
+            required: e.persistence?.required ?? 0,
+            reasonCodes: e.reasonCodes,
+          };
+          return {
+            doc: {
+              facilityId: fac,
+              instants: [...instants.filter((i) => i.at !== at), next]
+                .sort((a, b) => Date.parse(a.at) - Date.parse(b.at))
+                .slice(-MAX_INSTANTS),
+            },
+            index: { facilityId: fac, kind: "HISTORY" },
+          };
+        },
+      );
     }
   });
 }

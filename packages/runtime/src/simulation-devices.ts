@@ -49,7 +49,9 @@ export function syntheticSimulationKeys(facility: FacilityModel): InMemoryDevice
     facility.devices.map((d) => ({
       deviceId: d.deviceId,
       keyId: d.keyId,
-      key: new Uint8Array(createHash("sha256").update(`synthetic-local-key|${d.deviceId}`).digest()),
+      key: new Uint8Array(
+        createHash("sha256").update(`synthetic-local-key|${d.deviceId}`).digest(),
+      ),
     })),
   );
 }

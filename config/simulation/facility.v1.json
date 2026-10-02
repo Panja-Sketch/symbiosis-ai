@@ -45,11 +45,7 @@
           "equipment_running": "AST-SIM-FAN-B"
         }
       },
-      "expectedSignals": [
-        "temperature",
-        "relative_humidity",
-        "equipment_running"
-      ]
+      "expectedSignals": ["temperature", "relative_humidity", "equipment_running"]
     },
     {
       "deviceId": "DEV-SIM-PWR-01",
@@ -58,11 +54,7 @@
       "displayName": "Electrical Meter Gateway",
       "group": "meter",
       "assetId": "AST-SIM-FAN-A",
-      "expectedSignals": [
-        "current",
-        "load_percent",
-        "equipment_running"
-      ]
+      "expectedSignals": ["current", "load_percent", "equipment_running"]
     },
     {
       "deviceId": "DEV-SIM-VIB-01",
@@ -71,9 +63,7 @@
       "displayName": "Vibration Sensor Gateway",
       "group": "vibration",
       "assetId": "AST-SIM-FAN-A",
-      "expectedSignals": [
-        "vibration_rms"
-      ]
+      "expectedSignals": ["vibration_rms"]
     }
   ],
   "sensors": [

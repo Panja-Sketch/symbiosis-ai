@@ -102,7 +102,8 @@ describe("value validation", () => {
     expect(issues({ ...defaults, "rule.vibrationZ": "2" }).join()).toMatch(/finite number/);
     expect(issues(withValues({ "rule.persistence": 2.5 })).join()).toMatch(/whole number/);
     expect(issues({ ...defaults, "rule.nonsense": 1 }).join()).toMatch(/unknown setting/);
-    const { "rule.vibrationZ": _omit, ...missing } = defaults;
+    const missing: Record<string, unknown> = { ...defaults };
+    delete missing["rule.vibrationZ"];
     expect(issues(missing).join()).toMatch(/required/);
     expect(issues(null)).not.toEqual([]);
     expect(issues([])).not.toEqual([]);

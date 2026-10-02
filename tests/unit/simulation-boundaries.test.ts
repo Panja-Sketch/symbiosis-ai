@@ -64,8 +64,13 @@ describe("the simulation package is a source of data, not a decision maker", () 
       "UpdateResult",
     ]);
     for (const f of SIM) {
-      for (const m of text(f).matchAll(/import\s+(?:type\s+)?\{([^}]*)\}\s+from\s+["']@symbiosis\/repositories["']/g)) {
-        for (const name of (m[1] as string).split(",").map((s) => s.trim()).filter(Boolean)) {
+      for (const m of text(f).matchAll(
+        /import\s+(?:type\s+)?\{([^}]*)\}\s+from\s+["']@symbiosis\/repositories["']/g,
+      )) {
+        for (const name of (m[1] as string)
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean)) {
           expect(allowedNames.has(name), `${rel(f)} imports ${name} from repositories`).toBe(true);
         }
       }
@@ -81,23 +86,41 @@ describe("the simulation package is a source of data, not a decision maker", () 
   it("cannot reach the platform except through the signed edge request it is given", () => {
     for (const f of SIM) {
       const code = text(f);
-      expect(code, rel(f)).not.toMatch(/\bfetch\(|normalizeTelemetry|assessObservation|evaluateSample|bus\.publish|insertIfAbsent/);
+      expect(code, rel(f)).not.toMatch(
+        /\bfetch\(|normalizeTelemetry|assessObservation|evaluateSample|bus\.publish|insertIfAbsent/,
+      );
     }
     // the only outward call is the injected `submit` of already-signed bytes
-    expect(text(join(root, "packages", "simulation", "src", "engine.ts"))).toMatch(/deps\.submit\(/);
+    expect(text(join(root, "packages", "simulation", "src", "engine.ts"))).toMatch(
+      /deps\.submit\(/,
+    );
   });
 
   it("the physical state has no field that could carry a business outcome", () => {
     const state = text(join(root, "packages", "simulation", "src", "state.ts"));
-    const block = state.slice(state.indexOf("export type PhysicalValues"), state.indexOf("export type NumericField"));
+    const block = state.slice(
+      state.indexOf("export type PhysicalValues"),
+      state.indexOf("export type NumericField"),
+    );
     expect(block).not.toMatch(/severity|case|verif|result|alert|evidence|risk|recurr/i);
   });
 
   it("the scenario library describes the physical world only", () => {
-    const cfg = JSON.parse(readFileSync(join(root, "config", "simulation", "scenarios.v1.json"), "utf8")) as {
+    const cfg = JSON.parse(
+      readFileSync(join(root, "config", "simulation", "scenarios.v1.json"), "utf8"),
+    ) as {
       scenarios: Record<string, unknown>[];
     };
-    const allowedKeys = ["id", "label", "summary", "values", "rampSeconds", "weatherMode", "world", "expectation"];
+    const allowedKeys = [
+      "id",
+      "label",
+      "summary",
+      "values",
+      "rampSeconds",
+      "weatherMode",
+      "world",
+      "expectation",
+    ];
     for (const s of cfg.scenarios) {
       expect(Object.keys(s).every((k) => allowedKeys.includes(k))).toBe(true);
       for (const k of Object.keys(s.values as object)) {

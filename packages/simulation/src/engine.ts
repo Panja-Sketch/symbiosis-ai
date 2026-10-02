@@ -210,7 +210,10 @@ export function createSimulationEngine(deps: EngineDeps) {
             ? undefined
             : {
                 doc: ((): SimulationSession => {
-                  const { lease: _l, ...rest } = cur;
+                  const rest: { -readonly [K in keyof SimulationSession]: SimulationSession[K] } = {
+                    ...cur,
+                  };
+                  delete rest.lease;
                   return {
                     ...rest,
                     lastEmittedMs: Math.max(cur.lastEmittedMs, lastEmitted),

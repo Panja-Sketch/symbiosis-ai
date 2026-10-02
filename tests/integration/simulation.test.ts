@@ -30,12 +30,22 @@ describe("A. normal operation: baseline learns, no case, no email", () => {
     await w.steps(12, { tick: true });
     const o = await w.overview();
     expect(o.baseline.ready).toBe(true);
-    expect(o.baseline.signals.map((s: { status: string }) => s.status)).toEqual(["READY", "READY", "READY"]);
+    expect(o.baseline.signals.map((s: { status: string }) => s.status)).toEqual([
+      "READY",
+      "READY",
+      "READY",
+    ]);
     expect(await w.cases()).toHaveLength(0);
     expect(w.emails()).toHaveLength(0);
     // every sensor shows data from a labelled synthetic vendor, with the unit and trust the pipeline assigned
     const vib = o.sensors.find((s: { signal: string }) => s.signal === "vibration_rms");
-    expect(vib).toMatchObject({ status: "NORMAL", trusted: true, synthetic: true, sourceType: "SIMULATOR", sourceLabel: "Vibration Sensor Gateway" });
+    expect(vib).toMatchObject({
+      status: "NORMAL",
+      trusted: true,
+      synthetic: true,
+      sourceType: "SIMULATOR",
+      sourceLabel: "Vibration Sensor Gateway",
+    });
     expect(vib.sourceAdapter).toBe("sim-vibration-gateway@v1");
     expect(vib.value).toBeGreaterThan(0.25);
     expect(vib.value).toBeLessThan(0.35);
@@ -43,7 +53,9 @@ describe("A. normal operation: baseline learns, no case, no email", () => {
     expect(cur.value).toBeGreaterThan(11.5);
     expect(cur.value).toBeLessThan(12.5);
     expect(cur.sourceAdapter).toBe("sim-electrical-meter@v1");
-    const zone = o.sensors.find((s: { signal: string; assetId: string }) => s.signal === "temperature");
+    const zone = o.sensors.find(
+      (s: { signal: string; assetId: string }) => s.signal === "temperature",
+    );
     expect(zone.value).toBeCloseTo(4.2, 1);
     expect(zone.sourceAdapter).toBe("sim-hvac-controller@v1");
     // all three vendors reach the same canonical contract
@@ -65,7 +77,9 @@ describe("A. normal operation: baseline learns, no case, no email", () => {
     const r = await w.sim("POST", "/scenario", ADMIN, { scenarioId: "COMPOUND_COOLING_RISK" });
     expect(r.status).toBe(409);
     expect(r.body.error.code).toBe("BASELINE_LEARNING");
-    expect((await w.sim("POST", "/state", ADMIN, { patch: { vibrationRmsMs2: 0.9 } })).status).toBe(409);
+    expect((await w.sim("POST", "/state", ADMIN, { patch: { vibrationRmsMs2: 0.9 } })).status).toBe(
+      409,
+    );
     expect((await w.sim("POST", "/scenario", ADMIN, { scenarioId: "NORMAL" })).status).toBe(200);
   });
 });
@@ -76,14 +90,22 @@ describe("B. compound risk: sensors + context -> one case + one alert", () => {
     const caseId = await w.detect();
     const cases = await w.cases();
     expect(cases).toHaveLength(1);
-    expect(cases[0]).toMatchObject({ state: "OPEN", hazardType: "COOLING_ELECTRICAL_DETERIORATION" });
+    expect(cases[0]).toMatchObject({
+      state: "OPEN",
+      hazardType: "COOLING_ELECTRICAL_DETERIORATION",
+    });
     expect(["HIGH", "CRITICAL"]).toContain(cases[0]?.severity);
     // the rule's own conclusion, copied from storage, is what the screen shows
     const o = await w.overview();
     expect(o.rule.outcome).toBe("CANDIDATE_RISK");
-    expect(o.rule.persistence).toMatchObject({ qualifyingEvaluations: expect.any(Number), required: 3 });
+    expect(o.rule.persistence).toMatchObject({
+      qualifyingEvaluations: expect.any(Number),
+      required: 3,
+    });
     expect(o.rule.ruleVersion).toBe("sim.1");
-    const met = Object.fromEntries(o.rule.conditions.map((c: { id: string; met: boolean }) => [c.id, c.met]));
+    const met = Object.fromEntries(
+      o.rule.conditions.map((c: { id: string; met: boolean }) => [c.id, c.met]),
+    );
     expect(met).toMatchObject({ VIBRATION: true, CURRENT: true });
     // context: heat OR a rising zone temperature (the 20-second ramp may not have finished yet)
     expect(met.HEAT === true || met.ZONE_RISING === true).toBe(true);
@@ -91,7 +113,9 @@ describe("B. compound risk: sensors + context -> one case + one alert", () => {
     expect(w.emails()).toHaveLength(1);
     const mail = w.emails()[0];
     expect(mail?.to).toBe("usr-facility-mgr-001@symbiosis-demo.example");
-    expect(mail?.subject).toMatch(/^\[ALERT\] \[(HIGH|CRITICAL)\] .*Northgate Cold Storage - Phoenix/);
+    expect(mail?.subject).toMatch(
+      /^\[ALERT\] \[(HIGH|CRITICAL)\] .*Northgate Cold Storage - Phoenix/,
+    );
     expect(mail?.text).toMatch(/Facility: Northgate Cold Storage - Phoenix/);
     expect(mail?.text).toContain(`https://app.example/operations/cases/${caseId}`);
     expect(mail?.text).toMatch(/Primary Cooling Unit \(CU-A\)/);
@@ -103,7 +127,12 @@ describe("B. compound risk: sensors + context -> one case + one alert", () => {
     const ov = await w.overview();
     expect(ov.activeCaseId).toBe(caseId);
     expect(ov.notifications).toHaveLength(1);
-    expect(ov.notifications[0]).toMatchObject({ kind: "INITIAL", status: "SENT", channel: "EMAIL", addressHint: "u***1@symbiosis-demo.example" });
+    expect(ov.notifications[0]).toMatchObject({
+      kind: "INITIAL",
+      status: "SENT",
+      channel: "EMAIL",
+      addressHint: "u***1@symbiosis-demo.example",
+    });
     const tl = (await w.sim("GET", "/timeline")).body.items as { title: string; kind: string }[];
     const titles = tl.map((i) => i.title);
     expect(titles.some((t) => t.startsWith("Scenario applied: COMPOUND_COOLING_RISK"))).toBe(true);
@@ -131,10 +160,14 @@ describe("B. compound risk: sensors + context -> one case + one alert", () => {
     expect(await w.cases()).toHaveLength(0);
     const o = await w.overview();
     expect(o.rule.outcome).toBe("WATCH");
-    const met = Object.fromEntries(o.rule.conditions.map((c: { id: string; met: boolean }) => [c.id, c.met]));
+    const met = Object.fromEntries(
+      o.rule.conditions.map((c: { id: string; met: boolean }) => [c.id, c.met]),
+    );
     expect(met).toMatchObject({ VIBRATION: true, CURRENT: true, HEAT: false, ZONE_RISING: false });
     // now it gets hot: the SAME sensors plus the context become a compound condition
-    expect((await w.sim("POST", "/state", ADMIN, { patch: { outdoorTemperatureC: 43 } })).status).toBe(200);
+    expect(
+      (await w.sim("POST", "/state", ADMIN, { patch: { outdoorTemperatureC: 43 } })).status,
+    ).toBe(200);
     await w.until(async () => (await w.cases()).length > 0, 40, false);
     expect(await w.cases()).toHaveLength(1);
   });
@@ -150,7 +183,11 @@ describe("C. ineffective action: reported complete is NOT improved", () => {
     const v0 = await w.caseView(caseId);
     expect(v0.state).toBe("ACTION_REPORTED");
     expect(JSON.stringify(v0.didItWork).toUpperCase()).toContain("PENDING");
-    await w.until(async () => (await w.verifications(caseId)).some((x) => x.status === "COMPLETED"), 60, true);
+    await w.until(
+      async () => (await w.verifications(caseId)).some((x) => x.status === "COMPLETED"),
+      60,
+      true,
+    );
     const [att] = await w.verifications(caseId);
     expect(att?.assessment?.result).toBe("NOT_IMPROVING");
     expect(att?.policyVersion).toBe("sim.1");
@@ -168,7 +205,9 @@ describe("C. ineffective action: reported complete is NOT improved", () => {
     expect(w.emails().filter((m) => m.subject.startsWith("[FOLLOW-UP]"))).toHaveLength(1);
     const alerts = await w.runtime.alerts.listByCase(ORG, caseId);
     expect(alerts.filter((a) => a.kind === "FOLLOW_UP")).toHaveLength(1);
-    expect(alerts.find((a) => a.kind === "FOLLOW_UP")?.trigger?.type).toBe("VERIFICATION_NOT_IMPROVING");
+    expect(alerts.find((a) => a.kind === "FOLLOW_UP")?.trigger?.type).toBe(
+      "VERIFICATION_NOT_IMPROVING",
+    );
     // an evidence package preserves the real result and is labelled as simulation data
     const view = await w.caseView(caseId);
     expect(view.evidencePackages?.length ?? 0).toBeGreaterThan(0);
@@ -184,27 +223,44 @@ describe("D. successful action after a failed one: a legitimate second cycle -> 
     const caseId = await w.detect();
     await w.reportAction(caseId, BACKUP);
     await w.scenario("INEFFECTIVE_MITIGATION");
-    await w.until(async () => (await w.verifications(caseId)).some((x) => x.status === "COMPLETED"), 60, true);
+    await w.until(
+      async () => (await w.verifications(caseId)).some((x) => x.status === "COMPLETED"),
+      60,
+      true,
+    );
     expect((await w.caseView(caseId)).state).toBe("NOT_IMPROVING");
     const followUpsBefore = w.emails().filter((m) => m.subject.startsWith("[FOLLOW-UP]")).length;
 
     // a person acts again (a different approved action); the world genuinely improves
     await w.reportAction(caseId, INSPECT, false);
     await w.scenario("SUCCESSFUL_MITIGATION");
-    await w.until(async () => (await w.verifications(caseId)).filter((x) => x.status === "COMPLETED").length >= 2, 80, true);
+    await w.until(
+      async () =>
+        (await w.verifications(caseId)).filter((x) => x.status === "COMPLETED").length >= 2,
+      80,
+      true,
+    );
     const attempts = await w.verifications(caseId);
     expect(attempts.map((a) => a.assessment?.result)).toEqual(["NOT_IMPROVING", "VERIFIED"]);
     const v = await w.caseView(caseId);
     expect(v.state).toBe("VERIFIED_IMPROVED");
     // a verified improvement needs no follow-up
-    expect(w.emails().filter((m) => m.subject.startsWith("[FOLLOW-UP]"))).toHaveLength(followUpsBefore);
+    expect(w.emails().filter((m) => m.subject.startsWith("[FOLLOW-UP]"))).toHaveLength(
+      followUpsBefore,
+    );
     // evidence: the verified package is created and labelled as simulation data, never as real telemetry
     const pkgs = await w.runtime.evidencePackages.listByCase(ORG, caseId);
     expect(pkgs.length).toBeGreaterThanOrEqual(2);
-    const loaded = await w.runtime.evidenceService.load(ORG, pkgs[pkgs.length - 1]?.packageId ?? "");
+    const loaded = await w.runtime.evidenceService.load(
+      ORG,
+      pkgs[pkgs.length - 1]?.packageId ?? "",
+    );
     expect(loaded.ok).toBe(true);
     if (loaded.ok) {
-      expect(loaded.value.package.payload.source).toMatchObject({ synthetic: true, dataOrigin: "SYNTHETIC_SIMULATOR" });
+      expect(loaded.value.package.payload.source).toMatchObject({
+        synthetic: true,
+        dataOrigin: "SYNTHETIC_SIMULATOR",
+      });
       expect(loaded.value.package.payload.source.label).toMatch(/SYNTHETIC|SIMULATION/i);
       expect(loaded.value.package.payload.verification.policyVersion).toBe("sim.1");
     }
@@ -227,10 +283,15 @@ describe("E. recurrence: the same case reopens with a new risk event and a recur
     expect(cases[0]?.recurrenceCount).toBe(1);
     const events = await w.runtime.riskEvents.listByCase(ORG, caseId);
     expect(events.length).toBe(2);
-    const mail = w.emails().slice(before).filter((m) => m.subject.startsWith("[RECURRENCE]"));
+    const mail = w
+      .emails()
+      .slice(before)
+      .filter((m) => m.subject.startsWith("[RECURRENCE]"));
     expect(mail).toHaveLength(1);
     expect(mail[0]?.text).toMatch(/verified as improved has returned/);
     // preserved: the earlier evidence package is still there
-    expect((await w.runtime.evidencePackages.listByCase(ORG, caseId)).length).toBeGreaterThanOrEqual(1);
+    expect(
+      (await w.runtime.evidencePackages.listByCase(ORG, caseId)).length,
+    ).toBeGreaterThanOrEqual(1);
   });
 });

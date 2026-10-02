@@ -35,7 +35,8 @@ export function createSmtpCredentialsReader(
   return async () => {
     if (cached !== undefined && now() - cached.at < ttlMs) return cached.value;
     const raw = await secrets.accessLatest(secretId);
-    if (raw === undefined) throw new EmailNotConfiguredError("the SMTP credentials secret has no version");
+    if (raw === undefined)
+      throw new EmailNotConfiguredError("the SMTP credentials secret has no version");
     let parsed: unknown;
     try {
       parsed = JSON.parse(raw);
@@ -50,7 +51,9 @@ export function createSmtpCredentialsReader(
       o.username === "" ||
       o.password === ""
     ) {
-      throw new EmailNotConfiguredError("the SMTP credentials secret needs a username and a password");
+      throw new EmailNotConfiguredError(
+        "the SMTP credentials secret needs a username and a password",
+      );
     }
     cached = { at: now(), value: { username: o.username, password: o.password } };
     return cached.value;
@@ -79,7 +82,8 @@ export function createWeatherAuthHeaders(options: {
     return async () => {
       if (key === undefined || Date.now() - key.at > 300_000) {
         const v = await secrets.accessLatest(apiKeySecretId);
-        if (v === undefined || v.trim() === "") throw new Error("the weather API key secret has no version");
+        if (v === undefined || v.trim() === "")
+          throw new Error("the weather API key secret has no version");
         key = { at: Date.now(), value: v.trim() };
       }
       return { "X-Goog-Api-Key": key.value };
@@ -104,8 +108,14 @@ export function createWorkerTickInvoker(workerUrl: string): () => Promise<void> 
   const base = workerUrl.replace(/\/+$/, "");
   return async () => {
     const client = await auth.getIdTokenClient(base);
-    const res = await client.request({ url: `${base}/tick`, method: "POST", data: "{}", timeout: 60_000 });
-    if (res.status < 200 || res.status >= 300) throw new Error(`worker tick answered ${res.status}`);
+    const res = await client.request({
+      url: `${base}/tick`,
+      method: "POST",
+      data: "{}",
+      timeout: 60_000,
+    });
+    if (res.status < 200 || res.status >= 300)
+      throw new Error(`worker tick answered ${res.status}`);
   };
 }
 
@@ -164,7 +174,8 @@ export function createFirestoreFacilityPurge(options: {
       const doomed = snap.docs.filter((d) => {
         const raw = d.get("json");
         const j = (typeof raw === "string" ? JSON.parse(raw) : {}) as Rec;
-        const caseId = typeof j.caseId === "string" ? j.caseId : (d.get("caseId") as string | undefined);
+        const caseId =
+          typeof j.caseId === "string" ? j.caseId : (d.get("caseId") as string | undefined);
         return (
           j.facilityId === facilityId ||
           j.key?.facilityId === facilityId ||

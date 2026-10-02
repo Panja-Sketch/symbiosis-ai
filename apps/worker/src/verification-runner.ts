@@ -635,7 +635,9 @@ export async function resolveEvidence(
   const org = attempt.organizationId;
   const trail = await deps.audit.listByCase(org, attempt.caseId);
   const knownPolicies =
-    typeof deps.knownPolicies === "function" ? await deps.knownPolicies(attempt) : deps.knownPolicies;
+    typeof deps.knownPolicies === "function"
+      ? await deps.knownPolicies(attempt)
+      : deps.knownPolicies;
   const out: EvidenceResolution[] = [];
   for (const ref of attempt.evidenceReferences ?? []) {
     let exists = false;
@@ -653,9 +655,7 @@ export async function resolveEvidence(
         exists = trail.some((e) => e.auditId === ref.id);
         break;
       case "POLICY":
-        exists = knownPolicies.some(
-          (p) => `POLICY:${p.policyId}:${p.policyVersion}` === ref.id,
-        );
+        exists = knownPolicies.some((p) => `POLICY:${p.policyId}:${p.policyVersion}` === ref.id);
         break;
       case "DEVICE": {
         // The frozen copy taken at verification time wins; the live registry is only a fallback

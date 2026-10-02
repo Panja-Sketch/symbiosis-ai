@@ -13,7 +13,7 @@ import {
   validateStatePatch,
   valuesAt,
 } from "./state";
-import type { PhysicalValues, StatePatch, StateRevision } from "./state";
+import type { PhysicalValues, StateRevision } from "./state";
 
 /**
  * Simulation session control (S10, D-091).
@@ -335,7 +335,8 @@ export function createSimulationControl(deps: ControlDeps) {
       const now = deps.clock.nowMs();
       const updated = await store.update<SimulationSession>(CONTROL, org, fac, (cur) => {
         if (cur === undefined || cur.status === "RUNNING") return undefined;
-        const { stoppedAt: _stoppedAt, ...rest } = cur;
+        const rest: { -readonly [K in keyof SimulationSession]: SimulationSession[K] } = { ...cur };
+        delete rest.stoppedAt;
         return {
           doc: {
             ...rest,

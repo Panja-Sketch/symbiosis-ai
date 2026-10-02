@@ -5,7 +5,7 @@ import type { Clock } from "@symbiosis/clock";
 import type { WeatherService } from "@symbiosis/adapter-weather";
 import type { AuditLog } from "@symbiosis/audit";
 import type { IdGenerator } from "@symbiosis/event-bus";
-import { applySourceMapping, describeMapping } from "@symbiosis/normalization";
+import { applySourceMapping, describeMapping, parseSourceMapping } from "@symbiosis/normalization";
 import type { AdapterCatalog } from "@symbiosis/normalization";
 import type { DeliveryStore } from "@symbiosis/notifications";
 import {
@@ -460,6 +460,12 @@ export function createSimulationApi(deps: SimulationApiDeps) {
         const trace = await dryRun(profileId, version, payload);
         if (trace === undefined) return problem(404, "NOT_FOUND", "unknown profile or version");
         return json(200, { trace, observations: observationsOf(trace) });
+      }
+
+      // Validation only: tells the editor what is wrong before anything is published.
+      if (method === "POST" && a === "adapters" && b === "validate" && route.length === 2) {
+        const r = parseSourceMapping(body.definition);
+        return json(200, r.ok ? { valid: true, issues: [] } : { valid: false, issues: r.issues });
       }
 
       if (method === "POST" && a === "adapters" && b === "publish" && route.length === 2) {

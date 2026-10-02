@@ -1,10 +1,7 @@
 import { actionsFor, createOperations } from "@symbiosis/action-orchestration";
 import type { ActionLibrary, Operations } from "@symbiosis/action-orchestration";
 import { simulatorSourceAdapter } from "@symbiosis/adapter-simulator";
-import {
-  SimulatedWeatherProvider,
-  createWeatherService,
-} from "@symbiosis/adapter-weather";
+import { SimulatedWeatherProvider, createWeatherService } from "@symbiosis/adapter-weather";
 import type { WeatherPolicy, WeatherService } from "@symbiosis/adapter-weather";
 import type {
   SourceMappingDefinition,
@@ -43,7 +40,6 @@ import {
   StoreDeliveryStore,
   createAlerting,
   createFollowUps,
-  describeReasonCodes,
   startAlerting,
   startFollowUps,
 } from "@symbiosis/notifications";
@@ -55,10 +51,7 @@ import type {
   FollowUps,
   NotificationSender,
 } from "@symbiosis/notifications";
-import {
-  createSimulationControl,
-  createSimulationEngine,
-} from "@symbiosis/simulation";
+import { createSimulationControl, createSimulationEngine } from "@symbiosis/simulation";
 import type {
   EdgeSubmit,
   FacilityModel,
@@ -96,7 +89,12 @@ import {
 } from "@symbiosis/worker";
 import type { EvidenceResolution, VerificationRunner } from "@symbiosis/worker";
 import { createSimulationPolicies } from "./simulation-policy";
-import type { PolicyBundle, PolicyParameters, RawPolicyBase, SimulationPolicies } from "./simulation-policy";
+import type {
+  PolicyBundle,
+  PolicyParameters,
+  RawPolicyBase,
+  SimulationPolicies,
+} from "./simulation-policy";
 
 /** Observations pulled from the live weather provider: same mapping, a distinct source and name. */
 const weatherSourceAdapter = createEdgeV1Adapter({
@@ -245,7 +243,10 @@ export function composeServices(ports: Ports, options: ComposeOptions): Services
   const isSimScope = (org: string, fac: string) =>
     sim !== undefined && org === sim.facility.organizationId && fac === sim.facility.facilityId;
   const pick =
-    <K extends keyof Omit<PolicyBundle, "version" | "label">>(key: K, production: PolicyBundle[K]) =>
+    <K extends keyof Omit<PolicyBundle, "version" | "label">>(
+      key: K,
+      production: PolicyBundle[K],
+    ) =>
     async (org: string, fac: string): Promise<PolicyBundle[K]> =>
       simPolicies !== undefined && isSimScope(org, fac)
         ? (await simPolicies.active())[key]
