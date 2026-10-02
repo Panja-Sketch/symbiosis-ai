@@ -21,14 +21,14 @@ const ROUTES: readonly { readonly method: "GET" | "POST"; readonly pattern: RegE
     pattern:
       /^simulation\/(session\/(start|stop)|scenario|state|weather|pulse|tick|reset|policy|policy\/activate|adapters\/(preview|validate|publish|activate))$/,
   },
-  { method: "GET", pattern: /^cases\/[A-Za-z0-9_.:-]{1,128}$/ },
+  { method: "GET", pattern: /^cases\/[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$/ },
   {
     method: "POST",
-    pattern: /^cases\/[A-Za-z0-9_.:-]{1,128}\/(acknowledge|assignments|actions)$/,
+    pattern: /^cases\/[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}\/(acknowledge|assignments|actions)$/,
   },
-  { method: "GET", pattern: /^evidence\/[A-Za-z0-9_.:-]{1,128}$/ },
+  { method: "GET", pattern: /^evidence\/[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$/ },
   { method: "POST", pattern: /^sharing-agreements$/ },
-  { method: "POST", pattern: /^sharing-agreements\/[A-Za-z0-9_.:-]{1,128}\/revoke$/ },
+  { method: "POST", pattern: /^sharing-agreements\/[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}\/revoke$/ },
 ];
 
 const MAX_BODY = 32 * 1024;

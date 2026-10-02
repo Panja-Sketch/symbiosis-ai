@@ -118,6 +118,10 @@ const HTTP: Record<SimulationError["code"], number> = {
   SESSION_RESET: 409,
 };
 
+/** Equivalence of two sources' canonical values for the same reading (resolution, not meaning). */
+const EQUIVALENCE_ABSOLUTE = 1e-3;
+const EQUIVALENCE_RELATIVE = 1e-3;
+
 const PROFILE_ID = /^[a-z0-9][a-z0-9-]{2,63}$/;
 
 const publicSession = (s: Awaited<ReturnType<SimulationControl["view"]>>["session"]) => ({
@@ -421,19 +425,36 @@ export function createSimulationApi(deps: SimulationApiDeps) {
         const l = await run(left);
         const r = await Promise.all(right.map(run));
         const canon = (rows: { trace: AdapterTrace | null }[]) =>
-          rows
-            .flatMap((x) => observationsOf(x.trace ?? undefined))
-            .filter((o) => o.signal === "vibration_rms" || o.signal === "current")
-            .map((o) => `${o.assetId}|${o.signal}|${String(rounded(o.value))}|${o.unit}`)
-            .sort();
+          new Map(
+            rows
+              .flatMap((x) => observationsOf(x.trace ?? undefined))
+              .filter((o) => o.signal === "vibration_rms" || o.signal === "current")
+              .map((o) => [`${o.assetId}|${o.signal}|${o.unit}`, o.value] as const),
+          );
         const lc = canon([l]);
         const rc = canon(r);
+        // Two sources describe the same physical reading at their own resolution (one rounds to four
+        // decimals, another converts from a different unit), so "equivalent" means: the same asset,
+        // signal and canonical unit, and values equal within the stated tolerance.
+        const equal = (
+          a: number | boolean | null | undefined,
+          b: number | boolean | null | undefined,
+        ) =>
+          typeof a === "number" && typeof b === "number"
+            ? Math.abs(a - b) <= Math.max(EQUIVALENCE_ABSOLUTE, EQUIVALENCE_RELATIVE * Math.abs(a))
+            : a === b;
+        const keys = [...lc.keys()].sort();
+        const equivalent =
+          keys.length > 0 &&
+          keys.length === rc.size &&
+          keys.every((k) => rc.has(k) && equal(lc.get(k), rc.get(k)));
         return json(200, {
           instantAt: new Date(at).toISOString(),
           flat: l,
           specialized: r,
-          equivalent: lc.length > 0 && JSON.stringify(lc) === JSON.stringify(rc),
-          compared: lc,
+          equivalent,
+          tolerance: { absolute: EQUIVALENCE_ABSOLUTE, relative: EQUIVALENCE_RELATIVE },
+          compared: keys.map((k) => `${k}|${String(rounded(lc.get(k) ?? null))}`),
         });
       }
 

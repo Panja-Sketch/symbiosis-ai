@@ -169,6 +169,34 @@ export async function startS7Backend(
             return reply(200, { ok: true });
           }
           if (req.method !== "POST") return reply(405, { error: "POST only" });
+          if (url.pathname === "/control/sim-steps") {
+            // Facility Simulation (S10): let simulated time pass in 5-second steps and make the
+            // simulation emit and the scheduler run, exactly as the browser's own pulses and the
+            // cloud scheduler would over real time. Domain logic stays in the backend.
+            const count = Math.min(200, Math.max(1, Number(body.count ?? 1)));
+            let rejected = 0;
+            for (let i = 0; i < count; i++) {
+              clock.advance(5000);
+              // The browser also pulses on real time; a pulse in flight answers 409 (lease), so retry.
+              let j: { rejected?: unknown[] } = {};
+              for (let attempt = 0; attempt < 20; attempt++) {
+                const r = await fetch(`${current.server.baseUrl}/api/v1/simulation/pulse`, {
+                  method: "POST",
+                  headers: {
+                    "X-Demo-Actor-Id": "USR-ORG-ADMIN-001",
+                    "Content-Type": "application/json",
+                  },
+                  body: "{}",
+                });
+                j = (await r.json()) as { rejected?: unknown[] };
+                if (r.status !== 409) break;
+                await new Promise((done) => setTimeout(done, 100));
+              }
+              rejected += j.rejected?.length ?? 0;
+              if (body.tick !== false) await current.tick();
+            }
+            return reply(200, { steps: count, rejected });
+          }
           if (url.pathname === "/control/ai") {
             backend.setAi((body.mode as "template" | FakeGeminiMode | undefined) ?? "template");
             return reply(200, { ok: true });
