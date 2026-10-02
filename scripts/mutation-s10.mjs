@@ -17,14 +17,14 @@ const mutations = [
   {
     id: "M1 simulator directly creates a case",
     file: "packages/simulation/src/engine.ts",
-    from: `export class SimulationEngine`,
+    from: `export function createSimulationEngine(deps: EngineDeps) {`,
     to: `import type { CaseRepository } from "@symbiosis/repositories";\nexport const leakedCases: CaseRepository | undefined = undefined;\nexport class SimulationEngine`,
     tests: SIM_TESTS,
   },
   {
     id: "M2 simulator directly sets a verification result",
     file: "packages/simulation/src/engine.ts",
-    from: `export class SimulationEngine`,
+    from: `export function createSimulationEngine(deps: EngineDeps) {`,
     to: `export const leakedVerification = { result: "VERIFIED" as const };\nexport class SimulationEngine`,
     tests: SIM_TESTS,
   },
@@ -118,7 +118,7 @@ const mutations = [
   {
     id: "M14 reset ignores the typed confirmation",
     file: "packages/simulation/src/control.ts",
-    from: `confirm !== "RESET"`,
+    from: `confirmation !== "RESET"`,
     to: `false`,
     tests: [
       "packages/simulation/src/simulation.test.ts",
