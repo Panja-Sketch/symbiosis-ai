@@ -31,10 +31,13 @@ describe("S7 web boundary: presentation only", () => {
   it("reaches the backend only through lib/api.ts over HTTP", () => {
     const fetchers = production.filter((f) => /\bfetch\(/.test(strip(text(f))));
     // The two sign-in components call only the web app's own /auth/session route from the browser.
+    // The Facility Simulation workspace (D-093) needs a live view: its client code calls only this web
+    // app's own `/sim-api` proxy (lib/sim-client.ts), which forwards one allow-listed call to the API.
     expect(fetchers.map(rel)).toEqual([
       "/components/firebase-login.tsx",
       "/components/firebase-session-sync.tsx",
       "/lib/api.ts",
+      "/lib/sim-client.ts",
     ]);
   });
 

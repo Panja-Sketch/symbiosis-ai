@@ -12,6 +12,7 @@ export const NAV: Readonly<Record<Persona, readonly NavItem[]>> = {
   FACILITY: [
     { href: "/operations", label: "Operations" },
     { href: "/operations/evidence", label: "Evidence & sharing" },
+    { href: "/operations/simulation", label: "Facility Simulation" },
     { href: "/trust", label: "Trust & evidence" },
   ],
   INSURER: [

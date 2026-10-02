@@ -96,6 +96,7 @@ export async function apiCall<T>(path: string, init: Init = {}): Promise<ApiResu
     message: typeof e?.message === "string" ? e.message : `The API answered ${res.status}.`,
     ...(typeof e?.reason === "string" && { reason: e.reason }),
     ...(Array.isArray(e?.details) && { details: e.details as string[] }),
+    ...(Array.isArray(e?.issues) && { details: e.issues as string[] }),
   };
 }
 

@@ -55,7 +55,9 @@ export type EvidenceServiceDeps = {
    */
   readonly policies:
     | readonly PolicyDocument[]
-    | ((attempt: VerificationAttempt) => readonly PolicyDocument[] | Promise<readonly PolicyDocument[]>);
+    | ((
+        attempt: VerificationAttempt,
+      ) => readonly PolicyDocument[] | Promise<readonly PolicyDocument[]>);
   /** Approved actions for a hazard, from the versioned action library. */
   approvedActionsFor(hazardType: string): readonly ApprovedActionFact[];
 };
