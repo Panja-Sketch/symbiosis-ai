@@ -19,12 +19,14 @@ S10 — Enterprise Facility Simulation & Integration Demonstration. **Physical h
 | Gate | Result |
 | --- | --- |
 | `pnpm lint`, `pnpm typecheck`, `pnpm format:check` | pass |
-| `SYMBIOSIS_REQUIRE_EMULATOR=1 pnpm test` | 78 files, 1181 tests (+ later additions; see IMPLEMENTATION_STATE) all pass; the Firestore contract suites (`tests/contract`, 50 tests on the emulator) ran, none skipped |
+| `SYMBIOSIS_REQUIRE_EMULATOR=1 pnpm test` | 78 files, 1182 tests, all pass; the Firestore contract suites (`tests/contract`, 50 tests on the emulator) ran, none skipped |
 | Production Next build | pass (15 routes incl. `/operations/simulation`, `/sim-api/[...path]`) |
-| Playwright | S7-S9 tests plus 14 S10 tests (flows, cross-tenant, error states, keyboard, axe at desktop/tablet/mobile) |
+| Playwright | 40 pass (26 earlier + 14 S10: flows, cross-tenant, error states, keyboard, axe at desktop/tablet/mobile) |
 | Mutation checks `scripts/mutation-s10.mjs` | 15 mutations, all DETECTED, all restored |
-| Local smokes | `smoke:s2`-`s8` and `smoke:s10` (26 checks) pass |
-| Cloud smoke `smoke:s10:cloud` (real time, deployed) | see IMPLEMENTATION_STATE / completion report |
+| Local smokes | `smoke:s2`-`s8` and `smoke:s10` (26 checks) pass; `smoke:s7` 15 browser checks |
+| Cloud smoke `smoke:s10:cloud` (real time, deployed, live weather) | 29 passed, 0 failed |
+| Cloud smoke `smoke:s9` (regression on the ordered subscription) | 60 passed, 0 failed (its evidence-package check now waits for the asynchronous package) |
+| Production logs after all cloud runs | no ERROR entries; WARNING entries are the deliberate 401/403/404 negative probes; the only dead letter is the S9 DLQ proof from 2026-10-01 |
 
 ## Deployed (project `symbiosis-ai-2026`, us-central1)
 
