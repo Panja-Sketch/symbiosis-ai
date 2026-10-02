@@ -14,6 +14,17 @@ export interface AuditLog {
   append(entry: NewAuditEntry): Promise<AuditEntry>;
   listByCase(organizationId: string, caseId: string): Promise<readonly AuditEntry[]>;
   list(organizationId: string): Promise<readonly AuditEntry[]>;
+  /**
+   * Entries of the organization with a sequence greater than `afterSequence`, oldest first (S10: the
+   * simulation timeline reads incrementally instead of re-reading the whole log).
+   */
+  listAfter(
+    organizationId: string,
+    afterSequence: number,
+    limit?: number,
+  ): Promise<readonly AuditEntry[]>;
+  /** The organization's latest sequence number (0 when the log is empty). */
+  lastSequence(organizationId: string): Promise<number>;
 }
 
 export class InMemoryAuditLog implements AuditLog {
@@ -36,5 +47,18 @@ export class InMemoryAuditLog implements AuditLog {
 
   async list(organizationId: string): Promise<readonly AuditEntry[]> {
     return this.entries.filter((e) => e.organizationId === organizationId);
+  }
+
+  async listAfter(organizationId: string, afterSequence: number, limit = 1000) {
+    return this.entries
+      .filter((e) => e.organizationId === organizationId && e.sequence > afterSequence)
+      .slice(0, limit);
+  }
+
+  async lastSequence(organizationId: string): Promise<number> {
+    return this.entries.reduce(
+      (max, e) => (e.organizationId === organizationId ? Math.max(max, e.sequence) : max),
+      0,
+    );
   }
 }

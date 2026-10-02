@@ -1,3 +1,4 @@
+import { FieldPath } from "@google-cloud/firestore";
 import type { DocumentData } from "@google-cloud/firestore";
 import type { AuditEntry } from "@symbiosis/contracts";
 import type { AuditLog, NewAuditEntry } from "@symbiosis/audit";
@@ -79,6 +80,34 @@ export class FirestoreAuditLog implements AuditLog {
     return snap.docs
       .map((d) => decode<AuditEntry>(d.data()) as AuditEntry)
       .sort((a, b) => a.sequence - b.sequence);
+  }
+
+  /**
+   * Incremental read by document-id range (`<org>~<12-digit sequence>`), which needs no composite
+   * index and reads only the new tail.
+   */
+  async listAfter(
+    organizationId: string,
+    afterSequence: number,
+    limit = 1000,
+  ): Promise<readonly AuditEntry[]> {
+    const from = tenantDocId(organizationId, String(afterSequence + 1).padStart(12, "0"));
+    const to = tenantDocId(organizationId, "999999999999");
+    const snap = await this.ctx
+      .col(C.auditEntries)
+      .where(FieldPath.documentId(), ">=", from)
+      .where(FieldPath.documentId(), "<=", to)
+      .orderBy(FieldPath.documentId())
+      .limit(limit)
+      .get();
+    return snap.docs
+      .map((d) => decode<AuditEntry>(d.data()) as AuditEntry)
+      .filter((e) => e.organizationId === organizationId);
+  }
+
+  async lastSequence(organizationId: string): Promise<number> {
+    const counter = await this.ctx.col(C.auditCounters).doc(organizationId).get();
+    return (counter.get("last") as number | undefined) ?? 0;
   }
 }
 

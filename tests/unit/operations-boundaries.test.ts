@@ -60,7 +60,7 @@ describe("S4 stays within its boundaries", () => {
     // (operations, actions, alerting, escalation, audit, authz, tenancy) may start, complete or
     // record a verification, emit verification events, or name a verified state.
     const commandSide = s4Files.filter(
-      (f) => !/(view\.ts|html\.ts|risk-pipeline\.ts|app-handler\.ts)$/.test(f),
+      (f) => !/(view\.ts|html\.ts|risk-pipeline\.ts|app-handler\.ts|followup\.ts)$/.test(f),
     );
     expect(commandSide.length).toBeGreaterThan(10);
     for (const f of commandSide) {
@@ -69,6 +69,19 @@ describe("S4 stays within its boundaries", () => {
         /validateVerificationAssessment|START_VERIFICATION|RECORD_VERIFICATION|COMPLETE_VERIFICATION|completeVerification|startVerification|verification\.(started|completed)|VERIFIED_IMPROVED|"VERIFIED"|"VERIFYING"/,
       );
     }
+  });
+
+  it("the follow-up consumer (S10, D-090) only READS verification results: it can neither start, complete nor save one", () => {
+    const f = s4Files.find((x) =>
+      x.replaceAll("\\", "/").endsWith("notifications/src/followup.ts"),
+    );
+    expect(f).toBeDefined();
+    const code = stripComments(readFileSync(f as string, "utf8"));
+    expect(code).not.toMatch(
+      /validateVerificationAssessment|START_VERIFICATION|RECORD_VERIFICATION|COMPLETE_VERIFICATION|completeVerification|startVerification|verifications\.save|createVerificationRunner|VERIFIED_IMPROVED/,
+    );
+    // it decides only from a persisted, completed attempt
+    expect(code).toMatch(/attempt\.status !== "COMPLETED"/);
   });
 
   it("has no autonomous equipment-control vocabulary", () => {

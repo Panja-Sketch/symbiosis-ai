@@ -19,6 +19,7 @@ import {
   FirestoreRiskEventRepository,
   FirestoreSharedEvidenceRepository,
   FirestoreSharingAgreementRepository,
+  FirestoreTenantDocumentStore,
   FirestoreVerificationRepository,
   GcsEvidenceObjectStore,
   PubSubBus,
@@ -109,6 +110,7 @@ export function createGcpPlatform(config: GcpConfig, logger: Logger): GcpPlatfor
     registry: new FirestoreDeviceRegistry(o),
     keys: new SecretManagerDeviceKeyStore(createSecretAccess(config.projectId)),
     replayGuard: new FirestoreReplayGuard(o),
+    documents: new FirestoreTenantDocumentStore(o),
   };
 
   const probe = async (): Promise<Record<string, boolean>> => {

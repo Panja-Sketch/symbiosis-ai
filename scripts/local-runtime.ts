@@ -52,6 +52,7 @@ import {
   InMemoryObservationRepository,
   InMemoryRiskEventRepository,
   InMemorySharedEvidenceRepository,
+  InMemoryTenantDocumentStore,
   InMemorySharingAgreementRepository,
   InMemoryVerificationRepository,
 } from "@symbiosis/repositories";
@@ -173,6 +174,7 @@ export async function createLocalRuntime(options: LocalRuntimeOptions = {}): Pro
   const agreements = new InMemorySharingAgreementRepository();
   const shares = new InMemorySharedEvidenceRepository();
   const audit = new InMemoryAuditLog();
+  const documents = new InMemoryTenantDocumentStore();
   const directory = createSyntheticActorDirectory();
   const organizations = createSyntheticOrganizationDirectory();
   const verificationPolicy = options.verificationPolicy ?? loadVerificationPolicy();
@@ -200,6 +202,7 @@ export async function createLocalRuntime(options: LocalRuntimeOptions = {}): Pro
       registry,
       keys,
       replayGuard: new InMemoryReplayGuard(),
+      documents,
     },
     {
       clock,

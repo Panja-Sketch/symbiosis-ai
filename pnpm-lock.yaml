@@ -178,6 +178,9 @@ importers:
       '@symbiosis/action-orchestration':
         specifier: workspace:*
         version: link:packages/action-orchestration
+      '@symbiosis/adapter-email':
+        specifier: workspace:*
+        version: link:adapters/email
       '@symbiosis/adapter-gcp':
         specifier: workspace:*
         version: link:adapters/gcp
@@ -302,7 +305,17 @@ importers:
         specifier: ^5.0.2
         version: 5.0.2(@opentelemetry/api@1.9.1)(@types/node@26.6.3)(vite@8.3.1(@types/node@26.6.3)(esbuild@0.28.2)(tsx@4.23.15))
 
-  adapters/email: {}
+  adapters/email:
+    dependencies:
+      '@symbiosis/clock':
+        specifier: workspace:*
+        version: link:../../packages/clock
+      '@symbiosis/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+      '@symbiosis/notifications':
+        specifier: workspace:*
+        version: link:../../packages/notifications
 
   adapters/gcp:
     dependencies:

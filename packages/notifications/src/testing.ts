@@ -18,7 +18,7 @@ export class ScriptedNotificationSender implements NotificationSender {
 
   constructor(
     private readonly clock: Clock,
-    private readonly outcomes: readonly ("SENT" | "FAILED" | "THROW")[],
+    private readonly outcomes: readonly ("SENT" | "FAILED" | "FAILED_PERMANENT" | "THROW")[],
   ) {}
 
   async send(request: NotificationRequest): Promise<NotificationResult> {
@@ -33,8 +33,15 @@ export class ScriptedNotificationSender implements NotificationSender {
       requestedAt: request.requestedAt,
       completedAt: nowIso(this.clock),
     };
-    return outcome === "SENT"
-      ? { ...base, status: "SENT" }
-      : { ...base, status: "FAILED", failure: { code: "SCRIPTED_FAILURE", message: "scripted" } };
+    if (outcome === "SENT") return { ...base, status: "SENT" };
+    return {
+      ...base,
+      status: "FAILED",
+      failure: {
+        code: "SCRIPTED_FAILURE",
+        message: "scripted",
+        ...(outcome === "FAILED_PERMANENT" && { retryable: false }),
+      },
+    };
   }
 }

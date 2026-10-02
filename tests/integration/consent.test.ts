@@ -604,6 +604,8 @@ describe("C3 every insurer read is authorized against the stored agreement", () 
       },
       listByCase: w.runtime.audit.listByCase.bind(w.runtime.audit),
       list: w.runtime.audit.list.bind(w.runtime.audit),
+      listAfter: w.runtime.audit.listAfter.bind(w.runtime.audit),
+      lastSequence: w.runtime.audit.lastSequence.bind(w.runtime.audit),
     };
     const gateway = createInsuranceGateway({
       ids: { next: (p: string) => `${p}-X` },

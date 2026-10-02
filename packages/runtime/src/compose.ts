@@ -25,7 +25,9 @@ import type {
 } from "@symbiosis/intervention-prioritization";
 import { createAlerting, startAlerting } from "@symbiosis/notifications";
 import type { NotificationSender } from "@symbiosis/notifications";
+import { StoreDeliveryStore } from "@symbiosis/notifications";
 import type {
+  TenantDocumentStore,
   EvidencePackageRepository,
   ActionRepository,
   AlertRepository,
@@ -76,6 +78,8 @@ export type Ports = {
   readonly registry: DeviceRegistry;
   readonly keys: DeviceKeyStore;
   readonly replayGuard: ReplayGuard;
+  /** Control-plane and notification documents (S10): deliveries, contacts, simulation, catalog. */
+  readonly documents: TenantDocumentStore;
 };
 
 export type Policies = {
@@ -216,6 +220,7 @@ export function composeServices(ports: Ports, options: ComposeOptions): Services
     directory: ports.directory,
     sender: options.notificationSender,
     policy: policies.escalation,
+    deliveries: new StoreDeliveryStore(ports.documents),
   };
   const alerting = createAlerting(alertingDeps);
   const operations = createOperations({

@@ -13,6 +13,8 @@ import {
 } from "@symbiosis/repositories";
 import { openCaseFromDetection } from "@symbiosis/risk-lifecycle";
 import { createSyntheticActorDirectory, InMemoryActorDirectory } from "@symbiosis/tenancy";
+import { InMemoryTenantDocumentStore } from "@symbiosis/repositories";
+import { StoreDeliveryStore } from "./deliveries";
 import { ScriptedNotificationSender } from "./testing";
 import {
   ConsoleEmail,
@@ -93,6 +95,7 @@ async function setup(
     directory,
     sender,
     policy,
+    deliveries: new StoreDeliveryStore(new InMemoryTenantDocumentStore()),
   };
   const alerting = createAlerting(deps);
   return { alerting, deps, caseRecord: opened.value.case, event: opened.value.event };

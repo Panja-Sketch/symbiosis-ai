@@ -1,0 +1,28 @@
+{
+  "schema": "follow-up-policy.v1",
+  "version": "1",
+  "triggers": {
+    "VERIFICATION_NOT_IMPROVING": {
+      "enabled": true,
+      "recipientRole": "FACILITY_MANAGER",
+      "cooldownSeconds": 300
+    },
+    "VERIFICATION_PARTIALLY_VERIFIED": {
+      "enabled": true,
+      "recipientRole": "FACILITY_MANAGER",
+      "cooldownSeconds": 900
+    },
+    "VERIFICATION_INCONCLUSIVE": {
+      "enabled": true,
+      "recipientRole": "FACILITY_MANAGER",
+      "cooldownSeconds": 900
+    },
+    "ACTION_OVERDUE": {
+      "enabled": true,
+      "recipientRole": "FACILITY_MANAGER",
+      "cooldownSeconds": 1800,
+      "overdueAfterSeconds": 3600
+    }
+  },
+  "maxFollowUpsPerRiskEvent": 5
+}

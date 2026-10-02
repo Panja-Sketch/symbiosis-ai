@@ -32,6 +32,7 @@
     "@eslint/js": "^9.39.5",
     "@playwright/test": "^1.63.0",
     "@symbiosis/action-orchestration": "workspace:*",
+    "@symbiosis/adapter-email": "workspace:*",
     "@symbiosis/adapter-gcp": "workspace:*",
     "@symbiosis/adapter-simulator": "workspace:*",
     "@symbiosis/adapter-weather": "workspace:*",

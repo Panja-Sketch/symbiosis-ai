@@ -35,6 +35,8 @@ export type NotificationResult = {
   readonly recipientRef: string;
   readonly requestedAt: IsoTimestamp;
   readonly completedAt: IsoTimestamp;
+  /** Masked address for display (never the address itself). */
+  readonly addressHint?: string;
   readonly failure?: {
     readonly code: string;
     readonly message: string;
@@ -43,7 +45,7 @@ export type NotificationResult = {
   };
 };
 
-export const ALERT_KINDS = ["INITIAL", "ESCALATION", "FOLLOW_UP", "RECURRENCE"] as const;
+export const ALERT_KINDS = ["INITIAL", "ESCALATION", "FOLLOW_UP"] as const;
 export type AlertKind = (typeof ALERT_KINDS)[number];
 
 /**
@@ -97,7 +99,7 @@ export type Alert = {
   readonly requestedAt: IsoTimestamp;
   readonly sentAt?: IsoTimestamp;
   readonly correlationId: string;
-  /** Present on FOLLOW_UP and RECURRENCE alerts. */
+  /** Present on FOLLOW_UP alerts, and on the INITIAL alert of a recurrence (wording only). */
   readonly trigger?: AlertTrigger;
 };
 
