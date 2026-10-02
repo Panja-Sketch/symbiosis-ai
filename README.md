@@ -22,13 +22,13 @@ evidence package** (canonical JSON, SHA-256 manifest, frozen device facts, expli
 synthetic-data label) that preserves its actual result; the insured controls what an insurer
 sees through scoped, revocable **sharing agreements**, raw telemetry is off by default, and
 every insurer read is authorization-checked and audited. The system deliberately stops there:
-S7 added the Next.js persona web app, S8 a strictly bounded explanation layer (AI explains, never decides), and S9 the cloud runtime: the same services on Firestore, Pub/Sub, Cloud Storage, Secret Manager and Firebase Auth, deployed to Cloud Run (see [docs/GCP_RUNTIME.md](docs/GCP_RUNTIME.md)). **S10 (ESP32 hardware) is IN PROGRESS: firmware, provisioning and host/compatibility tests exist; the physical bench gates H0-H8 have not been run yet (see [docs/HARDWARE.md](docs/HARDWARE.md)).** Progress is tracked in
+S7 added the Next.js persona web app, S8 a strictly bounded explanation layer (AI explains, never decides), and S9 the cloud runtime: the same services on Firestore, Pub/Sub, Cloud Storage, Secret Manager and Firebase Auth, deployed to Cloud Run (see [docs/GCP_RUNTIME.md](docs/GCP_RUNTIME.md)). **S10 is the Enterprise Facility Simulation & Integration Demonstration (IN PROGRESS); the physical hardware prototype was removed from active scope by product decision (see [docs/HARDWARE.md](docs/HARDWARE.md)).** Progress is tracked in
 [docs/IMPLEMENTATION_STATE.md](docs/IMPLEMENTATION_STATE.md).
 
 ## Layout
 
 `apps/` (web, api, worker, simulator) · `packages/` (logical modules) · `adapters/` ·
-`config/` (versioned policies) · `firmware/` · `firmware-contracts/` · `infrastructure/` ·
+`config/` (versioned policies) · `firmware-contracts/` (edge signing vectors) · `infrastructure/` ·
 `tests/` · `docs/`. See spec §44.
 
 ## Commands
@@ -67,22 +67,20 @@ Edge endpoints: `POST /edge/v1/telemetry` and `POST /edge/v1/heartbeat`, signed 
 PROJECT_SPEC section 32. A known-answer signing vector for firmware is in
 `firmware-contracts/sample-packets/signing-vector.json`.
 
-## Hardware (S10, in progress)
+## Integrations (no proprietary hardware)
 
-The physical bench firmware lives in [firmware/esp32-lab](firmware/esp32-lab/README.md) (PlatformIO,
-pinned Arduino-ESP32, no third-party libraries). It signs telemetry with the unchanged S2 protocol.
+Symbiosis does not require Symbiosis sensors. A building-automation system, IoT gateway, equipment API or
+sensor platform integrates through a source adapter into the canonical observation contract and the
+signed edge boundary (`/edge/v1/*`). No real vendor integration exists yet; the facility simulation uses
+clearly labelled synthetic vendor profiles to prove the abstraction. The ESP32 bench prototype was
+removed from the product by decision D-085 (history keeps it).
 
 ```
-pnpm test:firmware      # host tests of the firmware core (needs c++/g++/clang++ or SYM_CXX)
-pnpm smoke:s10          # host checks; hardware checks report SKIPPED_HARDWARE without a device
-pnpm provision:device --confirm-project <id> --device-id DEV-PHX-BENCH-001 --write-firmware-secrets
-SMOKE_S10_CLOUD=1 GCP_PROJECT_ID=<id> pnpm smoke:s10 --confirm-project <id> --device-id DEV-PHX-BENCH-001
-node scripts/mutation-s10.mjs   # S10 mutation checks (never run during a build or deploy)
+pnpm provision:device --confirm-project <id> --device-id DEV-SITE-GATEWAY-001 --asset AST-SIM-FAN-A --signals vibration_rms,current
 ```
 
 `pnpm provision:device` is operator-only (your own Google credentials); the device key is stored in
-Secret Manager and in git-ignored local files and is never printed. Wi-Fi credentials, the API URL
-and the device key go in the git-ignored `firmware/esp32-lab/include/secrets.h`.
+Secret Manager and a git-ignored local file and is never printed.
 
 ## Secrets
 
