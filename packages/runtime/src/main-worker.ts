@@ -4,12 +4,19 @@ import { JsonLogger, createPushAuthVerifier, createPushHandler } from "@symbiosi
 import type { Logger } from "@symbiosis/adapter-gcp";
 import { SystemClock } from "@symbiosis/clock";
 import { RandomIdGenerator } from "@symbiosis/event-bus";
-import { ConsoleEmail } from "@symbiosis/notifications";
+import { StoreContactDirectory } from "@symbiosis/notifications";
 import { composeServices } from "./compose";
+import {
+  cloudSimulationOptions,
+  createCloudNotificationSender,
+  parseS10CloudConfig,
+} from "./cloud-s10";
 import {
   RuntimeConfigError,
   loadActionLibrary,
+  loadAdapterProfiles,
   loadBaselineConfig,
+  loadFollowUpPolicy,
   loadDataQualityConfig,
   loadEscalationPolicy,
   loadInterventionPolicy,
@@ -54,12 +61,32 @@ async function main(): Promise<void> {
 
   const clock = new SystemClock();
   const ids = new RandomIdGenerator();
+  let s10;
+  try {
+    s10 = parseS10CloudConfig(process.env);
+  } catch (e) {
+    return die("invalid S10 configuration", e);
+  }
   const services = composeServices(platform.ports, {
     clock,
     ids,
-    notificationSender: new ConsoleEmail(clock, (line) =>
-      logger.log("INFO", "notification", { component: "worker", line }),
-    ),
+    // Alerts, escalations and follow-ups are sent by the worker: SMTP when configured.
+    notificationSender: createCloudNotificationSender({
+      config: s10,
+      projectId: config.projectId,
+      clock,
+      contacts: new StoreContactDirectory(platform.ports.documents),
+      log: (line) => logger.log("INFO", "notification", { component: "worker", line }),
+    }),
+    adapterProfiles: loadAdapterProfiles(),
+    ...(s10.webBaseUrl !== undefined && { webBaseUrl: s10.webBaseUrl }),
+    simulation: cloudSimulationOptions({
+      config: s10,
+      projectId: config.projectId,
+      clock,
+      firestore: platform.firestore,
+      collectionPrefix: config.collectionPrefix,
+    }),
     policies: {
       escalation: loadEscalationPolicy(),
       actionLibrary: loadActionLibrary(),
@@ -68,6 +95,7 @@ async function main(): Promise<void> {
       baseline: loadBaselineConfig(),
       rule: loadRuleConfig(),
       dataQuality: loadDataQualityConfig(),
+      followUp: loadFollowUpPolicy(),
     },
   });
   services.startConsumers();
@@ -85,6 +113,13 @@ async function main(): Promise<void> {
     audience: worker.audience,
     serviceAccountEmail: worker.schedulerServiceAccount,
   });
+  // The API may also ask for one pass ("run the checks now" in the simulation workspace). It must
+  // authenticate as its own service identity; the worker still verifies the token.
+  const apiAccount = process.env.SYMBIOSIS_API_SERVICE_ACCOUNT ?? "";
+  const verifyApi =
+    apiAccount === ""
+      ? undefined
+      : createPushAuthVerifier({ audience: worker.audience, serviceAccountEmail: apiAccount });
 
   const app = async (request: EdgeRequest): Promise<EdgeResponse> => {
     const path = request.target.split("?")[0];
@@ -96,6 +131,7 @@ async function main(): Promise<void> {
       let allowed = false;
       try {
         allowed = await verifyScheduler(request.headers.authorization);
+        if (!allowed && verifyApi !== undefined) allowed = await verifyApi(request.headers.authorization);
       } catch {
         allowed = false;
       }
@@ -109,6 +145,7 @@ async function main(): Promise<void> {
           verificationStarted: result.verification.started.length,
           verificationCompleted: result.verification.completed.length,
           verificationFailures: result.verification.failures.length,
+          followUpsRequested: result.followUps.requested,
         });
         return { status: 200, body: { status: "ok" } };
       } catch (e) {

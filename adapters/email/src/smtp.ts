@@ -233,7 +233,22 @@ export class SmtpTransport implements EmailTransport {
     const timeout = this.config.timeoutMs ?? 12_000;
     let session: Session | undefined;
     try {
-      const creds = await this.credentials();
+      let creds: SmtpCredentials;
+      try {
+        creds = await this.credentials();
+      } catch (error) {
+        // No credentials configured is a permanent, loud failure (not a retry storm): the operator
+        // has to add the secret. Any other failure to read them is transient.
+        const notConfigured = error instanceof Error && error.name === "EmailNotConfigured";
+        return {
+          ok: false,
+          code: notConfigured ? "EMAIL_NOT_CONFIGURED" : "CREDENTIALS_UNAVAILABLE",
+          message: notConfigured
+            ? "email credentials are not configured"
+            : "email credentials could not be read",
+          retryable: !notConfigured,
+        };
+      }
       let mime: string;
       try {
         mime = buildMimeMessage(message);

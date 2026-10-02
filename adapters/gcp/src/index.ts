@@ -14,3 +14,4 @@ export * from "./vertex";
 export { Firestore } from "@google-cloud/firestore";
 export * from "./seed";
 export * from "./provision";
+export * from "./s10";

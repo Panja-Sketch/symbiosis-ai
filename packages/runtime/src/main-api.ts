@@ -10,11 +10,16 @@ import { JsonLogger } from "@symbiosis/adapter-gcp";
 import { SystemClock } from "@symbiosis/clock";
 import { RandomIdGenerator } from "@symbiosis/event-bus";
 import { ConsoleEmail } from "@symbiosis/notifications";
+import { createWorkerTickInvoker } from "@symbiosis/adapter-gcp";
 import { composeServices } from "./compose";
+import { cloudSimulationOptions, parseS10CloudConfig } from "./cloud-s10";
+import { createSimulationHttp } from "./simulation-http";
 import {
   RuntimeConfigError,
   loadActionLibrary,
+  loadAdapterProfiles,
   loadBaselineConfig,
+  loadFollowUpPolicy,
   loadDataQualityConfig,
   loadEscalationPolicy,
   loadInterventionPolicy,
@@ -58,9 +63,24 @@ async function main(): Promise<void> {
 
   const clock = new SystemClock();
   const ids = new RandomIdGenerator();
+  let s10;
+  try {
+    s10 = parseS10CloudConfig(process.env);
+  } catch (e) {
+    return fatal(base, "invalid S10 configuration", e);
+  }
   const services = composeServices(platform.ports, {
     clock,
     ids,
+    adapterProfiles: loadAdapterProfiles(),
+    ...(s10.webBaseUrl !== undefined && { webBaseUrl: s10.webBaseUrl }),
+    simulation: cloudSimulationOptions({
+      config: s10,
+      projectId: config.projectId,
+      clock,
+      firestore: platform.firestore,
+      collectionPrefix: config.collectionPrefix,
+    }),
     notificationSender: new ConsoleEmail(clock, (line) =>
       logger.log("INFO", "notification", { component: "api", line }),
     ),
@@ -72,6 +92,7 @@ async function main(): Promise<void> {
       baseline: loadBaselineConfig(),
       rule: loadRuleConfig(),
       dataQuality: loadDataQualityConfig(),
+      followUp: loadFollowUpPolicy(),
     },
   });
   const explanations = createCloudExplanationService({
@@ -90,13 +111,29 @@ async function main(): Promise<void> {
     bus: platform.bus,
     clock,
     ids,
+    adapters: services.catalog,
     log: (entry) =>
       logger.log(entry.level === "warn" ? "WARNING" : "INFO", entry.message, {
         component: "api",
         ...entry.fields,
       }),
   });
+  // The simulation reaches the platform exactly as a customer's gateway does: signed bytes sent to
+  // the edge boundary (here an in-process call of the very same handler the public route uses).
+  const http = createSimulationHttp({
+    services,
+    ports: platform.ports,
+    clock,
+    ids,
+    submit: async (r) => {
+      const res = await edge({ method: r.method, target: r.target, headers: r.headers, rawBody: r.rawBody });
+      return { status: res.status, body: res.body };
+    },
+    ...(s10.workerUrl !== undefined && { tick: createWorkerTickInvoker(s10.workerUrl) }),
+  });
   const app = createAppHandler({
+    ...(http.simulation !== undefined && { simulation: http.simulation }),
+    contacts: http.contacts,
     operations: services.operations,
     interventions: services.interventionService,
     evidence: services.evidenceService,
