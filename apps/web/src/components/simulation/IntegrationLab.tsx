@@ -424,7 +424,7 @@ export function IntegrationLab({ overview }: { readonly overview: SimOverview })
               testId="compare-equivalent"
             >
               {compare.equivalent
-                ? "Identical canonical observations"
+                ? "Equivalent canonical observations (same asset, signal and unit; values within the source resolution)"
                 : "The canonical observations differ"}
             </Pill>{" "}
             <span className="muted">at {formatClock(compare.instantAt)}</span>

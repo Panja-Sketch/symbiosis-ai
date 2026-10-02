@@ -1392,21 +1392,24 @@ textarea {
   stroke: var(--accent);
 }
 .twin-title {
-  font-size: 15px;
+  font-size: 18px;
   font-weight: 700;
   fill: var(--brand);
 }
 .twin-label {
-  font-size: 13px;
+  font-size: 16px;
   font-weight: 600;
   fill: var(--ink);
 }
+.twin-label-fit {
+  font-size: 13px;
+}
 .twin-small {
-  font-size: 11px;
+  font-size: 14px;
   fill: var(--ink-soft);
 }
 .twin-state {
-  font-size: 12px;
+  font-size: 15px;
   font-weight: 700;
   fill: var(--brand);
   letter-spacing: 0.04em;
@@ -1425,17 +1428,17 @@ textarea {
   stroke: var(--focus);
 }
 .twin-node-icon {
-  font-size: 15px;
+  font-size: 17px;
   font-weight: 700;
   fill: var(--ink);
 }
 .twin-node-value {
-  font-size: 12px;
+  font-size: 15px;
   font-weight: 700;
   fill: var(--ink);
 }
 .twin-node-name {
-  font-size: 10px;
+  font-size: 13px;
   fill: var(--ink-soft);
 }
 .twin-legend {
@@ -1497,8 +1500,15 @@ textarea {
 }
 .control-row {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 4px;
   margin: 10px 0;
+}
+.control-row select,
+.control-row input,
+.control-row textarea {
+  max-width: 100%;
+  min-width: 0;
 }
 .control-row-inline {
   display: flex;
@@ -1899,5 +1909,46 @@ textarea {
   }
   .control-inputs {
     grid-template-columns: 1fr 90px;
+  }
+}
+
+/* simulation tables: wide tables scroll inside their own frame; the sensor table becomes cards */
+@media (max-width: 680px) {
+  .table-wrap {
+    overflow-x: auto;
+  }
+  .table:not(.table-stack) {
+    min-width: 560px;
+  }
+  .table-stack,
+  .table-stack tbody,
+  .table-stack tr,
+  .table-stack th,
+  .table-stack td {
+    display: block;
+    width: 100%;
+  }
+  .table-stack thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+  }
+  .table-stack tr {
+    padding: 8px 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .table-stack th,
+  .table-stack td {
+    border: 0;
+    padding: 3px 12px;
+  }
+  .table-stack td::before {
+    content: attr(data-label) ": ";
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--ink-soft);
   }
 }

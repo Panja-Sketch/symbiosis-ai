@@ -343,8 +343,8 @@ export function SimulationWorkspace({
             <WeatherCard overview={overview} />
           </div>
         </div>
-        <div className="table-wrap">
-          <table className="table" data-testid="sensor-table">
+        <div className="table-wrap" tabIndex={0} role="region" aria-label="Scrollable table">
+          <table className="table table-stack" data-testid="sensor-table">
             <caption className="visually-hidden">All sensors and their latest readings</caption>
             <thead>
               <tr>
@@ -368,7 +368,7 @@ export function SimulationWorkspace({
                     </button>
                     <span className="muted block">{s.assetName}</span>
                   </th>
-                  <td>
+                  <td data-label="Reading">
                     {s.value === null
                       ? "no data"
                       : typeof s.value === "boolean"
@@ -377,9 +377,11 @@ export function SimulationWorkspace({
                           : "Stopped"
                         : `${Number(s.value.toFixed(3))} ${s.unit}`}
                   </td>
-                  <td>{s.status.replace(/_/g, " ").toLowerCase()}</td>
-                  <td>{s.ageSeconds === null ? "—" : `${s.ageSeconds} s ago`}</td>
-                  <td>{s.sourceLabel ?? "—"}</td>
+                  <td data-label="State">{s.status.replace(/_/g, " ").toLowerCase()}</td>
+                  <td data-label="Last update">
+                    {s.ageSeconds === null ? "—" : `${s.ageSeconds} s ago`}
+                  </td>
+                  <td data-label="Source">{s.sourceLabel ?? "—"}</td>
                 </tr>
               ))}
             </tbody>

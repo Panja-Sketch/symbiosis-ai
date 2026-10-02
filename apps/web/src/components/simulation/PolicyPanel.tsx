@@ -101,7 +101,7 @@ export function PolicyPanel({ overview }: { readonly overview: SimOverview }) {
         {groups.map((g) => (
           <div key={g}>
             <h3>{g}</h3>
-            <div className="table-wrap">
+            <div className="table-wrap" tabIndex={0} role="region" aria-label="Scrollable table">
               <table className="table policy-table">
                 <caption className="visually-hidden">{g} settings</caption>
                 <thead>
@@ -214,7 +214,7 @@ export function PolicyPanel({ overview }: { readonly overview: SimOverview }) {
         </p>
       )}
       <h3>Versions (history is never overwritten)</h3>
-      <div className="table-wrap">
+      <div className="table-wrap" tabIndex={0} role="region" aria-label="Scrollable table">
         <table className="table" data-testid="policy-versions">
           <caption className="visually-hidden">Policy versions</caption>
           <thead>

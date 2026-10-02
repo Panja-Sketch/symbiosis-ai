@@ -439,7 +439,7 @@ export function VerificationPanel({
               </dd>
             </dl>
           )}
-          <div className="table-wrap">
+          <div className="table-wrap" tabIndex={0} role="region" aria-label="Scrollable table">
             <table className="table" data-testid="criteria-table">
               <caption className="visually-hidden">Verification criteria</caption>
               <thead>
@@ -653,7 +653,7 @@ export function EvidencePanel({
           result.
         </p>
       ) : (
-        <div className="table-wrap">
+        <div className="table-wrap" tabIndex={0} role="region" aria-label="Scrollable table">
           <table className="table">
             <caption className="visually-hidden">Evidence packages</caption>
             <thead>

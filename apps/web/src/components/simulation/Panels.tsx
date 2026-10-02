@@ -354,7 +354,7 @@ export function RulePanel({ overview }: { readonly overview: SimOverview }) {
           {r.evaluatedAt !== null && <> · evaluated {formatClock(r.evaluatedAt)}</>}
         </span>
       </div>
-      <div className="table-wrap">
+      <div className="table-wrap" tabIndex={0} role="region" aria-label="Scrollable table">
         <table className="table rule-table">
           <caption className="visually-hidden">What the deterministic rule saw</caption>
           <thead>
@@ -493,7 +493,7 @@ export function NotificationsPanel({
           No notifications yet. They appear when a case opens.
         </p>
       ) : (
-        <div className="table-wrap">
+        <div className="table-wrap" tabIndex={0} role="region" aria-label="Scrollable table">
           <table className="table">
             <caption className="visually-hidden">Notification deliveries</caption>
             <thead>
@@ -589,6 +589,7 @@ export function TimelinePanel({ items }: { readonly items: readonly TimelineItem
   return (
     <ol
       className="sim-timeline"
+      tabIndex={0}
       data-testid="sim-timeline"
       aria-label="Live event timeline, oldest first"
     >

@@ -387,6 +387,7 @@ export type AdapterCompare = {
     readonly trace: AdapterTraceDto | null;
   }[];
   readonly equivalent: boolean;
+  readonly tolerance?: { readonly absolute: number; readonly relative: number };
   readonly compared: readonly string[];
 };
 

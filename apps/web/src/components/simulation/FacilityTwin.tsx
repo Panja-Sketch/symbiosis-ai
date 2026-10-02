@@ -11,14 +11,14 @@ import type { SimOverview, SimSensor } from "../../lib/sim-types";
  * Everything shown is data from the backend; the diagram contains no rule.
  */
 const NODE_POSITIONS: Readonly<Record<string, { x: number; y: number }>> = {
-  "SNS-ZONE-TEMP": { x: 105, y: 215 },
-  "SNS-ZONE-RH": { x: 235, y: 215 },
-  "SNS-CUA-VIB": { x: 455, y: 175 },
-  "SNS-CUA-CURRENT": { x: 455, y: 275 },
-  "SNS-CUA-LOAD": { x: 525, y: 275 },
-  "SNS-CUA-RUN": { x: 595, y: 275 },
-  "SNS-CUB-RUN": { x: 595, y: 350 },
-  "SNS-OUTDOOR-TEMP": { x: 790, y: 140 },
+  "SNS-ZONE-TEMP": { x: 115, y: 190 },
+  "SNS-ZONE-RH": { x: 275, y: 190 },
+  "SNS-CUA-VIB": { x: 455, y: 192 },
+  "SNS-CUA-CURRENT": { x: 455, y: 326 },
+  "SNS-CUA-LOAD": { x: 525, y: 326 },
+  "SNS-CUA-RUN": { x: 595, y: 326 },
+  "SNS-CUB-RUN": { x: 455, y: 440 },
+  "SNS-OUTDOOR-TEMP": { x: 775, y: 120 },
 };
 
 const STATUS_FILL: Readonly<Record<string, string>> = {
@@ -80,65 +80,71 @@ export function FacilityTwin({
   return (
     <figure className="twin" data-testid="facility-twin">
       <svg
-        viewBox="0 0 880 440"
+        viewBox="0 0 880 530"
         role="group"
         aria-label={`Facility diagram of ${overview.facility.name}. Select a sensor for its details.`}
         className="twin-svg"
       >
-        <rect x="20" y="52" width="650" height="368" rx="10" className="twin-building" />
-        <text x="36" y="76" className="twin-title">
+        <rect x="20" y="52" width="650" height="468" rx="10" className="twin-building" />
+        <text x="36" y="78" className="twin-title">
           {overview.facility.name}
         </text>
 
         {/* Cold storage zone */}
-        <rect x="46" y="96" width="310" height="300" rx="8" className="twin-zone" />
-        <text x="60" y="120" className="twin-label">
+        <rect x="46" y="96" width="310" height="400" rx="8" className="twin-zone" />
+        <text x="60" y="122" className="twin-label">
           {asset("ZONE")}
         </text>
         <g className="twin-racks" aria-hidden="true">
           {[0, 1, 2, 3].map((i) => (
-            <rect key={i} x={70 + i * 70} y={260} width="46" height="110" rx="3" />
+            <rect key={i} x={70 + i * 70} y={350} width="46" height="130" rx="3" />
           ))}
         </g>
 
         {/* Cooling plant */}
-        <rect x="386" y="96" width="262" height="300" rx="8" className="twin-plant" />
-        <text x="400" y="120" className="twin-label">
+        <rect x="386" y="96" width="262" height="400" rx="8" className="twin-plant" />
+        <text x="400" y="122" className="twin-label">
           Cooling plant
         </text>
-        <rect x="402" y="132" width="230" height="92" rx="6" className="twin-unit" />
-        <text x="414" y="152" className="twin-label">
+        <rect x="402" y="134" width="230" height="132" rx="6" className="twin-unit" />
+        <text x="414" y="156" className="twin-label">
           {asset("COOLING_PRIMARY")}
         </text>
-        <text x="414" y="212" className="twin-state" data-testid="cua-state">
+        <text x="620" y="254" textAnchor="end" className="twin-state" data-testid="cua-state">
           {stateText(cuaRun)}
         </text>
-        <rect x="402" y="236" width="230" height="64" rx="6" className="twin-electrical" />
-        <text x="414" y="256" className="twin-small">
+        <rect x="402" y="278" width="230" height="110" rx="6" className="twin-electrical" />
+        <text x="414" y="300" className="twin-small">
           Electrical panel EP-1 (CU-A)
         </text>
         <rect
           x="402"
-          y="312"
+          y="400"
           width="230"
-          height="72"
+          height="106"
           rx="6"
           className="twin-unit twin-unit-backup"
         />
-        <text x="414" y="332" className="twin-label">
+        <text x="414" y="422" className="twin-label">
           {asset("COOLING_BACKUP")}
         </text>
-        <text x="414" y="374" className="twin-state" data-testid="cub-state">
+        <text x="620" y="490" textAnchor="end" className="twin-state" data-testid="cub-state">
           {stateText(cubRun)}
         </text>
-        <path d="M 402 178 C 380 178, 380 200, 356 200" className="twin-pipe" aria-hidden="true" />
+        <path d="M 386 200 L 356 200" className="twin-pipe" aria-hidden="true" />
 
         {/* Outdoor / weather */}
-        <rect x="690" y="52" width="170" height="130" rx="10" className="twin-outdoor" />
-        <text x="702" y="76" className="twin-label">
+        <rect x="690" y="52" width="170" height="160" rx="10" className="twin-outdoor" />
+        <text x="775" y="78" textAnchor="middle" className="twin-label twin-label-fit">
           {asset("WEATHER")}
         </text>
-        <text x="702" y="170" className="twin-small" data-testid="twin-weather-label">
+        <text
+          x="775"
+          y="200"
+          textAnchor="middle"
+          className="twin-small"
+          data-testid="twin-weather-label"
+        >
           {overview.weather.display}
         </text>
 
@@ -175,7 +181,11 @@ export function FacilityTwin({
                 {shortValue(s)}
               </text>
               <text y="48" textAnchor="middle" className="twin-node-name" aria-hidden="true">
-                {s.name.replace("Zone ", "").replace("CU-A ", "").replace("CU-B ", "")}
+                {s.name
+                  .replace("Zone ", "")
+                  .replace("CU-A ", "")
+                  .replace("CU-B ", "")
+                  .replace("electrical ", "")}
               </text>
             </g>
           );
