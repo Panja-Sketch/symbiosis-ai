@@ -4,3 +4,4 @@ export const SCAFFOLD_PHASE = "S0" as const;
 export * from "./risk-pipeline";
 export * from "./verification-runner";
 export * from "./telemetry";
+export * from "./evaluation-recorder";

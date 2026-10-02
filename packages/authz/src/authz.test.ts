@@ -27,6 +27,7 @@ describe("local role permissions (not production authorization)", () => {
       "CASE_READ",
       "INTERVENTION_READ",
       "EVIDENCE_READ",
+      "SIMULATION_READ",
     ]);
     // S6: insurer-side roles can only read the consent-filtered evidence API, nothing else.
     for (const r of ["RISK_ENGINEER", "UNDERWRITER", "BROKER_RISK_MANAGER"] as const) {
@@ -57,5 +58,26 @@ describe("local role permissions (not production authorization)", () => {
 
   it("an actor with no roles can do nothing", () => {
     expect(can(actor([]), "CASE_READ")).toBe(false);
+  });
+
+  it("the facility simulation is operations only: never an insurer, never an auditor's control", () => {
+    for (const r of ["RISK_ENGINEER", "UNDERWRITER", "BROKER_RISK_MANAGER"] as const) {
+      for (const p of [
+        "SIMULATION_READ",
+        "SIMULATION_CONTROL",
+        "SIMULATION_POLICY_EDIT",
+        "SIMULATION_ADAPTER_EDIT",
+        "CONTACT_MANAGE",
+      ] as const) {
+        expect(can(actor([r]), p), `${r} ${p}`).toBe(false);
+      }
+    }
+    expect(can(actor(["READ_ONLY_AUDITOR"]), "SIMULATION_READ")).toBe(true);
+    expect(can(actor(["READ_ONLY_AUDITOR"]), "SIMULATION_CONTROL")).toBe(false);
+    expect(can(actor(["OPERATOR"]), "SIMULATION_CONTROL")).toBe(true);
+    expect(can(actor(["OPERATOR"]), "SIMULATION_POLICY_EDIT")).toBe(false);
+    expect(can(actor(["FACILITY_MANAGER"]), "SIMULATION_POLICY_EDIT")).toBe(true);
+    expect(can(actor(["FACILITY_MANAGER"]), "CONTACT_MANAGE")).toBe(false);
+    expect(can(actor(["ORG_ADMIN"]), "CONTACT_MANAGE")).toBe(true);
   });
 });

@@ -18,7 +18,9 @@ import type {
   OrganizationRecord,
 } from "@symbiosis/tenancy";
 import { RESULT_LABELS } from "@symbiosis/verification";
+import type { ContactsApi } from "./contacts-handler";
 import type { EdgeRequest, EdgeResponse } from "./edge-handler";
+import type { SimulationApi } from "./simulation-handler";
 import type { CaseEvidenceExtras } from "./html";
 import {
   renderCaseHtml,
@@ -52,6 +54,10 @@ export type AppApiDeps = {
    * (S7). Absent means the route does not exist. It lists directory entries only; choosing one
    * still goes through the same server-side directory lookup as every other request.
    */
+  /** Facility Simulation (S10). Absent means every `/api/v1/simulation/*` route does not exist. */
+  readonly simulation?: SimulationApi;
+  /** Notification contacts and preferences (S10). Absent means those routes do not exist. */
+  readonly contacts?: ContactsApi;
   /** Optional explanation layer (S8). Absent means the explanation route does not exist. */
   readonly explanations?: ExplanationService;
   readonly devIdentities?: {
@@ -379,6 +385,28 @@ export function createAppHandler(
         permissions: permissionsFor(actor.roles),
         identity: identity.kind === "demo" ? "DEVELOPMENT_ONLY" : "VERIFIED_TOKEN",
       });
+    }
+    // ---- Facility Simulation and notification contacts (S10) ----------------------------------
+    if (route[0] === "simulation") {
+      if (deps.simulation === undefined) return problem(404, "NOT_FOUND", "Unknown route");
+      const parsed = parseBody(request.rawBody);
+      if (!parsed.ok) return problem(400, "INVALID_REQUEST", "body must be a JSON object");
+      return deps.simulation({
+        actor,
+        method,
+        route: route.slice(1),
+        query,
+        body: parsed.value,
+      });
+    }
+    if (
+      deps.contacts !== undefined &&
+      ((route[0] === "me" && route[1] === "notification-preferences") || route[0] === "contacts")
+    ) {
+      const parsed = parseBody(request.rawBody);
+      if (!parsed.ok) return problem(400, "INVALID_REQUEST", "body must be a JSON object");
+      const r = await deps.contacts({ actor, method, route, body: parsed.value });
+      if (r !== undefined) return r;
     }
     if (method === "GET" && route.length === 1 && route[0] === "cases") {
       const r = await deps.operations.listCases(actor);

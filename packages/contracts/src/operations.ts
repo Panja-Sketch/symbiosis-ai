@@ -176,6 +176,7 @@ export const AUDIT_ACTIONS = [
   "SIMULATION_POLICY_ACTIVATED",
   "ADAPTER_MAPPING_PUBLISHED",
   "ADAPTER_MAPPING_ACTIVATED",
+  "CONTACT_UPDATED",
 ] as const;
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
 
@@ -203,7 +204,8 @@ export type AuditEntry = {
     | "SIMULATION"
     | "POLICY"
     | "ADAPTER"
-    | "WEATHER";
+    | "WEATHER"
+    | "CONTACT";
   readonly targetId: string;
   readonly beforeState?: string;
   readonly afterState?: string;

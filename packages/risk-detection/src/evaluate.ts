@@ -192,9 +192,51 @@ export function evaluateSample(input: EvaluateInput): EvaluateOutput {
       }
     }
 
+    // 1b. Same-instant siblings (S10, D-088). The primary signals of one asset may be reported by
+    // DIFFERENT gateways, so they can arrive in different events. A primary reading that is not in
+    // this event but is already a stored fact with exactly this instant belongs to the same sample.
+    // It is used only to complete the sample: it is never re-learned (a baseline refuses an
+    // observation at or before its last one) and never emits an evaluation of its own.
+    const siblings: CanonicalObservation[] = [];
+    const eventAssets = new Set(
+      obs
+        .filter(
+          (o) => o.signal === rule.signals.vibration || o.signal === rule.signals.current,
+        )
+        .map((o) => o.assetId),
+    );
+    for (const assetId of eventAssets) {
+      for (const signal of [rule.signals.vibration, rule.signals.current]) {
+        if (obs.some((o) => o.assetId === assetId && o.signal === signal)) continue;
+        const f = facts[`${assetId}|${signal}`];
+        if (f === undefined || f.observedAt !== at) continue;
+        siblings.push({
+          observationId: f.observationId,
+          organizationId: input.organizationId,
+          facilityId: input.facilityId,
+          assetId,
+          deviceId: "SAME-INSTANT-FACT",
+          signal: f.signal as CanonicalObservation["signal"],
+          value: f.value,
+          unit: f.unit,
+          observedAt: at,
+          receivedAt: at,
+          sourceType: "SIMULATOR",
+          sourceAdapter: "same-instant-fact",
+          quality: {
+            confidence: f.confidence,
+            stale: false,
+            outOfRange: false,
+            deviceHealthy: f.trusted,
+            authVerified: f.trusted,
+          },
+        });
+      }
+    }
+
     // 2. baselines
     const info = new Map<string, BaselineInfo>();
-    for (const o of obs) {
+    for (const o of [...obs, ...siblings]) {
       if (typeof o.value !== "number" || !baselineConfig.baselinedSignals.includes(o.signal))
         continue;
       const loadFact = facts[`${o.assetId}|${baselineConfig.operatingModes.loadSignal}`];
@@ -359,8 +401,12 @@ export function evaluateSample(input: EvaluateInput): EvaluateOutput {
     const contextKnown = outdoorF !== undefined || slopeKnown;
 
     primaryAssets.forEach((assetId, index) => {
-      const vibObs = obs.find((o) => o.assetId === assetId && o.signal === sig.vibration);
-      const curObs = obs.find((o) => o.assetId === assetId && o.signal === sig.current);
+      const vibObs =
+        obs.find((o) => o.assetId === assetId && o.signal === sig.vibration) ??
+        siblings.find((o) => o.assetId === assetId && o.signal === sig.vibration);
+      const curObs =
+        obs.find((o) => o.assetId === assetId && o.signal === sig.current) ??
+        siblings.find((o) => o.assetId === assetId && o.signal === sig.current);
       const vib = analyze("VIBRATION", vibObs, "z");
       const cur = analyze("CURRENT", curObs, "pct");
 

@@ -409,9 +409,15 @@ importers:
       '@symbiosis/action-orchestration':
         specifier: workspace:*
         version: link:../../packages/action-orchestration
+      '@symbiosis/adapter-weather':
+        specifier: workspace:*
+        version: link:../../adapters/weather
       '@symbiosis/ai-explanation':
         specifier: workspace:*
         version: link:../../packages/ai-explanation
+      '@symbiosis/audit':
+        specifier: workspace:*
+        version: link:../../packages/audit
       '@symbiosis/authz':
         specifier: workspace:*
         version: link:../../packages/authz
@@ -442,6 +448,15 @@ importers:
       '@symbiosis/normalization':
         specifier: workspace:*
         version: link:../../packages/normalization
+      '@symbiosis/notifications':
+        specifier: workspace:*
+        version: link:../../packages/notifications
+      '@symbiosis/repositories':
+        specifier: workspace:*
+        version: link:../../packages/repositories
+      '@symbiosis/simulation':
+        specifier: workspace:*
+        version: link:../../packages/simulation
       '@symbiosis/tenancy':
         specifier: workspace:*
         version: link:../../packages/tenancy

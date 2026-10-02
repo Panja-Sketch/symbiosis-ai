@@ -23,6 +23,39 @@ export const SCAFFOLD_PHASE = "S0" as const;
 export * from "./tenant-documents";
 
 /**
+ * Simulation reset support (S10, D-091): removes the records of ONE facility of ONE organization from
+ * an in-memory repository. A record belongs to the facility if it names it, or belongs to one of its
+ * cases. Production (Firestore) has the equivalent in the gcp adapter.
+ */
+export interface FacilityPurgeable {
+  purgeFacility(
+    organizationId: string,
+    facilityId: string,
+    caseIds: ReadonlySet<string>,
+  ): Promise<number>;
+}
+
+function purgeWhere<T>(map: Map<string, T>, pred: (v: T) => boolean): number {
+  let n = 0;
+  for (const [k, v] of [...map.entries()]) {
+    if (pred(v)) {
+      map.delete(k);
+      n += 1;
+    }
+  }
+  return n;
+}
+
+const inFacility = (
+  v: { organizationId?: string; facilityId?: string; caseId?: string },
+  org: string,
+  fac: string,
+  caseIds: ReadonlySet<string>,
+): boolean =>
+  v.organizationId === org &&
+  (v.facilityId === fac || (v.caseId !== undefined && caseIds.has(v.caseId)));
+
+/**
  * Canonical observation store. Uniqueness is the architecture dedupe identity
  * (device_id + signal + observed_at). Only the S2 need is modelled here; Firestore (S9)
  * must satisfy the same interface. Every query is organization-scoped.
@@ -45,8 +78,12 @@ export interface ObservationRepository {
   }): Promise<readonly CanonicalObservation[]>;
 }
 
-export class InMemoryObservationRepository implements ObservationRepository {
+export class InMemoryObservationRepository implements ObservationRepository , FacilityPurgeable {
   private readonly byKey = new Map<string, CanonicalObservation>();
+
+  async purgeFacility(org: string, fac: string, caseIds: ReadonlySet<string>) {
+    return purgeWhere(this.byKey, (o) => inFacility(o, org, fac, caseIds));
+  }
 
   async insertIfAbsent(observation: CanonicalObservation): Promise<boolean> {
     const key = observationDedupeKey(observation);
@@ -106,10 +143,23 @@ export interface BaselineRepository {
   listAudit(organizationId: string): Promise<readonly BaselineAuditRecord[]>;
 }
 
-export class InMemoryBaselineRepository implements BaselineRepository {
+export class InMemoryBaselineRepository implements BaselineRepository , FacilityPurgeable {
   private readonly byId = new Map<string, Baseline>();
   private readonly snapshots = new Map<string, BaselineSnapshot>();
   private readonly audit: BaselineAuditRecord[] = [];
+
+  async purgeFacility(org: string, fac: string, _caseIds: ReadonlySet<string>) {
+    const before = this.audit.length;
+    for (let i = this.audit.length - 1; i >= 0; i -= 1) {
+      const a = this.audit[i];
+      if (a?.key.organizationId === org && a.key.facilityId === fac) this.audit.splice(i, 1);
+    }
+    return (
+      purgeWhere(this.byId, (b) => b.key.organizationId === org && b.key.facilityId === fac) +
+      purgeWhere(this.snapshots, (x) => x.organizationId === org && x.facilityId === fac) +
+      (before - this.audit.length)
+    );
+  }
 
   async save(baseline: Baseline): Promise<void> {
     this.byId.set(baseline.baselineId, baseline);
@@ -166,8 +216,12 @@ export interface DetectionStateRepository {
   save(state: DetectionState): Promise<void>;
 }
 
-export class InMemoryDetectionStateRepository implements DetectionStateRepository {
+export class InMemoryDetectionStateRepository implements DetectionStateRepository , FacilityPurgeable {
   private readonly states = new Map<string, DetectionState>();
+
+  async purgeFacility(org: string, fac: string, caseIds: ReadonlySet<string>) {
+    return purgeWhere(this.states, (v) => inFacility(v, org, fac, caseIds));
+  }
 
   async get(stateKey: string): Promise<DetectionState | undefined> {
     return this.states.get(stateKey);
@@ -204,8 +258,12 @@ export interface CaseRepository {
   listAllForSystemTick(): Promise<readonly RiskImprovementCase[]>;
 }
 
-export class InMemoryCaseRepository implements CaseRepository {
+export class InMemoryCaseRepository implements CaseRepository , FacilityPurgeable {
   private readonly cases = new Map<string, RiskImprovementCase>();
+
+  async purgeFacility(org: string, fac: string, caseIds: ReadonlySet<string>) {
+    return purgeWhere(this.cases, (v) => inFacility(v, org, fac, caseIds));
+  }
 
   async save(c: RiskImprovementCase): Promise<void> {
     this.cases.set(`${c.organizationId}|${c.caseId}`, c);
@@ -265,8 +323,12 @@ export interface RiskEventRepository {
   listByCase(organizationId: string, caseId: string): Promise<readonly RiskEvent[]>;
 }
 
-export class InMemoryRiskEventRepository implements RiskEventRepository {
+export class InMemoryRiskEventRepository implements RiskEventRepository , FacilityPurgeable {
   private readonly events = new Map<string, RiskEvent>();
+
+  async purgeFacility(org: string, fac: string, caseIds: ReadonlySet<string>) {
+    return purgeWhere(this.events, (v) => inFacility(v, org, fac, caseIds));
+  }
 
   async save(event: RiskEvent): Promise<void> {
     this.events.set(`${event.organizationId}|${event.eventId}`, event);
@@ -292,8 +354,12 @@ export interface AlertRepository {
   listAllForSystemTick(): Promise<readonly Alert[]>;
 }
 
-export class InMemoryAlertRepository implements AlertRepository {
+export class InMemoryAlertRepository implements AlertRepository , FacilityPurgeable {
   private readonly alerts = new Map<string, Alert>();
+
+  async purgeFacility(org: string, fac: string, caseIds: ReadonlySet<string>) {
+    return purgeWhere(this.alerts, (v) => inFacility(v, org, fac, caseIds));
+  }
 
   async save(alert: Alert): Promise<void> {
     this.alerts.set(`${alert.organizationId}|${alert.alertId}`, alert);
@@ -321,8 +387,12 @@ export interface ActionRepository {
   listByCase(organizationId: string, caseId: string): Promise<readonly MitigationAction[]>;
 }
 
-export class InMemoryActionRepository implements ActionRepository {
+export class InMemoryActionRepository implements ActionRepository , FacilityPurgeable {
   private readonly actions = new Map<string, MitigationAction>();
+
+  async purgeFacility(org: string, fac: string, caseIds: ReadonlySet<string>) {
+    return purgeWhere(this.actions, (v) => inFacility(v, org, fac, caseIds));
+  }
 
   async save(organizationId: string, action: MitigationAction): Promise<void> {
     this.actions.set(`${organizationId}|${action.actionId}`, { ...action, organizationId });
@@ -352,8 +422,12 @@ export interface VerificationRepository {
   listAllForSystemTick(): Promise<readonly VerificationAttempt[]>;
 }
 
-export class InMemoryVerificationRepository implements VerificationRepository {
+export class InMemoryVerificationRepository implements VerificationRepository , FacilityPurgeable {
   private readonly attempts = new Map<string, VerificationAttempt>();
+
+  async purgeFacility(org: string, fac: string, caseIds: ReadonlySet<string>) {
+    return purgeWhere(this.attempts, (v) => inFacility(v, org, fac, caseIds));
+  }
 
   async save(attempt: VerificationAttempt): Promise<void> {
     const key = `${attempt.organizationId}|${attempt.verificationId}`;
@@ -396,8 +470,12 @@ export interface InterventionRepository {
   ): Promise<readonly RiskEngineerInterventionRecommendation[]>;
 }
 
-export class InMemoryInterventionRepository implements InterventionRepository {
+export class InMemoryInterventionRepository implements InterventionRepository , FacilityPurgeable {
   private readonly items = new Map<string, RiskEngineerInterventionRecommendation>();
+
+  async purgeFacility(org: string, fac: string, caseIds: ReadonlySet<string>) {
+    return purgeWhere(this.items, (v) => inFacility(v, org, fac, caseIds));
+  }
 
   async save(r: RiskEngineerInterventionRecommendation): Promise<void> {
     this.items.set(`${r.organizationId}|${r.interventionId}`, r);
@@ -435,8 +513,12 @@ export interface EvidencePackageRepository {
   listByCase(organizationId: string, caseId: string): Promise<readonly EvidencePackageRecord[]>;
 }
 
-export class InMemoryEvidencePackageRepository implements EvidencePackageRepository {
+export class InMemoryEvidencePackageRepository implements EvidencePackageRepository , FacilityPurgeable {
   private readonly records = new Map<string, EvidencePackageRecord>();
+
+  async purgeFacility(org: string, fac: string, caseIds: ReadonlySet<string>) {
+    return purgeWhere(this.records, (v) => inFacility(v, org, fac, caseIds));
+  }
 
   async insertIfAbsent(record: EvidencePackageRecord): Promise<boolean> {
     const key = `${record.organizationId}|${record.packageId}`;
@@ -499,8 +581,12 @@ export interface SharingAgreementRepository {
   listAllForSystemTick(): Promise<readonly SharingAgreement[]>;
 }
 
-export class InMemorySharingAgreementRepository implements SharingAgreementRepository {
+export class InMemorySharingAgreementRepository implements SharingAgreementRepository , FacilityPurgeable {
   private readonly items = new Map<string, SharingAgreement>();
+
+  async purgeFacility(org: string, fac: string, _caseIds: ReadonlySet<string>) {
+    return purgeWhere(this.items, (v) => v.organizationId === org && v.facilityIds.includes(fac));
+  }
 
   async insert(agreement: SharingAgreement): Promise<void> {
     if (this.items.has(agreement.agreementId)) {
@@ -567,8 +653,12 @@ export interface SharedEvidenceRepository {
   ): Promise<readonly SharedEvidenceRecord[]>;
 }
 
-export class InMemorySharedEvidenceRepository implements SharedEvidenceRepository {
+export class InMemorySharedEvidenceRepository implements SharedEvidenceRepository , FacilityPurgeable {
   private readonly items = new Map<string, SharedEvidenceRecord>();
+
+  async purgeFacility(org: string, fac: string, caseIds: ReadonlySet<string>) {
+    return purgeWhere(this.items, (v) => inFacility(v, org, fac, caseIds));
+  }
 
   async insertIfAbsent(record: SharedEvidenceRecord): Promise<boolean> {
     const key = `${record.agreementId}|${record.evidencePackageId}`;

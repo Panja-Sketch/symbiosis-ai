@@ -107,13 +107,13 @@ export const SYNTHETIC_ACTORS: readonly ActorContext[] = [
   {
     actorId: "USR-FACILITY-MGR-001",
     organizationId: "ORG-SIM-001",
-    facilityIds: ["FAC-SIM-001"],
+    facilityIds: ["FAC-SIM-001", "FAC-SIM-PHX-01"],
     roles: ["FACILITY_MANAGER"],
   },
   {
     actorId: "USR-OPERATOR-001",
     organizationId: "ORG-SIM-001",
-    facilityIds: ["FAC-SIM-001"],
+    facilityIds: ["FAC-SIM-001", "FAC-SIM-PHX-01"],
     roles: ["OPERATOR"],
   },
   {
@@ -192,7 +192,7 @@ export const SYNTHETIC_ORGANIZATIONS: readonly OrganizationRecord[] = [
     organizationId: "ORG-SIM-001",
     name: "Synthetic Cold Storage Co (insured)",
     type: "INSURED",
-    facilityIds: ["FAC-SIM-001"],
+    facilityIds: ["FAC-SIM-001", "FAC-SIM-PHX-01"],
   },
   {
     organizationId: "ORG-SIM-002",

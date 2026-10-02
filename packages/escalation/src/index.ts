@@ -1,5 +1,6 @@
-import { CASE_SEVERITIES, NOTIFICATION_CHANNELS } from "@symbiosis/contracts";
+import { CASE_SEVERITIES, NOTIFICATION_CHANNELS, resolveValue } from "@symbiosis/contracts";
 import type {
+  Resolvable,
   CaseSeverity,
   NotificationChannel,
   RiskEvent,
@@ -75,7 +76,8 @@ export type EscalationDeps = {
   readonly bus: EventBus;
   readonly ids: IdGenerator;
   readonly clock: Clock;
-  readonly policy: EscalationPolicy;
+  /** Fixed in production; the simulation tenant resolves its versioned policy (D-092). */
+  readonly policy: Resolvable<EscalationPolicy>;
   readonly requestEscalationAlert: EscalationAlertRequester;
 };
 
@@ -105,7 +107,8 @@ export async function runEscalationTick(deps: EscalationDeps): Promise<Escalatio
     const caseRecord = await deps.cases.get(alert.organizationId, alert.caseId);
     if (event === undefined || caseRecord === undefined) continue;
 
-    const deadline = acknowledgementDeadlineSeconds(deps.policy, caseRecord.severity);
+    const policy = await resolveValue(deps.policy, alert.organizationId, alert.facilityId);
+    const deadline = acknowledgementDeadlineSeconds(policy, caseRecord.severity);
     let reason: "ACKNOWLEDGEMENT_OVERDUE" | "ALERT_DELIVERY_EXHAUSTED" | undefined;
     if (
       alert.status === "SENT" &&

@@ -34,6 +34,7 @@ const EXPECTED = {
     "portfolio",
     "repositories",
     "runtime",
+    "simulation",
     "event-bus",
     "clock",
   ],

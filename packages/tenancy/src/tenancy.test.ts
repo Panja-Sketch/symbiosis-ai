@@ -17,7 +17,7 @@ describe("synthetic local directory", () => {
   it("derives organization and facility scope from the directory, per actor", async () => {
     const d = createSyntheticActorDirectory();
     const mgr = await d.get("USR-FACILITY-MGR-001");
-    expect(mgr).toMatchObject({ organizationId: "ORG-SIM-001", facilityIds: ["FAC-SIM-001"] });
+    expect(mgr).toMatchObject({ organizationId: "ORG-SIM-001", facilityIds: ["FAC-SIM-001", "FAC-SIM-PHX-01"] });
     expect(await d.get("USR-DOES-NOT-EXIST")).toBeUndefined();
   });
 

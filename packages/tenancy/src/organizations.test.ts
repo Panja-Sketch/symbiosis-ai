@@ -23,7 +23,7 @@ describe("synthetic organizations (S6)", () => {
     const orgs = createSyntheticOrganizationDirectory();
     expect(await orgs.get("ORG-SIM-001")).toMatchObject({
       type: "INSURED",
-      facilityIds: ["FAC-SIM-001"],
+      facilityIds: ["FAC-SIM-001", "FAC-SIM-PHX-01"],
     });
     expect((await orgs.get("ORG-SIM-002"))?.facilityIds).toEqual(["FAC-OTHER-001"]);
     for (const id of ["ORG-INS-001", "ORG-INS-002"]) {

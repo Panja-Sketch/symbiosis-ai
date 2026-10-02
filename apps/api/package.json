@@ -7,7 +7,9 @@
   "types": "src/index.ts",
   "dependencies": {
     "@symbiosis/action-orchestration": "workspace:*",
+    "@symbiosis/adapter-weather": "workspace:*",
     "@symbiosis/ai-explanation": "workspace:*",
+    "@symbiosis/audit": "workspace:*",
     "@symbiosis/authz": "workspace:*",
     "@symbiosis/clock": "workspace:*",
     "@symbiosis/consent": "workspace:*",
@@ -18,6 +20,9 @@
     "@symbiosis/evidence": "workspace:*",
     "@symbiosis/intervention-prioritization": "workspace:*",
     "@symbiosis/normalization": "workspace:*",
+    "@symbiosis/notifications": "workspace:*",
+    "@symbiosis/repositories": "workspace:*",
+    "@symbiosis/simulation": "workspace:*",
     "@symbiosis/tenancy": "workspace:*",
     "@symbiosis/verification": "workspace:*"
   }
