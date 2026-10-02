@@ -52,6 +52,18 @@ export function createEdgeV1Adapter(options: {
   return { ...options, fields: EDGE_V1_FIELDS };
 }
 
+export const EDGE_DEVICE_ADAPTER_NAME = "edge-device-v1" as const;
+
+/**
+ * Generic adapter for a real integration that already speaks the edge v1 telemetry contract
+ * (`source: HARDWARE`). It names no vendor: a customer gateway sends the same flat readings the
+ * simulator does. Vendor-specific payloads use a versioned source-adapter profile instead (D-088).
+ */
+export const edgeDeviceSourceAdapter: SourceAdapter = createEdgeV1Adapter({
+  adapterName: EDGE_DEVICE_ADAPTER_NAME,
+  sourceType: "HARDWARE",
+});
+
 export type NormalizeContext = {
   readonly organizationId: string;
   readonly facilityId: string;

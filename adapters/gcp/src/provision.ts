@@ -4,7 +4,8 @@ import type { DeviceRecord } from "@symbiosis/device-registry";
 import { deviceKeySecretId } from "./secrets/device-keys";
 
 /**
- * Operator-only physical-device provisioning (S10). Never run by a service and never reachable
+ * Operator-only edge-device provisioning (a gateway, a bridge, the simulator's vendor profiles).
+ * Never run by a service and never reachable
  * from a browser. It:
  *  1. generates a cryptographically strong 32-byte device key;
  *  2. stores it in Secret Manager under the S9 naming scheme (never overwriting an existing key),

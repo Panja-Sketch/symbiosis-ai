@@ -38,7 +38,7 @@ const EXPECTED = {
     "clock",
   ],
   // S9 (D-069) adds adapters/gcp (cloud adapters) and packages/runtime (composition + entrypoints).
-  adapters: ["simulator", "esp32", "weather", "email", "gcp"],
+  adapters: ["simulator", "weather", "email", "gcp"],
 } as const;
 
 describe("workspace structure (PROJECT_SPEC §44)", () => {

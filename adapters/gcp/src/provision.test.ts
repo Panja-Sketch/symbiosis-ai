@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createBenchDeviceRecord } from "@symbiosis/adapter-esp32";
+import { createEdgeDeviceRecord } from "@symbiosis/device-registry";
 import type { DeviceRecord } from "@symbiosis/device-registry";
 import { DeviceProvisioningError, provisionDevice } from "./provision";
 import type { ProvisionRegistry, ProvisionSecrets } from "./provision";
@@ -48,12 +48,14 @@ function fakes() {
   return { secrets, grants, devices, calls, failRegistry, secretClient, registry };
 }
 
-const record = (deviceId = "DEV-PHX-BENCH-001", keyId = "KEY-PHX-001") =>
-  createBenchDeviceRecord({
+const record = (deviceId = "DEV-GATEWAY-001", keyId = "KEY-GATEWAY-001") =>
+  createEdgeDeviceRecord({
     deviceId,
     keyId,
     organizationId: "ORG-SIM-001",
     facilityId: "FAC-SIM-001",
+    assetId: "AST-SIM-FAN-A",
+    expectedSignals: ["vibration_rms", "current"],
   });
 
 describe("provisionDevice", () => {
@@ -64,11 +66,11 @@ describe("provisionDevice", () => {
       { record: record(), apiServiceAccount: API_SA },
     );
     expect(result.keyHex).toMatch(/^[0-9a-f]{64}$/);
-    expect(result.secretId).toBe(deviceKeySecretId("DEV-PHX-BENCH-001", "KEY-PHX-001"));
+    expect(result.secretId).toBe(deviceKeySecretId("DEV-GATEWAY-001", "KEY-GATEWAY-001"));
     expect(f.secrets.get(result.secretId)?.versions).toEqual([result.keyHex]);
     expect(f.grants).toEqual([{ secretId: result.secretId, member: `serviceAccount:${API_SA}` }]);
-    const stored = f.devices.get("DEV-PHX-BENCH-001");
-    expect(stored?.activeKeyId).toBe("KEY-PHX-001");
+    const stored = f.devices.get("DEV-GATEWAY-001");
+    expect(stored?.activeKeyId).toBe("KEY-GATEWAY-001");
     expect(stored?.health).toBe("UNKNOWN");
     // the registry record never contains key material
     expect(JSON.stringify(stored)).not.toContain(result.keyHex);
@@ -110,7 +112,7 @@ describe("provisionDevice", () => {
 
   it("never overwrites an existing key secret", async () => {
     const f = fakes();
-    f.secrets.set(deviceKeySecretId("DEV-PHX-BENCH-001", "KEY-PHX-001"), {
+    f.secrets.set(deviceKeySecretId("DEV-GATEWAY-001", "KEY-GATEWAY-001"), {
       labels: {},
       versions: ["existing-key"],
     });
@@ -120,7 +122,7 @@ describe("provisionDevice", () => {
         { record: record(), apiServiceAccount: API_SA },
       ),
     ).rejects.toMatchObject({ code: "KEY_EXISTS" });
-    expect(f.secrets.get(deviceKeySecretId("DEV-PHX-BENCH-001", "KEY-PHX-001"))?.versions).toEqual([
+    expect(f.secrets.get(deviceKeySecretId("DEV-GATEWAY-001", "KEY-GATEWAY-001"))?.versions).toEqual([
       "existing-key",
     ]);
   });
@@ -143,7 +145,7 @@ describe("provisionDevice", () => {
     const deps = { secrets: f.secretClient, registry: f.registry };
     await expect(
       provisionDevice(deps, {
-        record: record("DEV-PHX-BENCH-001", "KEY-PHX-002"),
+        record: record("DEV-GATEWAY-001", "KEY-GATEWAY-002"),
         apiServiceAccount: API_SA,
         rotate: true,
       }),
@@ -153,29 +155,33 @@ describe("provisionDevice", () => {
       provisionDevice(deps, { record: record(), apiServiceAccount: API_SA, rotate: true }),
     ).rejects.toMatchObject({ code: "SAME_KEY_ID" });
     const rotated = await provisionDevice(deps, {
-      record: record("DEV-PHX-BENCH-001", "KEY-PHX-002"),
+      record: record("DEV-GATEWAY-001", "KEY-GATEWAY-002"),
       apiServiceAccount: API_SA,
       rotate: true,
     });
     expect(rotated.rotated).toBe(true);
-    expect(f.devices.get("DEV-PHX-BENCH-001")?.activeKeyId).toBe("KEY-PHX-002");
+    expect(f.devices.get("DEV-GATEWAY-001")?.activeKeyId).toBe("KEY-GATEWAY-002");
   });
 
   it("rejects malformed ids before touching the cloud", () => {
     expect(() =>
-      createBenchDeviceRecord({
+      createEdgeDeviceRecord({
         deviceId: "dev lower",
         keyId: "KEY-1",
         organizationId: "O",
         facilityId: "F",
+        assetId: "A",
+        expectedSignals: ["current"],
       }),
     ).toThrow();
     expect(() =>
-      createBenchDeviceRecord({
+      createEdgeDeviceRecord({
         deviceId: "DEV-1",
         keyId: "key-1",
         organizationId: "O",
         facilityId: "F",
+        assetId: "A",
+        expectedSignals: ["current"],
       }),
     ).toThrow();
   });

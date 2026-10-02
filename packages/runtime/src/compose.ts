@@ -1,12 +1,12 @@
 import { actionsFor, createOperations } from "@symbiosis/action-orchestration";
 import type { ActionLibrary, Operations } from "@symbiosis/action-orchestration";
-import { esp32SourceAdapter } from "@symbiosis/adapter-esp32";
 import { simulatorSourceAdapter } from "@symbiosis/adapter-simulator";
 import type { AuditLog } from "@symbiosis/audit";
 import type { BaselineConfig } from "@symbiosis/baselines";
 import { createInsuranceGateway, createSharingService, startSharing } from "@symbiosis/consent";
 import type { InsuranceGateway, SharingService } from "@symbiosis/consent";
 import type { Clock } from "@symbiosis/clock";
+import { edgeDeviceSourceAdapter } from "@symbiosis/normalization";
 import type { DataQualityConfig } from "@symbiosis/data-quality";
 import type { DeviceKeyStore, DeviceRegistry } from "@symbiosis/device-registry";
 import type { ReplayGuard } from "@symbiosis/edge-security";
@@ -236,7 +236,7 @@ export function composeServices(ports: Ports, options: ComposeOptions): Services
   const startConsumers = () => {
     startTelemetryWorker({
       bus,
-      adapters: { HARDWARE: esp32SourceAdapter, SIMULATOR: simulatorSourceAdapter },
+      adapters: { HARDWARE: edgeDeviceSourceAdapter, SIMULATOR: simulatorSourceAdapter },
       quality: policies.dataQuality,
       observations,
       ids,

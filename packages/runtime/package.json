@@ -7,7 +7,6 @@
   "types": "src/index.ts",
   "dependencies": {
     "@symbiosis/action-orchestration": "workspace:*",
-    "@symbiosis/adapter-esp32": "workspace:*",
     "@symbiosis/adapter-gcp": "workspace:*",
     "@symbiosis/adapter-simulator": "workspace:*",
     "@symbiosis/ai-explanation": "workspace:*",
@@ -24,6 +23,7 @@
     "@symbiosis/event-bus": "workspace:*",
     "@symbiosis/evidence": "workspace:*",
     "@symbiosis/intervention-prioritization": "workspace:*",
+    "@symbiosis/normalization": "workspace:*",
     "@symbiosis/notifications": "workspace:*",
     "@symbiosis/repositories": "workspace:*",
     "@symbiosis/risk-detection": "workspace:*",

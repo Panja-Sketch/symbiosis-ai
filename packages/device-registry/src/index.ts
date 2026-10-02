@@ -20,6 +20,14 @@ export type DeviceRecord = {
   readonly activeKeyId: string;
   readonly expectedSignals: readonly CanonicalSignal[];
   readonly capabilities: readonly string[];
+  /**
+   * Binds the device to a versioned source-adapter profile (S10, D-088). A device with a profile
+   * sends its own vendor payload to `/edge/v1/source`; the profile (never the request) decides how
+   * that payload becomes canonical observations. Absent: the device speaks the edge v1 contract.
+   */
+  readonly sourceProfile?: { readonly profileId: string };
+  /** Human name shown in operations screens; ids stay secondary. */
+  readonly displayName?: string;
   readonly firmwareVersion?: string;
   readonly lastSeenAt?: string;
   /** UNKNOWN until a heartbeat reports otherwise; never treated as healthy. */
@@ -86,6 +94,53 @@ export class InMemoryDeviceKeyStore implements DeviceKeyStore {
   async getKey(deviceId: string, keyId: string): Promise<Uint8Array | undefined> {
     return this.keys.get(`${deviceId}|${keyId}`);
   }
+}
+
+export const DEVICE_ID_PATTERN = /^DEV-[A-Z0-9]+(?:-[A-Z0-9]+)*$/;
+export const KEY_ID_PATTERN = /^KEY-[A-Z0-9]+(?:-[A-Z0-9]+)*$/;
+
+export type EdgeDeviceInput = {
+  readonly deviceId: string;
+  readonly keyId: string;
+  readonly organizationId: string;
+  readonly facilityId: string;
+  readonly assetId: string;
+  readonly assetMapping?: AssetMapping;
+  readonly expectedSignals: readonly CanonicalSignal[];
+  readonly capabilities?: readonly string[];
+  readonly sourceProfile?: { readonly profileId: string };
+  readonly displayName?: string;
+};
+
+/**
+ * Builds a registry record for any integration that sends signed data to the edge boundary (a
+ * building-automation gateway, an IoT gateway, an equipment API bridge, the simulator). The record
+ * names no vendor or hardware model: placement of readings onto logical assets is configuration.
+ * A new device is ACTIVE and never healthy until a heartbeat says so.
+ */
+export function createEdgeDeviceRecord(input: EdgeDeviceInput): DeviceRecord {
+  if (!DEVICE_ID_PATTERN.test(input.deviceId)) {
+    throw new Error("deviceId must look like DEV-UPPER-CASE-001");
+  }
+  if (!KEY_ID_PATTERN.test(input.keyId)) throw new Error("keyId must look like KEY-UPPER-CASE-001");
+  if (input.organizationId === "" || input.facilityId === "" || input.assetId === "") {
+    throw new Error("organizationId, facilityId and assetId are required");
+  }
+  if (input.expectedSignals.length === 0) throw new Error("expectedSignals must not be empty");
+  return {
+    deviceId: input.deviceId,
+    organizationId: input.organizationId,
+    facilityId: input.facilityId,
+    assetId: input.assetId,
+    ...(input.assetMapping !== undefined && { assetMapping: input.assetMapping }),
+    status: "ACTIVE",
+    activeKeyId: input.keyId,
+    expectedSignals: input.expectedSignals,
+    capabilities: input.capabilities ?? ["telemetry", "heartbeat"],
+    ...(input.sourceProfile !== undefined && { sourceProfile: input.sourceProfile }),
+    ...(input.displayName !== undefined && { displayName: input.displayName }),
+    health: "UNKNOWN",
+  };
 }
 
 const HEX_KEY = /^[0-9a-fA-F]{64}$/;

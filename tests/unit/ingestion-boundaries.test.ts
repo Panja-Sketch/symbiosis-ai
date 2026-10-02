@@ -30,20 +30,15 @@ describe("hardware independence (spec principle 7)", () => {
   const HARDWARE_MODELS = /esp32|sht41|mpu6050|ina219/i;
 
   it("canonical, domain, ingestion and app sources never name hardware models", () => {
-    // packages/runtime/src/compose.ts is a composition root (like scripts/): it must register the
-    // hardware source adapter by name. No other package or app may.
-    const files = [...sources("packages"), ...sources("apps")].filter(
-      (f) => rel(f) !== "packages/runtime/src/compose.ts",
-    );
+    const files = [...sources("packages"), ...sources("apps")];
     expect(files.length).toBeGreaterThan(10);
     for (const f of files) {
       expect(readFileSync(f, "utf8"), rel(f)).not.toMatch(HARDWARE_MODELS);
     }
   });
 
-  it("only the esp32 adapter may name the ESP32", () => {
-    const adapterFiles = sources("adapters").filter((f) => !rel(f).startsWith("adapters/esp32/"));
-    for (const f of adapterFiles) {
+  it("no adapter names a hardware model either (the physical prototype left the product, D-085)", () => {
+    for (const f of sources("adapters")) {
       expect(readFileSync(f, "utf8"), rel(f)).not.toMatch(/esp32|sht41|mpu6050|ina219/i);
     }
   });

@@ -25,16 +25,13 @@
     "smoke:s8": "tsx scripts/smoke-s8.ts",
     "seed:gcp": "tsx scripts/seed-gcp.ts",
     "smoke:s9": "tsx scripts/smoke-s9.ts",
-    "provision:device": "tsx scripts/provision-device.ts",
-    "test:firmware": "node firmware/esp32-lab/test/host/run.mjs",
-    "smoke:s10": "tsx scripts/smoke-s10.ts"
+    "provision:device": "tsx scripts/provision-device.ts"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.13.0",
     "@eslint/js": "^9.39.5",
     "@playwright/test": "^1.63.0",
     "@symbiosis/action-orchestration": "workspace:*",
-    "@symbiosis/adapter-esp32": "workspace:*",
     "@symbiosis/adapter-gcp": "workspace:*",
     "@symbiosis/adapter-simulator": "workspace:*",
     "@symbiosis/ai-explanation": "workspace:*",

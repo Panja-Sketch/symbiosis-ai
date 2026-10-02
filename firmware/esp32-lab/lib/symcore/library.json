@@ -1,6 +1,0 @@
-{
-  "name": "symcore",
-  "version": "0.1.0",
-  "description": "Hardware-independent Symbiosis edge firmware logic (signing, sequence, payload, retry, health). Host-tested.",
-  "build": { "flags": ["-Wall", "-Wextra"] }
-}
