@@ -171,14 +171,31 @@ try {
   );
 
   // ---- baseline, live weather ------------------------------------------------------------------
-  await until("baselines READY", async () => (await overview()).baseline.ready === true, 240_000);
+  await until(
+    "baselines READY",
+    async () => {
+      const b = (await overview()).baseline;
+      if (process.env.SMOKE_DEBUG === "1") {
+        console.log(
+          "  baseline:",
+          (b.signals as Json[]).map((x) => `${x.signal}:${x.status}:${x.samples}`).join(" "),
+          `pulseErrors=${pulseErrors}`,
+        );
+      }
+      return b.ready === true;
+    },
+    240_000,
+  );
   check("baselines become READY from signed vendor telemetry", true);
   const ov0 = await overview();
   const live = ov0.weather.display === "LIVE WEATHER";
   check(
     "weather is LIVE WEATHER with the provider's own temperature and time",
-    live && typeof ov0.weather.temperatureC === "number",
-    `${ov0.weather.display}`,
+    live &&
+      typeof ov0.weather.reading?.temperatureC === "number" &&
+      ov0.weather.reading?.provider === "GOOGLE_WEATHER" &&
+      typeof ov0.weather.reading?.observedAt === "string",
+    `${ov0.weather.display} ${ov0.weather.reading?.temperatureC}C`,
   );
   check("NORMAL opens no case", (ov0.cases as unknown[]).length === 0);
   const sensor = (ov0.sensors as Json[]).find((s) => s.signal === "vibration_rms");

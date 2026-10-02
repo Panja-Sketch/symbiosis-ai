@@ -85,7 +85,7 @@ composite index: `observations (organizationId, facilityId, observedAtMs)`. Rule
 
 ## Delivery, DLQ and operations
 
-Pub/Sub delivers at least once and unordered. The worker (1 instance, concurrency 1) acknowledges only
+Pub/Sub delivers at least once; events of one facility are ordered by key (S10, D-098), other events are not. The worker (1 instance, concurrency 1) acknowledges only
 after every handler succeeded and the event was recorded in `processedEvents`; a redelivered finished
 event is dropped (log message `duplicate delivery dropped`). Failures answer 5xx: retry with backoff
 10 s to 300 s, then dead letter after 5 attempts. Inspect dead letters:
@@ -212,11 +212,22 @@ redeploy with `SYMBIOSIS_EMAIL_PROVIDER=smtp SYMBIOSIS_SMTP_HOST=smtp.gmail.com 
 inspected (never seen, referenced by no data) and deleted together with the key secret and the local key
 file. `DEV-SIM-001` and all shared edge infrastructure were retained.
 
-**IAM added in S10:** `roles/run.invoker` for `symbiosis-api` on `symbiosis-worker`; `secretAccessor` for
-`symbiosis-api` on each of the three simulation device-key secrets (created by `seed:sim`). No role was
-widened and no identity was added.
+**IAM added in S10:** `roles/run.invoker` for `symbiosis-api` on `symbiosis-worker`;
+`roles/serviceusage.serviceUsageConsumer` for `symbiosis-api` and `symbiosis-worker` (needed to call the
+Weather API with their own token); `secretAccessor` for `symbiosis-api` on each of the three simulation
+device-key secrets (created by `seed:sim`); `pubsub.publisher` is unchanged. No role was widened and no
+identity was added. No Secret Manager secret was added besides the three device keys (and the bench key
+was deleted); the optional SMTP secret is created by the operator.
 
-**Deployed (2026-10-02, image tag `1776efcda017`):** `symbiosis-api-00005-lp8`, `symbiosis-web-00005-hh4`,
-`symbiosis-worker-00005-mhz` (previous revisions `...-00004-gdw`, `...-00004-mgk`, `...-00004-86k` remain
-available for rollback). Images by digest: worker `sha256:9d7393a46955283edb9383904b9613eb06dea45ad055bc8a639fb0e309706a4a`
-API `sha256:0a0d663a235e1619a80aa124e97a380db5888cef24f16f9793f224d4ea8bb1a7`, web `sha256:3cc58edf9ca4e9f14a27c42f8e2d2305b223ad0e615160fd1a97814689b317f2`).
+**Delivery order (D-098).** The push subscription `symbiosis-events-worker` has message ordering enabled
+and the bus publishes with the ordering key `<organizationId>:<facilityId>` on the regional endpoint, so
+the events of one facility reach the worker in publish order (the detector assumes it). An unordered
+subscription cannot be converted: `02-deploy.sh` recreates it.
+
+**Deployed (2026-10-02, image tag `979a199a293f`):** `symbiosis-api-00006-zsh`,
+`symbiosis-web-00006-qrz`, `symbiosis-worker-00006-jmp`, by digest: API
+`sha256:fdf1db2956aac6fce8df9a19bb67e7ba7838b5a09bbad094cf214495df622f30`, web
+`sha256:d746c25b5451273de6153152cbdd67421f1b32d8d0fc1b237d1420b3dd071a57`, worker
+`sha256:53484c7a8c98a1c33ef17faa7e6a07e93262670550698a759c4991bba64d0480`. Intermediate S10 revisions
+`...-00005-*` (tag `1776efcda017`, unordered delivery) and the S9 revisions `...-00004-*` (`gdw`, `mgk`,
+`86k`) remain available for rollback.

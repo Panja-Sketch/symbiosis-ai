@@ -252,6 +252,33 @@ test.describe("S10 Facility Simulation", () => {
     await expect(lab).toContainText(/synthetic/i);
   });
 
+  test("ERROR STATES: a lost connection and an API error are shown in words, and recover", async ({
+    page,
+  }) => {
+    await open(page);
+    await page.getByTestId("sim-start").click();
+    await expect(page.getByTestId("sim-status")).toContainText(/running/i);
+    // the connection drops
+    await page.route("**/sim-api/simulation", (route) => route.abort());
+    await expect(page.getByTestId("sim-offline")).toContainText(/connection|lost|retry/i, {
+      timeout: 15_000,
+    });
+    // the connection returns: the notice clears by itself
+    await page.unroute("**/sim-api/simulation");
+    await expect(page.getByTestId("sim-offline")).toHaveCount(0, { timeout: 15_000 });
+    // the backend answers with an error: its own message is shown, the page does not break
+    await page.route("**/sim-api/simulation/scenario", (route) =>
+      route.fulfill({
+        status: 409,
+        contentType: "application/json",
+        body: JSON.stringify({ error: { code: "BASELINE_LEARNING", message: "Learning normal." } }),
+      }),
+    );
+    await page.getByTestId("scenario-COMPOUND_COOLING_RISK").click();
+    await expect(page.getByTestId("scenario-message")).toContainText(/Learning normal/);
+    await expect(page.getByTestId("sim-workspace")).toBeVisible();
+  });
+
   test("keyboard: a sensor node is reachable and selectable without a mouse", async ({ page }) => {
     await open(page);
     await page.getByTestId("sim-start").click();
