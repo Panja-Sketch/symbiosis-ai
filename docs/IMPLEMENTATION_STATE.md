@@ -20,3 +20,5 @@ Allowed status: NOT_STARTED | IN_PROGRESS | BLOCKED | COMPLETE
 Physical hardware prototype: REMOVED FROM ACTIVE SCOPE BY PRODUCT DECISION (D-085). The old H0-H8 gates were never run and are not claimed.
 
 S10 completion standard met on 2026-10-02: production build, browser, authorization and tenant isolation, E2E (40 Playwright tests incl. axe at three viewports), Firestore emulator suites (not skipped), 15 mutation checks, local smoke (26), cloud deployment and cloud smoke (29 of 29, real time, live weather), provenance and documentation. **Real email smoke: PENDING EXTERNAL DEMO CREDENTIALS** (architecture validated with fake and in-memory providers; the cloud runs the console provider). **Needs owner review: D-098** (Pub/Sub message ordering added to the S9 transport after the first cloud smoke found a delivery-order divergence). S11 is NOT_STARTED.
+
+Repository cleanup after S10: README and `docs/ARCHITECTURE.md` rewritten, spec references removed (spec kept in Git history at `3ac75f2`); file deletions pending owner approval, see `docs/SESSION_HANDOFF.md`.

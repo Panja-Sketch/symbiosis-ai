@@ -1,6 +1,6 @@
-# Source adapters: the vendor-neutral integration boundary (S10)
+# Source adapters: the vendor-neutral integration boundary
 
-`PROJECT_SPEC.md` is the architecture; D-088 in `docs/DECISIONS.md` records the design. This file is the
+`docs/ARCHITECTURE.md` is the architecture; D-088 in `docs/DECISIONS.md` records the design. This file is the
 practical description of how a building system reaches the platform.
 
 **No real vendor integration exists yet.** The four profiles shipped in `config/adapters/` are

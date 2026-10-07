@@ -1,10 +1,10 @@
 # CLAUDE.md — Symbiosis AI
 
-`PROJECT_SPEC.md` is the locked architecture source of truth. This file does not duplicate it.
+`docs/ARCHITECTURE.md` is the architecture reference. This file does not duplicate it. (The original planning spec was removed from the tree; it remains in Git history at commit `3ac75f2`.)
 
 ## Start of every session
 
-1. Read `PROJECT_SPEC.md`, `docs/SESSION_HANDOFF.md`, `docs/IMPLEMENTATION_STATE.md`, `docs/DECISIONS.md`.
+1. Read `docs/ARCHITECTURE.md`, `docs/SESSION_HANDOFF.md`, `docs/IMPLEMENTATION_STATE.md`, `docs/DECISIONS.md`.
 2. Run `git status` and `git log --oneline -10`.
 3. Confirm the exact next task from `docs/SESSION_HANDOFF.md`.
 

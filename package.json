@@ -28,7 +28,18 @@
     "smoke:s9": "tsx scripts/smoke-s9.ts",
     "smoke:s10": "tsx scripts/smoke-s10.ts",
     "smoke:s10:cloud": "tsx scripts/smoke-s10-cloud.ts",
-    "provision:device": "tsx scripts/provision-device.ts"
+    "provision:device": "tsx scripts/provision-device.ts",
+    "smoke:ingestion": "tsx scripts/smoke-s2.ts",
+    "smoke:detection": "tsx scripts/smoke-s3.ts",
+    "smoke:workflow": "tsx scripts/smoke-s4.ts",
+    "smoke:verification": "tsx scripts/smoke-s5.ts",
+    "smoke:evidence": "tsx scripts/smoke-s6.ts",
+    "smoke:ui": "pnpm web:build && tsx scripts/smoke-s7.ts",
+    "smoke:explanations": "tsx scripts/smoke-s8.ts",
+    "smoke:simulation": "tsx scripts/smoke-s10.ts",
+    "smoke:cloud": "tsx scripts/smoke-s9.ts",
+    "smoke:cloud-simulation": "tsx scripts/smoke-s10-cloud.ts",
+    "check:simulation-boundaries": "node scripts/mutation-s10.mjs"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.13.0",

@@ -1,7 +1,6 @@
-# AI Governance (S8)
+# AI Governance
 
-PROJECT_SPEC.md Part VII (sections 18 and 18.1 to 18.2) is the source of truth; this file records how S8
-implements it. **AI advises; deterministic code decides state; humans act; sensors verify.**
+This file records how the explanation layer is bounded and implemented (see `docs/ARCHITECTURE.md`). **AI advises; deterministic code decides state; humans act; sensors verify.**
 
 ## What Gemini may and may not do
 

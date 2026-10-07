@@ -42,7 +42,7 @@ const EXPECTED = {
   adapters: ["simulator", "weather", "email", "gcp"],
 } as const;
 
-describe("workspace structure (PROJECT_SPEC §44)", () => {
+describe("workspace structure", () => {
   for (const [group, names] of Object.entries(EXPECTED)) {
     it(`${group}/ contains exactly the specified members`, () => {
       const actual = readdirSync(join(root, group), { withFileTypes: true })

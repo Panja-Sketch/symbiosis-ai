@@ -1,7 +1,6 @@
 # Architectural Decisions
 
-Meaningful architectural/technical decisions only. `PROJECT_SPEC.md` is the architecture
-source of truth; this log records choices made while implementing it. Not a session diary.
+Meaningful architectural/technical decisions only. `docs/ARCHITECTURE.md` describes the architecture; this log records choices made while implementing it. Not a session diary. References to "spec" sections below refer to the original planning spec, kept in Git history (commit `3ac75f2`, file `PROJECT_SPEC.md`).
 
 ## D-001 — pnpm workspace monorepo (S0, 2026-09-30)
 

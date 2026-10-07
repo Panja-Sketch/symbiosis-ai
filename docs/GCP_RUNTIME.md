@@ -1,6 +1,6 @@
-# Google Cloud runtime and runbook (S9)
+# Google Cloud runtime and runbook
 
-`PROJECT_SPEC.md` is the architecture; `docs/DECISIONS.md` D-069 to D-077 record the S9 choices. This
+`docs/ARCHITECTURE.md` is the architecture; `docs/DECISIONS.md` D-069 to D-077 record the cloud runtime choices. This
 file is the operating manual for the deployed runtime. It contains names only, never secret values.
 
 ## Resource map (project `symbiosis-ai-2026`, region `us-central1`)

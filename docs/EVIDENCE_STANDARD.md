@@ -1,8 +1,7 @@
 # Evidence Standard
 
-Written in S6. `PROJECT_SPEC.md` (Part VIII, sections 19, 20, 43) is the source of truth for _what_
-the evidence and consent features are; this file records the concrete formats and rules the
-implementation uses. Decisions are numbered in `DECISIONS.md` (D-047 to D-055).
+This file records the concrete formats and rules the evidence and consent features use (see
+`docs/ARCHITECTURE.md` for where they sit in the system). Decisions are numbered in `DECISIONS.md` (D-047 to D-055).
 
 ## What an evidence package is
 

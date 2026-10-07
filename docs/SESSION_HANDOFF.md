@@ -50,6 +50,15 @@ Image tag `979a199a293f`: `symbiosis-api-00006-zsh`, `symbiosis-web-00006-qrz`, 
 - Mappings cover scalar readings only; no array or batch mapping.
 - Accessibility: automated axe (WCAG 2.1 A/AA) plus keyboard checks on the sensor diagram; a full manual screen-reader pass was not performed.
 
+## Repository cleanup (after S10)
+
+- README rewritten (problem, solution, architecture, novelty, benefits, quick start) without phase labels; `docs/ARCHITECTURE.md` now holds the architecture, state machine, pipeline and security model.
+- The planning spec `PROJECT_SPEC.md` is no longer the architecture reference. It stays in Git history (commit `3ac75f2`); `CLAUDE.md` and the docs now point to `docs/ARCHITECTURE.md`.
+- Readable script aliases were added next to the existing ones (`smoke:ingestion`, `smoke:detection`, `smoke:workflow`, `smoke:verification`, `smoke:evidence`, `smoke:ui`, `smoke:explanations`, `smoke:simulation`, `smoke:cloud`, `smoke:cloud-simulation`, `check:simulation-boundaries`). The old names still work.
+- `.env.example` (placeholder names only; read by `tests/unit/ai-boundaries.test.ts`), `.dockerignore` and `.gcloudignore` are kept on purpose: they keep `.secrets/` and `node_modules` out of image and Cloud Build contexts.
+- Pending owner approval (deletions were blocked by the tooling): remove `PROJECT_SPEC.md`, `docs/HARDWARE.md`, `docs/DOMAIN_MODEL.md`, `docs/THREAT_MODEL.md`, `docs/submission/README.md` and the empty `.gitkeep` placeholders.
+- Environment note: `pnpm.exe` is blocked by a Windows Application Control policy on the dev machine; tools were run through node directly.
+
 ## Not started
 
 S11 (hardening). Not started on purpose.

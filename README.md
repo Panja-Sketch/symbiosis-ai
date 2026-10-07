@@ -1,259 +1,266 @@
 # Symbiosis AI
 
-A vendor-neutral, human-in-the-loop continuous risk **verification** platform for property
-insurers and insured businesses. See [PROJECT_SPEC.md](PROJECT_SPEC.md) for the locked
-architecture (single source of truth).
+**Sensor-verified risk improvement for property insurers and the businesses they insure.**
 
-## Status
+> AI explains. People act. Sensors verify. Evidence proves. The customer controls what the insurer sees.
 
-Phases **S0** (foundation), **S1** (domain core), **S2** (local ingestion), **S3** (detection +
-baselines), **S4** (operations workflow), **S5** (verification + recurrence + intervention
-prioritization) **S6** (evidence + consent), **S7** (persona UI) **S8** (grounded Gemini explanations) and **S9** (Google Cloud production adapters and deployment) are complete. A simulated device is authenticated, normalized and assessed; a
-deterministic rule detects persistent compound deterioration and opens a Risk Improvement Case; an
-alert goes out through a local notification port (ConsoleEmail); a person acknowledges, an approved
-action is assigned and reported, and the case waits as **VERIFICATION PENDING**. A reported action
-is **never** evidence that the risk improved: a deterministic verification over trusted
-post-action sensor readings (versioned policy in `config/verification-policy/`) concludes
-`VERIFIED`, `PARTIALLY_VERIFIED`, `NOT_IMPROVING` or `INCONCLUSIVE`, history is kept, and if the
-same hazard returns inside the recurrence-watch window the **same** case is `REOPENED`. A
-deterministic, versioned risk-engineer intervention recommendation (decision support only) is
-recalculated on material events. Every completed verification now produces an **immutable
-evidence package** (canonical JSON, SHA-256 manifest, frozen device facts, explicit
-synthetic-data label) that preserves its actual result; the insured controls what an insurer
-sees through scoped, revocable **sharing agreements**, raw telemetry is off by default, and
-every insurer read is authorization-checked and audited. The system deliberately stops there:
-S7 added the Next.js persona web app, S8 a strictly bounded explanation layer (AI explains, never decides), and S9 the cloud runtime: the same services on Firestore, Pub/Sub, Cloud Storage, Secret Manager and Firebase Auth, deployed to Cloud Run (see [docs/GCP_RUNTIME.md](docs/GCP_RUNTIME.md)). **S10 is the Enterprise Facility Simulation & Integration Demonstration; the physical hardware prototype was removed from active scope by product decision (see [docs/HARDWARE.md](docs/HARDWARE.md)).** Progress is tracked in
-[docs/IMPLEMENTATION_STATE.md](docs/IMPLEMENTATION_STATE.md).
+Symbiosis is a vendor-neutral, human-in-the-loop platform that turns physical risk signals and human
+mitigation actions into **auditable, sensor-verified evidence of risk improvement**, which the insured
+organization can choose to share with its insurer.
 
-## Layout
+## Contents
 
-`apps/` (web, api, worker, simulator) · `packages/` (logical modules) · `adapters/` ·
-`config/` (versioned policies) · `firmware-contracts/` (edge signing vectors) · `infrastructure/` ·
-`tests/` · `docs/`. See spec §44.
+- [The problem](#the-problem)
+- [The solution](#the-solution)
+- [How it works](#how-it-works)
+- [Architecture](#architecture)
+- [What makes it different](#what-makes-it-different)
+- [Benefits](#benefits)
+- [Key capabilities](#key-capabilities)
+- [Try it locally](#try-it-locally)
+- [Testing](#testing)
+- [Deployment](#deployment)
+- [Repository layout](#repository-layout)
+- [Trust, security and limits](#trust-security-and-limits)
+- [Documentation](#documentation)
 
-## Commands
+## The problem
 
-Requires Node >= 20 and pnpm 12.
+Sensors can already detect leaks, freezing, overheating and failing equipment, and send an alert. The
+weak link is what happens **after** a risk is identified:
+
+- Who owns the recommendation?
+- Was the action actually completed?
+- Did the action reduce the physical risk, or only get ticked off?
+- Did the improvement last, or did the hazard return?
+- What trustworthy evidence can be shared with the insurer, without handing over a firehose of raw data?
+
+Today, the answers live in emails, spreadsheets and self-reported checklists. A "completed" ticket is
+not proof the risk went down, insurers cannot tell reported work from effective work, and businesses
+have no safe way to show real improvement without exposing operational data.
+
+## The solution
+
+Symbiosis closes the loop. The central object is not an alert but a persistent **Risk Improvement
+Case** that follows one hazard from detection to proven improvement, and back if it returns:
+
+```
+detect -> alert -> acknowledge -> assign -> act -> verify with sensors -> evidence -> consent -> monitor -> reopen if it returns
+```
+
+- **Detect** persistent, compound deterioration with a deterministic, versioned rule.
+- **Assign** accountable humans and approved actions. Escalate when nobody responds.
+- **Verify** the physical outcome from trusted post-action sensor readings, never from a self-report.
+- **Prove** it with an immutable, hashed evidence package, whatever the result.
+- **Share** only what the customer consents to, revocably and with a full audit trail.
+- **Watch** for recurrence and reopen the _same_ case when the hazard returns.
+
+## How it works
+
+The reference scenario is a cold-storage facility whose cooling plant is degrading.
+
+1. **Telemetry arrives** (vibration, current, zone temperature, equipment state, outdoor weather) as
+   signed requests, mapped by a versioned adapter into a canonical observation.
+2. **Quality and trust checks** rate each reading. Stale, out-of-range or unauthenticated data is
+   excluded or down-weighted, never silently trusted.
+3. **Detection** finds a persistent compound condition, for example vibration and current above their
+   learned baselines while the zone warms. One abnormal signal alone is only a watch condition.
+4. **A case opens and the facility manager is alerted.** They acknowledge, assign and report an
+   approved action. The case then shows **VERIFICATION PENDING**. A reported action is never shown as
+   an improvement.
+5. **Deterministic verification** runs after the post-action window and concludes
+   `VERIFIED_IMPROVED`, `PARTIALLY_VERIFIED`, `NOT_IMPROVING` or `INCONCLUSIVE`, with confidence and
+   reason codes. If the fix did not work, a follow-up goes out.
+6. **An evidence package** is built and hashed. The facility can grant its insurer scoped, revocable
+   access to the parts it chooses.
+7. **Monitoring continues.** If the same hazard returns inside the watch window, the same case reopens.
+
+## Architecture
+
+```mermaid
+flowchart LR
+    subgraph Sources
+      SIM[Facility simulation]
+      GW[BMS / IoT gateway / sensors]
+    end
+    subgraph Cloud Run
+      API[api<br/>edge ingestion, REST,<br/>insurer evidence API]
+      WRK[worker - private<br/>detection, lifecycle,<br/>verification, evidence]
+      WEB[web<br/>Next.js workspaces]
+    end
+    BUS[(Pub/Sub)]
+    FS[(Firestore)]
+    GCS[(Cloud Storage<br/>evidence)]
+    AI[Vertex AI Gemini<br/>explanations only]
+
+    SIM -->|signed| API
+    GW -->|signed| API
+    API --> BUS --> WRK
+    API & WRK --> FS
+    WRK --> GCS
+    API --> AI
+    WEB --> API
+```
+
+Principles that shape the design:
+
+| Principle                                  | What it means in the code                                                          |
+| ------------------------------------------ | ---------------------------------------------------------------------------------- |
+| AI advises, code decides, people act       | No LLM in detection, verification, lifecycle, consent or intervention selection    |
+| Reported is not verified                   | Only trusted sensor data can produce a verified state                              |
+| Vendor-neutral                             | Risk logic uses canonical signals; vendors integrate through declarative adapters  |
+| Consent first                              | Raw telemetry stays with the insured; insurers see consented, audited evidence     |
+| Versioned policy                           | Every threshold lives in `config/`; every result records the policy version        |
+| Honest provenance                          | Simulation data, live weather, deterministic results and AI text are labelled apart |
+
+Read the full design, the case state machine, the event pipeline and the security model in
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
+## What makes it different
+
+Alerting is not new. Symbiosis is built around the part that usually has no owner:
+
+- **Verification of effect, not just of activity.** A deterministic policy compares trusted
+  post-action readings with the case's own baseline. Missing, stale or low-quality data can only ever
+  produce `INCONCLUSIVE`, never a false pass.
+- **A case, not an alert.** One durable record carries the hazard, the people, the actions, the
+  verification, the evidence and any recurrence, and it can be **reopened** when a verified fix decays.
+- **Consent-controlled evidence.** Insurers receive evidence packages, not dashboards. The customer
+  grants and revokes scopes; every read is audited; raw telemetry is separately opt-in.
+- **Bounded AI.** Gemini only restates facts the system already established. Each answer is validated
+  against those facts and discarded for a deterministic template if any check fails. It cannot decide,
+  create evidence or change state.
+- **Integrate anything.** Building systems and gateways connect through versioned, declarative source
+  mappings (no scripting) into one canonical observation contract. No proprietary sensor is required.
+- **Provable behaviour.** Architectural tests, 15 mutation checks and a real-time cloud smoke test
+  guard the boundaries that matter, for example that the simulator can never touch cases or evidence.
+
+## Benefits
+
+| For                     | Benefit                                                                                              |
+| ----------------------- | ---------------------------------------------------------------------------------------------------- |
+| Facility managers       | Clear next action, an accountable owner, and proof their work reduced the risk                      |
+| Insured organizations   | Show real improvement to insurers while keeping control of their operational data                    |
+| Risk engineers          | See which recommendations are open, reported only, or independently verified, and which regressed  |
+| Underwriters            | Concise, consented, risk-quality evidence instead of a sensor dashboard                              |
+| Security and compliance | Tenant isolation, signed devices, immutable evidence, audit trail, documented AI limits              |
+
+## Key capabilities
+
+- **Facility workspace**: case list and detail ("what happened, why it matters, what to do, who owns it,
+  what was done, did it work, is it staying fixed"), evidence, sharing and a timeline.
+- **Insurer workspace**: consented outcomes, recurrence, recommendations and evidence metadata only;
+  "Not shared with you" for any scope the customer did not grant.
+- **Facility Simulation** (`/operations/simulation`): a synthetic cold-storage plant with a sensor
+  diagram, scenarios (normal, emerging deterioration, compound risk, ineffective mitigation,
+  successful mitigation, sensor failure, recurrence), manual controls, live or simulated weather, the
+  rule's own conclusion, the case and its notifications, verification charts, evidence, an
+  **Integration Lab** (source payload to mapping to canonical observation) and an editable, versioned
+  **demo policy**.
+- **Decision support**: a deterministic risk-engineer recommendation (Remote Monitoring, Remote Review,
+  Risk Engineer Review, Site Visit Recommended) that schedules nobody and changes no underwriting.
+- **Trust Center** page explaining how conclusions are reached and what is not claimed.
+
+## Try it locally
+
+Requires Node 20 or newer and pnpm 12.
 
 ```
 pnpm install
-pnpm lint
-pnpm typecheck
-pnpm test
-pnpm format:check
+pnpm dev
 ```
 
-## Running locally (S2-S7)
+`pnpm dev` starts the API and worker (one process, in-memory event bus) on `http://127.0.0.1:8787`, a
+signed telemetry simulator, and the web app on `http://127.0.0.1:3000`. Open the web app, pick a demo
+identity (a development identity, not real authentication), and explore the facility and insurer
+workspaces. Choose what the simulator sends with `SIMULATOR_SCENARIO` (for example
+`SIMULATOR_SCENARIO=compound-outdoor-heat pnpm dev`). Baseline learning needs a short warm-up in real
+time; the smoke tests below use a simulated clock instead.
+
+## Testing
 
 ```
-pnpm dev          # api + worker (one process, in-memory bus), the simulator and the web app (:3000)
-pnpm smoke:s2     # self-checking ingestion run over real HTTP, exits non-zero on failure
-pnpm smoke:s3     # baseline -> isolated anomalies -> compound deterioration -> one case
-pnpm smoke:s4     # detected -> alert -> acknowledge -> assign -> report -> VERIFICATION PENDING
-pnpm smoke:s5     # ... -> trusted post-action data -> VERIFIED -> hazard returns -> same case REOPENED
-pnpm smoke:s6     # ... VERIFIED -> evidence package + hashes -> SHAREABLE -> consent -> insurer read -> revoke
-pnpm smoke:s7     # builds the web app, then drives both personas in a real browser (incl. phone width)
-pnpm test:e2e     # builds the web app, then the Playwright browser tests (S7 to S10)
-pnpm smoke:s8     # grounded explanations: Gemini adapter over a scripted endpoint, consent, fallback
+pnpm lint && pnpm typecheck && pnpm format:check
+pnpm test                 # unit, integration and Firestore-emulator contract tests (needs Java)
+pnpm test:e2e             # builds the web app, then Playwright browser tests incl. accessibility (axe)
+pnpm check:simulation-boundaries   # mutation checks of the simulation boundaries (needs a clean tree)
 ```
 
-`pnpm dev` listens on `http://127.0.0.1:8787` (override with `EDGE_PORT`) and prints each
-telemetry event as the simulator signed packets flow through. The **web app** also starts, on
-`http://127.0.0.1:3000` (`WEB_PORT`); api and worker share a process only because the local
-event bus is in-memory. Everything uses a public, obviously synthetic dev device (`DEV-SIM-001`);
-no real credentials exist in the repo.
+End-to-end smoke runs over real HTTP, each self-checking:
 
-Edge endpoints: `POST /edge/v1/telemetry` and `POST /edge/v1/heartbeat`, signed per
-PROJECT_SPEC section 32. A known-answer signing vector for firmware is in
-`firmware-contracts/sample-packets/signing-vector.json`.
+| Command             | What it proves                                                                 |
+| ------------------- | ------------------------------------------------------------------------------ |
+| `pnpm smoke:ingestion`     | Signed ingestion, replay protection, normalization                             |
+| `pnpm smoke:detection`     | Baselines, isolated anomalies, compound deterioration opens one case           |
+| `pnpm smoke:workflow`     | Alert, acknowledge, assign, report, verification pending                       |
+| `pnpm smoke:verification`     | Trusted post-action data verifies; a returning hazard reopens the same case    |
+| `pnpm smoke:evidence`     | Evidence package and hashes, consent, insurer read, revocation                 |
+| `pnpm smoke:ui`     | Both personas driven in a real browser, including phone width                  |
+| `pnpm smoke:explanations`     | Grounded explanations, consent, fallback                                       |
+| `pnpm smoke:simulation` | Full closed loop through the facility simulation                               |
 
-## Facility Simulation and integrations (S10)
+Opt-in checks against a real cloud project (they write synthetic records to its simulation facility):
+`pnpm smoke:cloud` and `pnpm smoke:cloud-simulation` (real time, live weather). Both require
+`--confirm-project <id>` and an environment flag, and never print credentials.
 
-Symbiosis does not require Symbiosis sensors, and **the physical hardware prototype is REMOVED FROM
-ACTIVE SCOPE BY PRODUCT DECISION** (D-085; Git history keeps it, last at `c55ecec`; the old gates H0 to
-H8 were never run and are not claimed). A building-automation system, IoT gateway, equipment API or
-sensor platform integrates through a **versioned, declarative source adapter** into the canonical
-observation contract and the signed edge boundary (`/edge/v1/*`). No real vendor integration exists yet;
-the **Facility Simulation** (`/operations/simulation`, operations and admin roles only) drives a synthetic
-cold-storage facility through the real pipeline with clearly labelled synthetic vendor profiles
-([docs/ADAPTERS.md](docs/ADAPTERS.md)).
+## Deployment
 
-```
-simulated physical state -> vendor payload -> signed edge request -> versioned adapter -> canonical
-observation -> validation / quality -> deterministic rule -> case -> alert email -> human action ->
-post-action telemetry -> deterministic verification -> follow-up or VERIFIED -> evidence -> consent ->
-recurrence
-```
-
-The simulation produces source data only: it has no code path to cases, verification, evidence or
-recurrence (an architectural test and mutation checks enforce it). The workspace shows: a facility
-diagram with every sensor, scenarios (normal, emerging deterioration, compound risk, ineffective and
-successful mitigation, sensor failure, recurrence) and manual controls, live or simulated weather
-(`LIVE WEATHER`, `SIMULATED WEATHER`, `WEATHER UNAVAILABLE`, never faked), the rule's own conclusion and
-persistence, the case and its notifications (a reported action and a verified improvement are different
-facts), verification criteria and charts, evidence and customer-controlled sharing, a timeline of real
-records, the Integration Lab (source payload -> mapping -> canonical -> ingested, with provenance) and
-the **DEMO / SIMULATION POLICY** (versioned, bounded, labelled; production policy files are untouched).
-Provenance is always visible: **Simulation data**, **Live weather**, **Deterministic system result**,
-**AI-generated explanation** are four different things. Time is real time (a shortened demo policy, not a
-faster clock: D-087).
+Three Cloud Run services (`web`, `api`, private `worker`) with dedicated least-privilege service
+accounts, on Firestore, Pub/Sub, Cloud Storage, Secret Manager, Firebase Authentication, Vertex AI and
+Cloud Scheduler. Cloud sign-in uses Firebase Email/Password; the API verifies each ID token and derives
+organization, facilities and roles from stored records, never from the request. Resource map, IAM
+matrix, Firestore structure, deployment and rollback are in [docs/GCP_RUNTIME.md](docs/GCP_RUNTIME.md).
 
 ```
-pnpm smoke:s10                 # local closed-loop smoke over real HTTP (simulated clock)
-pnpm test:e2e                  # Playwright, including the S10 browser tests and axe
-node scripts/mutation-s10.mjs  # 14 mutation checks (needs a clean tree)
-GCP_PROJECT_ID=<id> pnpm seed:sim --confirm-project <id> [--contact USR-FACILITY-MGR-001=<address>]
-SMOKE_S10_CLOUD=1 GCP_PROJECT_ID=<id> pnpm smoke:s10:cloud --confirm-project <id>   # OPT-IN, real time
-pnpm provision:device --confirm-project <id> --device-id DEV-SITE-GATEWAY-001 --asset AST-SIM-FAN-A --signals vibration_rms,current
+pnpm seed:gcp --confirm-project <id>      # idempotent synthetic demo organizations and users (operator only)
+pnpm seed:sim --confirm-project <id>      # simulation facility devices and keys (operator only)
+pnpm provision:device --confirm-project <id> --device-id <id> --asset <id> --signals <list>
 ```
 
-`pnpm provision:device` and `pnpm seed:sim` are operator-only (your own Google credentials); device keys
-live in Secret Manager and are never printed. Email uses the console provider until SMTP credentials
-are added directly to Secret Manager (docs/GCP_RUNTIME.md): **real email smoke: PENDING EXTERNAL DEMO
-CREDENTIALS**. Known limitations: [docs/SESSION_HANDOFF.md](docs/SESSION_HANDOFF.md).
+Demo-user passwords are written only to a git-ignored local file. Email notifications use a console
+provider until SMTP credentials are added to Secret Manager.
 
-## Secrets
-
-Never commit secrets. `.env.example` lists placeholder names only; production secrets will use
-Google Secret Manager.
-
-## Working with Claude
-
-Read [CLAUDE.md](CLAUDE.md) and [docs/SESSION_HANDOFF.md](docs/SESSION_HANDOFF.md) first.
-
-Choose what the simulator sends with `SIMULATOR_SCENARIO` (`normal`, `isolated-vibration`,
-`isolated-current`, `context-only`, `compound-outdoor-heat`, `compound-rising-temperature`), e.g.
-`SIMULATOR_SCENARIO=compound-outdoor-heat pnpm dev`. With real time the baseline needs its 2
-minute warm-up before detection can conclude anything; `pnpm smoke:s3` and the tests use a
-simulated clock instead of waiting. Baseline and rule thresholds live in `config/rules/`
-(`baselines.v1.json`, `cooling-electrical.v1.json`, `data-quality.v1.json`).
-
-### Operations workflow (S4)
-
-With `pnpm dev` running, open `http://127.0.0.1:8787/ui/cases?actor=USR-FACILITY-MGR-001` (a
-minimal, read-only workflow-proof page; the real UI is S7). The JSON API is under `/api/v1`:
-`GET /cases`, `GET /cases/:id`, `POST /cases/:id/acknowledge`, `POST /cases/:id/assignments`,
-`POST /cases/:id/actions`, `POST /cases/:id/actions/:actionId/acknowledge`,
-`POST /cases/:id/dismiss`, and `POST /ops/tick` (escalation + alert retries; ORG_ADMIN).
-
-**Development identity only:** callers are identified by the `X-Demo-Actor-Id` header (or
-`?actor=` on pages) against a synthetic in-memory directory (`USR-FACILITY-MGR-001`,
-`USR-OPERATOR-001`, `USR-ORG-ADMIN-001`, `USR-AUDITOR-001`, and one actor in another organization).
-It is not authentication. Alerts are printed by ConsoleEmail; nothing is emailed. Escalation
-deadlines, retry settings and recipient roles are in `config/escalation/`, and the approved,
-recommend-only actions are in `config/action-library/`. `OPS_TICK_INTERVAL_MS` sets the dev
-scheduler stand-in (default 10 s).
-
-### Verification, recurrence and intervention recommendations (S5)
-
-Verification is driven by the scheduler seam: `runtime.tick()` (in `pnpm dev` every
-`OPS_TICK_INTERVAL_MS`; also `POST /api/v1/ops/tick`, ORG_ADMIN) starts a verification for each
-case whose action was reported, then completes every verification whose post-action window has
-ended. Nothing is concluded before the window ends, and tests use simulated time. The policy
-(window, minimum observations, required signals, missingness, sustained duration, hysteresis,
-recurrence-watch window) is `config/verification-policy/cooling-electrical.v1.json`; the
-intervention policy is `config/intervention-policy/risk-engineer-prioritization.v1.json`.
-`SIMULATOR_SCENARIO` also accepts `partial-improvement` and `backup-running`.
-
-Added API (same development identity): `GET /api/v1/verifications/:id`,
-`GET /api/v1/interventions`, `GET /api/v1/interventions/:id`,
-`POST /api/v1/interventions/:id/acknowledge`. The case page now shows "Did it work?" (pending or the
-result with criteria, before/after values, completeness, confidence and evidence-reference count),
-"Is it staying fixed?" (recurrence watch and count) and the deterministic intervention
-recommendation (Remote Monitoring, Remote Review, Risk Engineer Review, Site Visit Recommended). A
-recommendation is decision support only: it schedules nobody and changes no underwriting, premium
-or coverage.
-
-### Evidence and consent (S6)
-
-A completed verification (any result) is turned into an immutable evidence package by the
-worker (`evidence.package_created`, case `latestEvidencePackageId`, then `evidence.shareable`);
-the case is then `SHAREABLE`, **never** `SHARED` merely because a package exists. The format,
-canonical serialization, hashes and snapshot rules are in
-[docs/EVIDENCE_STANDARD.md](docs/EVIDENCE_STANDARD.md). Try it with `pnpm dev`:
-
-- Insured side (development identity `USR-FACILITY-MGR-001`; `USR-ORG-ADMIN-001` may also grant raw
-  telemetry): `GET /api/v1/evidence/:id`, `POST /api/v1/sharing-agreements`
-  (`{recipientOrganizationId, facilityIds, scopes, effectiveFrom?, expiresAt?}`),
-  `POST /api/v1/sharing-agreements/:id/revoke`, plus `GET /api/v1/sharing-agreements[/:id]`. The
-  case page `/ui/cases/:id?actor=USR-FACILITY-MGR-001` shows the latest package (id, result,
-  policy, time, hashes with a live hash check, synthetic label), the sharing state, and grant and
-  revoke forms.
-- Insurer side (`USR-RISK-ENGINEER-001`, `USR-UNDERWRITER-001`; recipient organization
-  `ORG-INS-001`): `GET /insurance/v1/sites`, `/sites/:id/cases`, `/cases/:id`,
-  `/cases/:id/evidence` (add `?include=raw_telemetry` only with an explicit `RAW_TELEMETRY` scope),
-  `/recommendations`, `/interventions`; page `/ui/insurer/cases?actor=USR-RISK-ENGINEER-001`.
-  Every result is consent-filtered and audited; there is no sensor dashboard.
-
-Scopes: `RECOMMENDATION`, `EVENT_SUMMARY`, `ACTION_SUMMARY`, `BEFORE_AFTER_METRICS`,
-`VERIFICATION_RESULT`, `VERIFICATION_CONFIDENCE`, `RECURRENCE_STATUS`, `EVIDENCE_ARTIFACTS`,
-`INTERVENTION_RECOMMENDATION`, and the separate, off-by-default `RAW_TELEMETRY`. A revoked,
-expired or not-yet-effective agreement, another recipient, another facility or a missing scope
-is denied on the very next read. Everything is synthetic and local (in-memory stores and object
-store); no cloud service is used.
-
-### Persona web app (S7)
-
-`apps/web` is a Next.js 16 app (App Router, React 19, plain CSS; decisions D-056 to D-063). Open
-`http://127.0.0.1:3000` after `pnpm dev` and pick a **demo identity** (a development identity, not
-authentication; the shell labels it). It never reads a repository: server components and Server
-Actions call `/api/v1` (facility) and `/insurance/v1` (insurer) over HTTP, and the browser never
-talks to the API. `SYMBIOSIS_API_URL` (default `http://127.0.0.1:8787`) points it at the API.
-
-| Route                                                                         | Persona  | Purpose                                                                                                                                                         |
-| ----------------------------------------------------------------------------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `/`                                                                           | both     | The product claim, the DETECT to MONITOR flow, one door per persona                                                                                             |
-| `/operations`                                                                 | facility | Summary cards, filterable case list                                                                                                                             |
-| `/operations/cases/[id]`                                                      | facility | Case detail: what happened, why it matters, what to do, accountability, what was done, did it work?, is it staying fixed?, evidence, sharing, timeline          |
-| `/operations/evidence`                                                        | facility | Evidence packages and who can see them                                                                                                                          |
-| `/risk-evidence`, `/risk-evidence/sites[/id]`, `/cases/[id]`, `/interventions` | insurer  | Consented evidence only: outcomes, recurrence, recommendations, package metadata                                                                                |
-| `/trust`                                                                      | both     | How conclusions are reached, what a package proves, what is not claimed                                                                                         |
-
-A reported action and a verified improvement are always shown as different facts. The insurer
-screens say "Not shared with you" for any scope the customer did not grant, and revoking sharing
-removes access on the insurer's next request. The earlier `/ui/*` pages in `apps/api` are
-superseded; they remain as a fallback and debugging surface. Browser tests use the real backend on
-a simulated clock through `scripts/s7-backend.ts`; the identity switcher lists
-`GET /api/v1/dev/identities` (local only). The layout is responsive (tables become cards on
-phones) and was checked with axe-core (WCAG 2.1 A/AA).
-
-### Grounded explanations (S8)
-
-Case detail (facility) and the shared case (insurer) show a **Plain-language summary** below the
-deterministic facts. The explanation comes from the `ExplanationProvider` port in
-`packages/ai-explanation`: a deterministic **template** (default, offline, always the fallback) or the
-**Gemini** adapter (Vertex AI REST). Gemini only restates facts the deterministic system already
-established; every answer is validated against those facts (schema, ids, numbers, result and level
-fidelity, approved actions, prohibited claims) and one failed check discards it in favour of the
-template. The page labels what it is: "AI-generated explanation based on verified system data" only for a
-validated Gemini answer, otherwise "Template summary ... No AI model was used". Insurer explanations use
-the consent-filtered projection only and are denied the moment sharing is revoked.
+## Repository layout
 
 ```
-GET /api/v1/cases/:id/explanation          # facility (same authorization as the case)
-GET /insurance/v1/cases/:id/explanation    # insurer (consent gateway, audited)
-SYMBIOSIS_AI_PROVIDER=gemini GCP_PROJECT_ID=... VERTEX_ACCESS_TOKEN=... pnpm dev   # opt in; template otherwise
+apps/            web (Next.js), api, worker, simulator
+packages/        domain modules: contracts, detection, verification, evidence, consent, ...
+adapters/        GCP, weather, email and simulator implementations of the ports
+config/          versioned policies: rules, verification, escalation, actions, source adapters
+infrastructure/  Cloud Build, deploy and IAM scripts, Firestore rules
+tests/           unit, integration, contract, security and browser tests
+scripts/         dev launcher, smoke runs, seeding, provisioning, mutation checks
+docs/            architecture, decisions, adapters, evidence standard, AI governance, runbook
 ```
 
-The model, region and limits are in `config/explanation/explanation.v1.json` (default model
-`gemini-2.5-flash`, override with `GEMINI_MODEL`). See [docs/AI_GOVERNANCE.md](docs/AI_GOVERNANCE.md).
+## Trust, security and limits
 
-### Google Cloud runtime (S9)
+- Devices sign every request (HMAC-SHA256 over method, path, timestamp, nonce, sequence and body hash);
+  replays are rejected. Keys live in Secret Manager.
+- Tenants are isolated by scoped ids and server-side identity mapping. Firestore client access is
+  denied; only the services read and write.
+- Evidence packages are immutable, hashed and written once.
+- Every insurer read is consent-checked and audited.
+- Secrets are never committed. `.env.example` lists placeholder **names** only.
 
-The same services run in two adapter families selected by `SYMBIOSIS_RUNTIME`: `local` (in-memory,
-demo identity header; unit tests, `pnpm dev`, the S2-S8 smokes) and `gcp` (Firestore, Pub/Sub,
-Cloud Storage, Secret Manager, Firebase Authentication, Vertex AI through the service identity).
-`gcp` refuses to start on missing configuration and never falls back to memory. Deployed as three
-Cloud Run services (public `web` and `api`, **private** `worker`) with dedicated least-privilege
-service accounts. Resource map, IAM matrix, Firestore structure, transaction boundaries, delivery
-and dead-letter behavior, deployment and rollback: [docs/GCP_RUNTIME.md](docs/GCP_RUNTIME.md).
+What Symbiosis deliberately does **not** do: claim an alert prevented a loss, change premiums,
+underwrite or adjudicate, command building equipment, call a self-report "verified", expose raw
+telemetry to insurers by default, or let an LLM decide whether a risk was fixed.
 
-```
-pnpm test                      # includes Firestore contract tests on the emulator (needs Java; see runbook)
-pnpm seed:gcp --confirm-project <id>      # explicit, idempotent synthetic demo seeding (operator only)
-SMOKE_S9=1 GCP_PROJECT_ID=<id> pnpm smoke:s9 --confirm-project <id>   # OPT-IN: touches the real project
-```
+Current limits: no real vendor integration yet (the shipped source profiles are clearly labelled
+synthetic); the simulation runs in real time with a shortened demo policy; real email delivery awaits
+SMTP credentials; one worker instance. Details are in [docs/SESSION_HANDOFF.md](docs/SESSION_HANDOFF.md).
 
-Cloud sign-in uses Firebase Email/Password; the API verifies each ID token and derives organization,
-facilities and roles from stored records, never from the request. Demo-user passwords are written only to
-the git-ignored `.secrets/demo-users.json`.
+## Documentation
+
+| Document                                           | Contents                                                |
+| -------------------------------------------------- | ------------------------------------------------------- |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)       | Design, state machine, pipeline, security model         |
+| [docs/ADAPTERS.md](docs/ADAPTERS.md)               | Vendor-neutral source adapters and integration path     |
+| [docs/EVIDENCE_STANDARD.md](docs/EVIDENCE_STANDARD.md) | Evidence package format, hashing, consent scopes    |
+| [docs/AI_GOVERNANCE.md](docs/AI_GOVERNANCE.md)     | What the AI may and may not do, and how it is checked   |
+| [docs/GCP_RUNTIME.md](docs/GCP_RUNTIME.md)         | Cloud resources, IAM, deployment, rollback, operations  |
+| [docs/DECISIONS.md](docs/DECISIONS.md)             | Decision log                                            |
+
+Everything in this repository is synthetic and for demonstration. No real customer, device or vendor
+data is included.
