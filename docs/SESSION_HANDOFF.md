@@ -56,8 +56,7 @@ Image tag `979a199a293f`: `symbiosis-api-00006-zsh`, `symbiosis-web-00006-qrz`, 
 - The planning spec `PROJECT_SPEC.md` is no longer the architecture reference. It stays in Git history (commit `3ac75f2`); `CLAUDE.md` and the docs now point to `docs/ARCHITECTURE.md`.
 - Readable script aliases were added next to the existing ones (`smoke:ingestion`, `smoke:detection`, `smoke:workflow`, `smoke:verification`, `smoke:evidence`, `smoke:ui`, `smoke:explanations`, `smoke:simulation`, `smoke:cloud`, `smoke:cloud-simulation`, `check:simulation-boundaries`). The old names still work.
 - `.env.example` (placeholder names only; read by `tests/unit/ai-boundaries.test.ts`), `.dockerignore` and `.gcloudignore` are kept on purpose: they keep `.secrets/` and `node_modules` out of image and Cloud Build contexts.
-- Pending owner approval (deletions were blocked by the tooling): remove `PROJECT_SPEC.md`, `docs/HARDWARE.md`, `docs/DOMAIN_MODEL.md`, `docs/THREAT_MODEL.md`, `docs/submission/README.md` and the empty `.gitkeep` placeholders.
-- Environment note: `pnpm.exe` is blocked by a Windows Application Control policy on the dev machine; tools were run through node directly.
+- Removed from the tree (still in Git history at `3ac75f2`): `PROJECT_SPEC.md`, `docs/HARDWARE.md`, `docs/DOMAIN_MODEL.md`, `docs/THREAT_MODEL.md`, `docs/submission/README.md` and the empty `.gitkeep` placeholders. Older entries in `docs/DECISIONS.md` still name them as history.
 
 ## Not started
 
